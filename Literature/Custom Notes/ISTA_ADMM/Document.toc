@@ -1,0 +1,40 @@
+\contentsline {section}{\numberline {1}Motivation: Inverse Problems, Sparsity, and BEADS}{2}{}%
+\contentsline {section}{\numberline {2}Preliminaries: Vectors, Norms, Convexity, and Prox}{3}{}%
+\contentsline {subsection}{\numberline {2.1}Basic linear algebra and norms}{3}{}%
+\contentsline {paragraph}{Inner products and norms.}{3}{}%
+\contentsline {subsection}{\numberline {2.2}Convex sets and convex functions}{4}{}%
+\contentsline {subsection}{\numberline {2.3}Subgradients and nonsmooth functions}{4}{}%
+\contentsline {subsection}{\numberline {2.4}Proximal operators}{4}{}%
+\contentsline {paragraph}{Soft-thresholding as a prox.}{5}{}%
+\contentsline {section}{\numberline {3}Composite Optimization Formulation}{5}{}%
+\contentsline {paragraph}{Example: LASSO.}{5}{}%
+\contentsline {paragraph}{Example: Analysis-sparse denoising.}{6}{}%
+\contentsline {section}{\numberline {4}Gradient Descent as a Starting Point}{6}{}%
+\contentsline {section}{\numberline {5}ISTA: Iterative Shrinkage-Thresholding Algorithm}{6}{}%
+\contentsline {subsection}{\numberline {5.1}Derivation from proximal gradient}{6}{}%
+\contentsline {subsection}{\numberline {5.2}ISTA for LASSO and soft-thresholding}{7}{}%
+\contentsline {subsection}{\numberline {5.3}Convergence rate of ISTA}{7}{}%
+\contentsline {subsection}{\numberline {5.4}Numerical example: 2D LASSO with ISTA}{7}{}%
+\contentsline {section}{\numberline {6}FISTA: Fast Iterative Shrinkage-Thresholding}{8}{}%
+\contentsline {subsection}{\numberline {6.1}Nesterov-type acceleration}{8}{}%
+\contentsline {subsection}{\numberline {6.2}Convergence rate}{9}{}%
+\contentsline {subsection}{\numberline {6.3}FISTA for LASSO}{9}{}%
+\contentsline {paragraph}{Practical notes.}{9}{}%
+\contentsline {section}{\numberline {7}ADMM: Alternating Direction Method of Multipliers}{9}{}%
+\contentsline {subsection}{\numberline {7.1}Augmented Lagrangian}{10}{}%
+\contentsline {subsection}{\numberline {7.2}ADMM iterations}{10}{}%
+\contentsline {subsection}{\numberline {7.3}ADMM for analysis-sparse problems}{10}{}%
+\contentsline {paragraph}{$z$-update.}{11}{}%
+\contentsline {paragraph}{$x$-update.}{11}{}%
+\contentsline {subsection}{\numberline {7.4}ADMM and BEADS-like models}{11}{}%
+\contentsline {section}{\numberline {8}Optimality Conditions and Proximal Perspective}{12}{}%
+\contentsline {subsection}{\numberline {8.1}First-order optimality for composite problems}{12}{}%
+\contentsline {subsection}{\numberline {8.2}Proximal operator as resolvent of subgradient}{12}{}%
+\contentsline {section}{\numberline {9}Choosing Between ISTA, FISTA, and ADMM}{12}{}%
+\contentsline {subsection}{\numberline {9.1}ISTA vs FISTA}{12}{}%
+\contentsline {subsection}{\numberline {9.2}ADMM vs proximal gradient}{13}{}%
+\contentsline {section}{\numberline {10}Implementation Notes in Signal Processing Contexts}{13}{}%
+\contentsline {subsection}{\numberline {10.1}Step sizes and Lipschitz constants}{13}{}%
+\contentsline {subsection}{\numberline {10.2}Stopping criteria}{13}{}%
+\contentsline {subsection}{\numberline {10.3}Matrix-free implementations}{14}{}%
+\contentsline {section}{\numberline {11}Summary}{14}{}%

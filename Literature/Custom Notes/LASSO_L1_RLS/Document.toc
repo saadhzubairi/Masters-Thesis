@@ -1,0 +1,39 @@
+\contentsline {section}{\numberline {1}Overview}{3}{}%
+\contentsline {section}{\numberline {2}Notation and quick reminders}{3}{}%
+\contentsline {section}{\numberline {3}From least squares to the LASSO}{5}{}%
+\contentsline {subsection}{\numberline {3.1}Linear inverse problem and least squares}{5}{}%
+\contentsline {subsection}{\numberline {3.2}Sparsity and the $\ell _0$ formulation}{5}{}%
+\contentsline {subsection}{\numberline {3.3}Relaxation: from $\ell _0$ to $\ell _1$}{5}{}%
+\contentsline {paragraph}{Penalized (LASSO / BPD) form.}{5}{}%
+\contentsline {paragraph}{Constrained (classic LASSO) form.}{6}{}%
+\contentsline {subsection}{\numberline {3.4}Geometric intuition: $\ell _1$ vs.\ $\ell _2$}{6}{}%
+\contentsline {section}{\numberline {4}Optimality conditions for LASSO}{6}{}%
+\contentsline {subsection}{\numberline {4.1}Convexity and existence of a minimizer}{6}{}%
+\contentsline {subsection}{\numberline {4.2}Subgradient optimality conditions}{7}{}%
+\contentsline {section}{\numberline {5}Soft--thresholding examples}{7}{}%
+\contentsline {subsection}{\numberline {5.1}Scalar LASSO: closed form solution}{7}{}%
+\contentsline {subsection}{\numberline {5.2}Orthogonal design: componentwise soft--thresholding}{8}{}%
+\contentsline {section}{\numberline {6}LASSO as basis pursuit denoising and sparse signal models}{8}{}%
+\contentsline {subsection}{\numberline {6.1}Basis pursuit and BPD}{8}{}%
+\contentsline {subsection}{\numberline {6.2}Sparse representation model}{9}{}%
+\contentsline {section}{\numberline {7}Example: LASSO for denoising}{9}{}%
+\contentsline {subsection}{\numberline {7.1}Choice of $\lambda $ and bias--variance tradeoff}{9}{}%
+\contentsline {subsection}{\numberline {7.2}Special case: Parseval frame}{10}{}%
+\contentsline {section}{\numberline {8}Example: LASSO for sparse deconvolution}{10}{}%
+\contentsline {subsection}{\numberline {8.1}Comparison with $\ell _2$--regularized deconvolution}{10}{}%
+\contentsline {section}{\numberline {9}Iterative algorithms for LASSO}{10}{}%
+\contentsline {subsection}{\numberline {9.1}Proximal gradient / ISTA}{10}{}%
+\contentsline {subsection}{\numberline {9.2}FISTA: accelerated proximal gradient}{11}{}%
+\contentsline {subsection}{\numberline {9.3}Splitting and SALSA--type methods}{11}{}%
+\contentsline {section}{\numberline {10}Conditions for sparse recovery}{12}{}%
+\contentsline {subsection}{\numberline {10.1}Noiseless exact recovery}{12}{}%
+\contentsline {paragraph}{Mutual coherence condition.}{12}{}%
+\contentsline {paragraph}{Restricted isometry property (RIP).}{12}{}%
+\contentsline {subsection}{\numberline {10.2}Noisy case and LASSO}{12}{}%
+\contentsline {section}{\numberline {11}LASSO in the context of Selesnick--style problems}{12}{}%
+\contentsline {subsection}{\numberline {11.1}Sparse Fourier coefficients}{13}{}%
+\contentsline {subsection}{\numberline {11.2}Denoising in the Fourier domain}{13}{}%
+\contentsline {subsection}{\numberline {11.3}Deconvolution with sparse spikes}{13}{}%
+\contentsline {subsection}{\numberline {11.4}Missing data / inpainting}{13}{}%
+\contentsline {subsection}{\numberline {11.5}Morphological component separation}{13}{}%
+\contentsline {section}{\numberline {12}Summary}{14}{}%

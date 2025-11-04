@@ -1,0 +1,929 @@
+\documentclass[11pt]{article}
+
+\usepackage[margin=1in]{geometry}
+\usepackage{amsmath,amssymb,amsthm,mathtools}
+\usepackage{bm}
+\usepackage{bbm}
+\usepackage{enumitem}
+
+\title{From Gradient Descent to ISTA, FISTA, and ADMM \\
+for Sparse Signal Processing and Baseline Estimation}
+\author{}
+\date{}
+
+\newtheorem{definition}{Definition}
+
+\newcommand{\R}{\mathbb{R}}
+\newcommand{\N}{\mathbb{N}}
+\newcommand{\ip}[2]{\left\langle #1, #2 \right\rangle}
+\newcommand{\norm}[1]{\left\lVert #1 \right\rVert}
+\newcommand{\prox}{\operatorname{prox}}
+\newcommand{\sgn}{\operatorname{sgn}}
+\newcommand{\argmin}{\operatorname*{arg\,min}}
+\newcommand{\1}{\mathbbm{1}}
+
+\begin{document}
+\maketitle
+
+\tableofcontents
+
+\section{Motivation: Inverse Problems, Sparsity, and BEADS}
+
+In many signal processing problems we observe a signal
+\[
+y \in \R^n
+\]
+that is a noisy, distorted version of some underlying structure we care
+about: spikes, edges, a slowly-varying baseline, etc. A generic linear
+model is
+\begin{equation}
+y = Hx + \varepsilon,
+\end{equation}
+where
+\begin{itemize}[leftmargin=2em]
+    \item $x \in \R^p$ is the unknown signal/parameter vector,
+    \item $H \in \R^{n \times p}$ is a known linear operator (e.g.\ convolution, sampling, mixing),
+    \item $\varepsilon$ is noise (often modeled as Gaussian).
+\end{itemize}
+
+\noindent
+\textbf{Reminder (Linear operator / matrix).} A matrix $H$ represents a linear
+map $x \mapsto Hx$, i.e.\ $H(\alpha x + \beta z) = \alpha Hx + \beta Hz$ for
+all $x,z$ and scalars $\alpha,\beta$.
+
+In BEADS--type problems (baseline estimation and denoising with sparsity),
+one often models
+\[
+y = b + s + w,
+\]
+where
+\begin{itemize}[leftmargin=2em]
+    \item $b$ is a smooth or slowly-varying \emph{baseline},
+    \item $s$ is a \emph{sparse} component (e.g.\ spikes or events),
+    \item $w$ is noise.
+\end{itemize}
+
+\noindent
+\textbf{Reminder (Sparse vector).} A vector $x \in \R^p$ is called \emph{sparse}
+if most of its entries are exactly zero, i.e.\ only few coordinates are nonzero.
+
+A typical optimization model is then
+\begin{equation}
+\min_{b,s} 
+\underbrace{\frac{1}{2}\norm{y - b - s}_2^2}_{\text{data fit}}
++ \lambda_s \norm{W s}_1
++ \lambda_b \norm{D b}_1
++ \iota_{\mathcal{C}}(b,s),
+\label{eq:generic-beads}
+\end{equation}
+where $W,D$ are linear operators that promote sparsity in appropriate
+domains (e.g.\ finite differences for piecewise-smoothness).
+
+\noindent
+\textbf{Reminder ($\ell_2$--norm).} For $x\in\R^n$, the Euclidean norm is
+$\norm{x}_2 = \sqrt{\sum_{i=1}^n x_i^2}$.
+
+\noindent
+\textbf{Reminder ($\ell_1$--norm).} For $x\in\R^n$, the $\ell_1$ norm is
+$\norm{x}_1 = \sum_{i=1}^n |x_i|$, often used to promote sparsity.
+
+\noindent
+\textbf{Reminder (Indicator function).} For a set $\mathcal{C}$,
+$\iota_{\mathcal{C}}(x) = 0$ if $x\in\mathcal{C}$ and $+\infty$ otherwise; this
+encodes hard constraints $x\in\mathcal{C}$ inside an optimization problem.
+
+Problems such as \eqref{eq:generic-beads} are convex but \emph{nonsmooth}
+because of the $\ell_1$ terms and indicator constraints. First-order methods
+like ISTA, FISTA, and ADMM are the workhorses for solving them efficiently in 
+high dimensions.
+
+The goal of this note is to build up, from undergraduate-level gradient descent,
+the mathematical machinery needed to understand:
+\begin{itemize}[leftmargin=2em]
+    \item ISTA (Iterative Shrinkage-Thresholding Algorithm),
+    \item FISTA (Fast ISTA, Nesterov-accelerated),
+    \item ADMM (Alternating Direction Method of Multipliers),
+\end{itemize}
+in the context of sparse signal processing and baseline estimation.
+
+\section{Preliminaries: Vectors, Norms, Convexity, and Prox}
+
+\subsection{Basic linear algebra and norms}
+
+We work in finite-dimensional real vector spaces $\R^n$.
+
+\noindent
+\textbf{Reminder (Vector space).} $\R^n$ with componentwise addition and scalar
+multiplication is a vector space; linear combinations $\alpha x + \beta y$ stay
+inside $\R^n$.
+
+\paragraph{Inner products and norms.}
+For $x,y \in \R^n$, the standard inner product is
+\[
+\ip{x}{y} = \sum_{i=1}^n x_i y_i.
+\]
+
+\noindent
+\textbf{Reminder (Inner product).} An inner product is a bilinear, symmetric,
+positive-definite map $\ip{\cdot}{\cdot}$ that generalizes the dot product and
+induces a notion of angle and length.
+
+From the inner product we get the Euclidean norm
+\[
+\norm{x}_2 = \sqrt{\ip{x}{x}}.
+\]
+
+More generally, for $p \ge 1$,
+\[
+\norm{x}_p = \Big( \sum_{i=1}^n |x_i|^p \Big)^{1/p}
+\]
+defines the $\ell_p$ norm.
+
+\noindent
+\textbf{Reminder (Norm).} A norm $\norm{\cdot}$ satisfies:
+$\norm{x} \ge 0$, $\norm{x}=0 \Leftrightarrow x=0$,
+$\norm{\alpha x}=|\alpha|\norm{x}$, and triangle inequality
+$\norm{x+y}\le\norm{x}+\norm{y}$.
+
+For matrices $A \in \R^{m\times n}$ we use the \emph{operator norm}
+induced by $\ell_2$:
+\[
+\norm{A}_2 = \max_{x \ne 0} \frac{\norm{Ax}_2}{\norm{x}_2}.
+\]
+
+\noindent
+\textbf{Reminder (Spectral norm).} The spectral norm $\norm{A}_2$ is the largest
+singular value of $A$, i.e.\ the square root of the largest eigenvalue of $A^\top A$.
+
+\subsection{Convex sets and convex functions}
+
+\begin{definition}[Convex set]
+A set $C \subset \R^n$ is convex if for all $x,y\in C$ and all
+$\theta \in [0,1]$, we have
+\[
+\theta x + (1-\theta) y \in C.
+\]
+\end{definition}
+
+\noindent
+\textbf{Reminder.} Convex sets contain the line segments between any two of
+their points.
+
+\begin{definition}[Convex function]
+A function $f:\R^n \to \R\cup\{+\infty\}$ is convex if for all
+$x,y\in \operatorname{dom} f$ and $\theta\in[0,1]$,
+\[
+f(\theta x + (1-\theta) y) \le \theta f(x) + (1-\theta) f(y).
+\]
+\end{definition}
+
+\noindent
+\textbf{Reminder.} Convex functions have no ``bad'' local minima; any local
+minimum is global.
+
+\begin{definition}[Lipschitz continuous gradient]
+Let $g:\R^n\to\R$ be differentiable. Its gradient $\nabla g$ is $L$--Lipschitz
+if there exists $L>0$ such that
+\[
+\norm{\nabla g(x) - \nabla g(y)}_2 \le L \norm{x - y}_2
+\quad \forall x,y.
+\]
+\end{definition}
+
+\noindent
+\textbf{Reminder.} Lipschitz continuity of $\nabla g$ means the gradient does
+not change too fast; $L$ controls the curvature of $g$.
+
+One important consequence (used in ISTA/FISTA) is the \emph{quadratic upper
+bound}:
+\[
+g(x) \le g(y) + \ip{\nabla g(y)}{x-y} + \frac{L}{2}\norm{x-y}_2^2
+\quad \forall x,y.
+\]
+
+\subsection{Subgradients and nonsmooth functions}
+
+For nonsmooth convex functions we use \emph{subgradients}.
+
+\begin{definition}[Subgradient]
+Let $h:\R^n\to\R\cup\{+\infty\}$ be convex. A vector $s\in\R^n$ is a subgradient
+of $h$ at $x$ if
+\[
+h(z) \ge h(x) + \ip{s}{z-x} \quad \forall z.
+\]
+The set of all subgradients at $x$ is the \emph{subdifferential} $\partial h(x)$.
+\end{definition}
+
+\noindent
+\textbf{Reminder.} Subgradients generalize gradients to nonsmooth convex
+functions; at differentiable points, $\partial h(x)=\{\nabla h(x)\}$.
+
+Example: for $h(x) = \norm{x}_1$, the $i$th component of any subgradient $s$ at
+$x$ satisfies
+\[
+s_i \in
+\begin{cases}
+\{+1\}, & x_i > 0,\\
+[-1,+1], & x_i = 0,\\
+\{-1\}, & x_i < 0.
+\end{cases}
+\]
+
+\subsection{Proximal operators}
+
+Central objects for ISTA/FISTA/ADMM are \emph{proximal operators}.
+
+\begin{definition}[Proximal operator]
+Let $h:\R^n \to \R\cup\{+\infty\}$ be convex, proper, and lower semicontinuous.
+For $\gamma>0$, the proximal operator of $\gamma h$ is
+\[
+\prox_{\gamma h}(v) := 
+\argmin_{x\in\R^n} \left\{
+    h(x) + \frac{1}{2\gamma}\norm{x - v}_2^2
+\right\}.
+\]
+\end{definition}
+
+\noindent
+\textbf{Reminder.} The prox of $h$ at $v$ is a compromise between being close
+to $v$ and having small $h(x)$.
+
+\noindent
+\textbf{Reminder (arg\,min).} $\argmin_{x} \phi(x)$ denotes the set of points
+$x$ that minimize $\phi$; when $\phi$ is strictly convex, there is a unique minimizer.
+
+The proximal operator can be viewed as a generalized projection: if $h$ is the
+indicator $\iota_C$ of a closed convex set $C$, then
+\[
+\prox_{\gamma \iota_C}(v) = P_C(v),
+\]
+the Euclidean projection of $v$ onto $C$.
+
+\noindent
+\textbf{Reminder (Projection).} The projection $P_C(v)$ is the point in $C$
+closest to $v$ in Euclidean distance.
+
+\paragraph{Soft-thresholding as a prox.}
+For $h(x) = \lambda\norm{x}_1$, the prox has a closed form:
+\[
+\prox_{\gamma \lambda \norm{\cdot}_1}(v) = S_{\gamma\lambda}(v),
+\]
+where $S_\tau$ is the \emph{soft-thresholding (shrinkage) operator} defined
+componentwise by
+\[
+[S_\tau(v)]_i = \sgn(v_i)\,\max\{|v_i| - \tau,\,0\}.
+\]
+
+\noindent
+\textbf{Reminder (Sign function).} $\sgn(t) = 1$ if $t>0$, $\sgn(t)=-1$ if $t<0$,
+and any value in $[-1,1]$ if $t=0$ (choice at 0 does not matter in practice).
+
+Soft-thresholding is the key nonlinearity in ISTA/FISTA for $\ell_1$-regularized
+problems.
+
+\section{Composite Optimization Formulation}
+
+ISTA and FISTA solve problems of the form
+\begin{equation}
+\min_{x\in\R^p} F(x) := g(x) + h(x),
+\label{eq:composite}
+\end{equation}
+with the following structure:
+\begin{itemize}[leftmargin=2em]
+    \item $g:\R^p\to\R$ is convex, differentiable, and has an $L$--Lipschitz gradient;
+    \item $h:\R^p\to\R\cup\{+\infty\}$ is convex, possibly nonsmooth, and
+    $\prox_{\gamma h}$ is easy to compute.
+\end{itemize}
+
+\noindent
+\textbf{Reminder (Composite problem).} A composite problem splits the objective
+into a smooth part $g$ and a nonsmooth but prox-friendly part $h$.
+
+\paragraph{Example: LASSO.}
+Given $A\in\R^{n\times p}$, $y\in\R^n$, and $\lambda>0$,
+\begin{equation}
+\min_{x\in\R^p} \frac{1}{2}\norm{Ax-y}_2^2 + \lambda \norm{x}_1.
+\label{eq:lasso}
+\end{equation}
+Here:
+\[
+g(x) = \frac{1}{2}\norm{Ax-y}_2^2, \qquad
+h(x) = \lambda\norm{x}_1.
+\]
+We have
+\[
+\nabla g(x) = A^\top (Ax-y),
+\]
+and $\nabla g$ is Lipschitz with constant $L = \norm{A^\top A}_2$.
+
+\noindent
+\textbf{Reminder (Adjoint / transpose).} For real matrices, $A^\top$ is the
+transpose; it is the adjoint with respect to the standard inner product:
+$\ip{Ax}{y} = \ip{x}{A^\top y}$.
+
+\paragraph{Example: Analysis-sparse denoising.}
+Take a 1D signal $x \in \R^n$, observed as $y=x+w$. Let $D\in\R^{(n-1)\times n}$
+be the first-difference operator
+\[
+(Dx)_i = x_{i+1} - x_i.
+\]
+Then the problem
+\[
+\min_x \frac{1}{2}\norm{x-y}_2^2 + \lambda\norm{Dx}_1
+\]
+is total variation-type denoising in analysis form.
+
+In BEADS-style models, $x$ may be a concatenation of components $b,s$, and $D$
+may be higher-order differences, but the composite form is similar.
+
+\section{Gradient Descent as a Starting Point}
+
+Before ISTA, recall vanilla gradient descent for smooth $g$:
+\[
+\min_{x} g(x).
+\]
+The iteration is
+\begin{equation}
+x^{k+1} = x^k - \alpha \nabla g(x^k),
+\label{eq:gd}
+\end{equation}
+where $\alpha>0$ is a step size (learning rate).
+
+\noindent
+\textbf{Reminder (Gradient).} For differentiable $g:\R^n\to\R$, the gradient
+$\nabla g(x)$ is the vector of partial derivatives and points in the direction
+of steepest increase of $g$.
+
+If $\nabla g$ is $L$--Lipschitz and $0<\alpha<2/L$, gradient descent converges
+to a minimizer of $g$.
+
+The problem: gradient descent cannot handle nonsmooth terms like $\lambda\norm{x}_1$
+or constraints encoded in $\iota_{\mathcal{C}}$ directly. We need a way to
+combine gradient steps with nondifferentiable regularizers. This is exactly what
+proximal gradient methods (ISTA/FISTA) do.
+
+\section{ISTA: Iterative Shrinkage-Thresholding Algorithm}
+
+\subsection{Derivation from proximal gradient}
+
+Given \eqref{eq:composite}, we want to exploit the Lipschitz property of
+$\nabla g$:
+\begin{equation}
+g(x) \le g(y) + \ip{\nabla g(y)}{x-y} + \frac{L}{2}\norm{x-y}_2^2.
+\label{eq:g-upper}
+\end{equation}
+
+Fix a point $x^k$. Define a local quadratic upper bound around $x^k$:
+\[
+Q_L(x;x^k) := g(x^k) + \ip{\nabla g(x^k)}{x - x^k} + \frac{L}{2}\norm{x-x^k}_2^2.
+\]
+
+\noindent
+\textbf{Reminder (Majorization).} A function $Q(x)$ \emph{majorizes} $g(x)$ if
+$Q(x)\ge g(x)$ for all $x$, with equality at some point; minimizing $Q$ then
+gives a descent direction for $g$.
+
+We consider the surrogate
+\[
+x^{k+1} 
+= \argmin_x \left\{
+    Q_L(x;x^k) + h(x)
+\right\}.
+\]
+Dropping constants independent of $x$ and rescaling, this is equivalent to
+\begin{align*}
+x^{k+1}
+&= \argmin_x \left\{
+    \ip{\nabla g(x^k)}{x - x^k} + \frac{L}{2}\norm{x-x^k}_2^2 + h(x)
+\right\} \\
+&= \argmin_x \left\{
+    \frac{L}{2}\norm{x - \big(x^k - \tfrac{1}{L}\nabla g(x^k)\big)}_2^2 + h(x)
+\right\}.
+\end{align*}
+Therefore
+\begin{equation}
+x^{k+1}
+= \prox_{\frac{1}{L} h}\Big( x^k - \frac{1}{L} \nabla g(x^k) \Big).
+\label{eq:ista-step}
+\end{equation}
+
+\noindent
+\textbf{Reminder (Proximal gradient step).} A proximal gradient step first
+takes a gradient step on $g$, then applies the prox of $h$.
+
+More generally, for any $\alpha\in(0,1/L]$:
+\begin{equation}
+x^{k+1} = \prox_{\alpha h} \big( x^k - \alpha \nabla g(x^k) \big).
+\label{eq:ista-general}
+\end{equation}
+This is the Iterative Shrinkage-Thresholding Algorithm (ISTA).
+
+\subsection{ISTA for LASSO and soft-thresholding}
+
+Consider LASSO \eqref{eq:lasso}. Then
+\[
+x^{k+1} = \prox_{\alpha \lambda\norm{\cdot}_1}
+\big( x^k - \alpha A^\top(Ax^k - y) \big)
+= S_{\alpha\lambda}\big( x^k - \alpha A^\top(Ax^k - y) \big).
+\]
+
+\noindent
+\textbf{Reminder (Shrinkage operator).} The shrinkage operator $S_{\tau}$ pulls
+each coordinate towards zero by $\tau$ and sets it to zero if the magnitude is
+smaller than $\tau$.
+
+Thus ISTA is:
+\begin{equation}
+\boxed{
+x^{k+1} = S_{\alpha\lambda}\big( x^k - \alpha A^\top(Ax^k - y) \big),
+\qquad 0 < \alpha \le \frac{1}{L}.
+}
+\end{equation}
+
+\subsection{Convergence rate of ISTA}
+
+Under standard assumptions (convex $g,h$, $g$ with $L$--Lipschitz gradient),
+ISTA satisfies
+\[
+F(x^k) - F(x^\star) \le \frac{C}{k}
+\]
+for some constant $C$ depending on $x^0$ and $x^\star$, where $x^\star$ is a
+minimizer of $F$.
+
+\noindent
+\textbf{Reminder (Sublinear rate).} A convergence rate $O(1/k)$ is called
+sublinear; roughly, the error shrinks inversely with the iteration count.
+
+FISTA will improve this to $O(1/k^2)$.
+
+\subsection{Numerical example: 2D LASSO with ISTA}
+
+Consider $A\in\R^{2\times 2}$ and $y\in\R^2$:
+\[
+A = \begin{bmatrix} 2 & 0 \\ 0 & 1 \end{bmatrix}, \quad
+y = \begin{bmatrix} 3 \\ 1 \end{bmatrix}, \quad
+\lambda = 0.5.
+\]
+We solve
+\[
+\min_{x\in\R^2} \frac{1}{2}\norm{Ax - y}_2^2 + \lambda\norm{x}_1.
+\]
+Compute $A^\top A = \operatorname{diag}(4,1)$, so
+\[
+L = \norm{A^\top A}_2 = 4.
+\]
+Choose $\alpha = 1/L = 0.25$.
+
+\noindent
+\textbf{Iteration 0.} Initialize $x^0 = (0,0)^\top$.
+
+\[
+\nabla g(x^0) = A^\top (Ax^0 - y) = A^\top (0 - y)
+= -A^\top y = -\begin{bmatrix} 2&0\\0&1\end{bmatrix}\begin{bmatrix}3\\1\end{bmatrix}
+= -\begin{bmatrix}6\\1\end{bmatrix}.
+\]
+Gradient step:
+\[
+u^0 = x^0 - \alpha \nabla g(x^0)
+= 0 - 0.25 (-6,-1)^\top
+= (1.5, 0.25)^\top.
+\]
+Shrinkage with $\tau=\alpha\lambda = 0.25\cdot 0.5 = 0.125$:
+\[
+x^1 = S_{0.125}(u^0)
+= \begin{bmatrix}
+\sgn(1.5)\max(1.5-0.125,0) \\
+\sgn(0.25)\max(0.25-0.125,0)
+\end{bmatrix}
+= \begin{bmatrix}
+1.375 \\ 0.125
+\end{bmatrix}.
+\]
+
+\noindent
+\textbf{Iteration 1.}
+Compute
+\[
+Ax^1 = \begin{bmatrix}2&0\\0&1\end{bmatrix}\begin{bmatrix}1.375\\0.125\end{bmatrix}
+= \begin{bmatrix}2.75 \\ 0.125\end{bmatrix},\quad
+Ax^1 - y = \begin{bmatrix}-0.25 \\ -0.875\end{bmatrix}.
+\]
+Then
+\[
+\nabla g(x^1) = A^\top(Ax^1 - y)
+= \begin{bmatrix}2&0\\0&1\end{bmatrix}\begin{bmatrix}-0.25\\-0.875\end{bmatrix}
+= \begin{bmatrix}-0.5\\-0.875\end{bmatrix}.
+\]
+Gradient step:
+\[
+u^1 = x^1 - \alpha\nabla g(x^1)
+= \begin{bmatrix}1.375\\0.125\end{bmatrix}
+- 0.25 \begin{bmatrix}-0.5\\-0.875\end{bmatrix}
+= \begin{bmatrix}1.375 + 0.125 \\ 0.125 + 0.21875 \end{bmatrix}
+= \begin{bmatrix}1.5 \\ 0.34375\end{bmatrix}.
+\]
+Shrinkage:
+\[
+x^2 = S_{0.125}(u^1)
+= \begin{bmatrix}
+\max(1.5-0.125,0)\\
+\max(0.34375-0.125,0)
+\end{bmatrix}
+= \begin{bmatrix}
+1.375 \\ 0.21875
+\end{bmatrix}.
+\]
+
+Continuing this way, $x^k$ converges to the LASSO solution. This small example
+illustrates the mechanics of ISTA: gradient step + shrinkage.
+
+\section{FISTA: Fast Iterative Shrinkage-Thresholding}
+
+ISTA has an $O(1/k)$ convergence rate for the objective value. Nesterov's
+acceleration can improve this to $O(1/k^2)$. FISTA is the accelerated version of
+ISTA.
+
+\subsection{Nesterov-type acceleration}
+
+FISTA maintains two sequences: $\{x^k\}$ (like ISTA) and an auxiliary sequence
+$\{y^k\}$ that extrapolates momentum from past iterates.
+
+\noindent
+\textbf{FISTA algorithm (for $F(x)=g(x)+h(x)$).}
+
+\begin{itemize}[leftmargin=2em]
+\item Choose $x^0 = x^{-1}$, set $t_0=1$.
+\item For $k=0,1,2,\dots$:
+\begin{align*}
+y^k &= x^k + \frac{t_k - 1}{t_k} (x^k - x^{k-1}), \\
+x^{k+1} &= \prox_{\alpha h}\big( y^k - \alpha \nabla g(y^k) \big), \\
+t_{k+1} &= \frac{1 + \sqrt{1 + 4 t_k^2}}{2}.
+\end{align*}
+\end{itemize}
+
+\noindent
+\textbf{Reminder (Momentum / extrapolation).} The term
+$x^k + \theta_k(x^k - x^{k-1})$ uses a linear combination of the last two
+iterates to ``predict'' the next search point and injects momentum into the
+iteration.
+
+The step size $\alpha$ is typically chosen as in ISTA, e.g.\ $\alpha = 1/L$.
+
+\subsection{Convergence rate}
+
+For convex $F=g+h$ with $g$ having $L$--Lipschitz gradient,
+FISTA satisfies
+\[
+F(x^k) - F(x^\star) \le \frac{2L\norm{x^0 - x^\star}_2^2}{(k+1)^2}.
+\]
+This is an order-of-magnitude improvement over ISTA: to get error less than
+$\varepsilon$, ISTA needs $O(1/\varepsilon)$ iterations while FISTA needs
+$O(1/\sqrt{\varepsilon})$.
+
+\noindent
+\textbf{Reminder (Big-O notation).} $f(k) = O(g(k))$ means there are constants
+$C,k_0$ such that $|f(k)| \le C|g(k)|$ for all $k\ge k_0$; it captures
+asymptotic growth.
+
+\subsection{FISTA for LASSO}
+
+Using the same LASSO setup, the FISTA update reads
+\[
+x^{k+1} = S_{\alpha\lambda}\big( y^k - \alpha A^\top(Ay^k - y) \big).
+\]
+Momentum is only applied on the smooth part (through $y^k$), not on the
+nonlinear shrinkage.
+
+\paragraph{Practical notes.}
+\begin{itemize}[leftmargin=2em]
+    \item FISTA can overshoot; a \emph{monotone} variant resets momentum if
+    $F(x^{k+1}) > F(x^k)$.
+    \item Restarts (setting $t_k=1$ and $y^k = x^k$) are often used when
+    the method oscillates.
+\end{itemize}
+
+\section{ADMM: Alternating Direction Method of Multipliers}
+
+ISTA/FISTA handle problems of the form $g(x)+h(x)$. ADMM is useful for more
+structured problems, especially when we can separate variables.
+
+\subsection{Augmented Lagrangian}
+
+Consider
+\begin{equation}
+\min_{x,z} f(x) + g(z)
+\quad\text{s.t.}\quad
+Ax + Bz = c
+\label{eq:admm-general}
+\end{equation}
+with matrices $A,B$ and vector $c$.
+
+\noindent
+\textbf{Reminder (Equality-constrained problem).} Constraints of the form
+$Ax+Bz=c$ enforce a linear relationship between $x$ and $z$.
+
+The augmented Lagrangian is
+\[
+\mathcal{L}_\rho(x,z,u)
+= f(x) + g(z) + u^\top(Ax+Bz-c)
++ \frac{\rho}{2}\norm{Ax+Bz-c}_2^2,
+\]
+where $u$ is the Lagrange multiplier and $\rho>0$ is a penalty parameter.
+
+\noindent
+\textbf{Reminder (Lagrange multiplier).} Lagrange multipliers $u$ enforce constraints
+by penalizing violations $Ax+Bz-c$ in the objective.
+
+Defining the scaled dual variable $w = u/\rho$, the \emph{scaled} augmented
+Lagrangian becomes
+\[
+\mathcal{L}_\rho(x,z,w)
+= f(x) + g(z) + \frac{\rho}{2}\norm{Ax+Bz-c + w}_2^2
+- \frac{\rho}{2}\norm{w}_2^2.
+\]
+
+\subsection{ADMM iterations}
+
+ADMM alternates minimization over $x$ and $z$ and then updates the dual:
+\begin{align}
+x^{k+1} 
+&= \argmin_x \left\{
+    f(x) + \frac{\rho}{2}\norm{Ax + B z^k - c + w^k}_2^2
+\right\}, \label{eq:admm-x}\\
+z^{k+1} 
+&= \argmin_z \left\{
+    g(z) + \frac{\rho}{2}\norm{Ax^{k+1} + B z - c + w^k}_2^2
+\right\}, \label{eq:admm-z}\\
+w^{k+1} 
+&= w^k + Ax^{k+1} + B z^{k+1} - c. \label{eq:admm-w}
+\end{align}
+
+\noindent
+\textbf{Reminder (Alternating minimization).} Alternating minimization optimizes
+over subsets of variables in turn, holding the others fixed.
+
+In many problems, the $x$- and $z$-updates have closed forms or reduce to
+simple linear systems and proximal steps.
+
+\subsection{ADMM for analysis-sparse problems}
+
+Consider the analysis-sparse problem
+\begin{equation}
+\min_x \frac{1}{2}\norm{Hx - y}_2^2 + \lambda\norm{Dx}_1,
+\label{eq:analysis}
+\end{equation}
+where $D$ is (for instance) a first- or second-order difference operator.
+
+Introduce $z = Dx$ and rewrite:
+\[
+\min_{x,z} \frac{1}{2}\norm{Hx - y}_2^2 + \lambda\norm{z}_1
+\quad\text{s.t.}\quad z = Dx.
+\]
+This fits \eqref{eq:admm-general} with
+\[
+f(x) = \frac{1}{2}\norm{Hx-y}_2^2,\quad
+g(z) = \lambda\norm{z}_1,\quad
+A = D,\quad B = -I,\quad c=0.
+\]
+
+The ADMM updates become
+\begin{align}
+x^{k+1}
+&= \argmin_x \Big\{
+    \frac{1}{2}\norm{Hx-y}_2^2 + \frac{\rho}{2}\norm{Dx - z^k + w^k}_2^2
+\Big\}, \label{eq:admm-x-analysis}\\
+z^{k+1}
+&= \argmin_z \Big\{
+    \lambda\norm{z}_1 + \frac{\rho}{2}\norm{Dx^{k+1} - z + w^k}_2^2
+\Big\}, \label{eq:admm-z-analysis}\\
+w^{k+1}
+&= w^k + Dx^{k+1} - z^{k+1}. \label{eq:admm-w-analysis}
+\end{align}
+
+\paragraph{$z$-update.}
+The $z$-update is proximal:
+\[
+z^{k+1}
+= \prox_{\frac{\lambda}{\rho}\norm{\cdot}_1}(Dx^{k+1} + w^k)
+= S_{\lambda/\rho}(Dx^{k+1} + w^k).
+\]
+
+\paragraph{$x$-update.}
+The $x$-update solves a quadratic problem and has the normal equations
+\[
+(H^\top H + \rho D^\top D) x^{k+1}
+= H^\top y + \rho D^\top (z^k - w^k).
+\]
+
+\noindent
+\textbf{Reminder (Normal equations).} For $\min_x \frac{1}{2}\norm{Ax-b}_2^2$,
+the optimality condition is $A^\top A x = A^\top b$, called the normal equations.
+
+For 1D signals and difference operators $D$, $D^\top D$ is (block) tridiagonal,
+so the system can be solved efficiently by banded solvers or even FFTs if $H$
+and $D$ are convolution operators under periodic boundary conditions.
+
+\subsection{ADMM and BEADS-like models}
+
+In BEADS-like decompositions, one often has two components, $b$ and $s$, with
+different regularizers:
+\[
+\min_{b,s}
+\frac{1}{2}\norm{y - b - s}_2^2
++ \lambda_s\norm{W s}_1
++ \lambda_b\norm{D b}_1
++ \iota_{\mathcal{C}}(b,s),
+\]
+where $\mathcal{C}$ may enforce constraints like $s\ge 0$ (nonnegative spikes)
+or shape constraints on $b$.
+
+Introduce auxiliary variables
+\[
+z_s = W s, \qquad z_b = D b,
+\]
+and constraints $z_s = W s$, $z_b = D b$, plus $(b,s) \in \mathcal{C}$. ADMM
+splits this into subproblems:
+\begin{itemize}[leftmargin=2em]
+    \item a quadratic problem for $(b,s)$ (similar to \eqref{eq:admm-x-analysis}),
+    \item two shrinkage steps for $z_s$ and $z_b$,
+    \item projection onto constraints $\mathcal{C}$ if needed.
+\end{itemize}
+
+This is the backbone of many practical BEADS implementations:
+\begin{itemize}[leftmargin=2em]
+    \item global structure enforced via $D b$ (smooth baseline),
+    \item local sparsity enforced via $W s$ (spikes),
+    \item efficient solving via ADMM.
+\end{itemize}
+
+\section{Optimality Conditions and Proximal Perspective}
+
+\subsection{First-order optimality for composite problems}
+
+For the composite problem $\min_x g(x)+h(x)$ with convex $g,h$, a point $x^\star$
+is optimal iff
+\[
+0 \in \nabla g(x^\star) + \partial h(x^\star),
+\]
+i.e.\ there exists $s^\star\in\partial h(x^\star)$ such that
+\[
+\nabla g(x^\star) + s^\star = 0.
+\]
+
+\noindent
+\textbf{Reminder (Inclusion $0\in A(x)$).} Writing $0\in A(x)$ for a set-valued
+map $A$ means there exists an element of $A(x)$ that equals $0$.
+
+This is the subgradient generalization of $\nabla F(x^\star)=0$.
+
+\subsection{Proximal operator as resolvent of subgradient}
+
+For convex $h$, the subdifferential $\partial h$ is a maximally monotone
+operator (in the finite-dimensional sense), and the proximal operator is
+its \emph{resolvent}:
+\[
+\prox_{\gamma h}(v) = (I + \gamma \partial h)^{-1}(v).
+\]
+
+\noindent
+\textbf{Reminder (Monotone operator).} A set-valued operator $A$ is monotone if
+$\ip{u-v}{x-y} \ge 0$ whenever $u\in A(x)$ and $v\in A(y)$; it encodes a generalized
+notion of nonnegative slope.
+
+\noindent
+\textbf{Reminder (Resolvent).} The resolvent of $A$ is
+$(I+\gamma A)^{-1}$; for subgradients, this coincides with the proximal operator.
+
+ISTA and FISTA can thus be viewed as forward-backward splitting methods for
+finding a zero of $\nabla g + \partial h$:
+\begin{itemize}[leftmargin=2em]
+    \item forward step: explicit Euler step for $\nabla g$,
+    \item backward step: implicit step for $\partial h$ via the prox.
+\end{itemize}
+
+ADMM can be viewed as a splitting scheme for the dual or as a Douglas--Rachford
+splitting on related monotone operators, but for most signal processing use it
+suffices to remember the practical iteration formulas.
+
+\section{Choosing Between ISTA, FISTA, and ADMM}
+
+\subsection{ISTA vs FISTA}
+
+\begin{itemize}[leftmargin=2em]
+    \item \textbf{ISTA:}
+    \begin{itemize}
+        \item Simple, stable, easy to implement.
+        \item Convergence: $O(1/k)$ in objective gap.
+        \item Good when high accuracy is not needed or when a warm start is available.
+    \end{itemize}
+    \item \textbf{FISTA:}
+    \begin{itemize}
+        \item Slightly more complex (keeps two sequences $x^k,y^k$ and scalar $t_k$).
+        \item Faster convergence: $O(1/k^2)$.
+        \item Can overshoot; monotone variants and restarts are common.
+    \end{itemize}
+\end{itemize}
+
+\subsection{ADMM vs proximal gradient}
+
+ADMM is preferable when:
+\begin{itemize}[leftmargin=2em]
+    \item The problem has multiple terms that are easy to handle separately,
+    e.g.\ multiple $\ell_1$ penalties on linear transforms $W_1 x, W_2 x$.
+    \item The smooth part does not have a cheap gradient but its quadratic
+    part leads to a structured linear system that can be solved efficiently
+    (e.g.\ via FFT or banded solvers).
+    \item We want explicit access to primal and dual residuals (good stopping
+    criteria in constrained problems).
+\end{itemize}
+
+ISTA/FISTA are preferable when:
+\begin{itemize}[leftmargin=2em]
+    \item There is a single simple nonsmooth term, e.g.\ $\lambda\norm{x}_1$
+    or $\lambda\norm{Dx}_1$ with a cheap prox.
+    \item The gradient of $g$ is cheap (e.g.\ convolution) and we can apply $A$
+    and $A^\top$ efficiently.
+\end{itemize}
+
+\section{Implementation Notes in Signal Processing Contexts}
+
+\subsection{Step sizes and Lipschitz constants}
+
+For $g(x) = \frac{1}{2}\norm{Ax - y}_2^2$, we have
+\[
+\nabla g(x) = A^\top(Ax-y),
+\]
+with Lipschitz constant $L = \norm{A^\top A}_2$.
+
+\noindent
+\textbf{Reminder (Spectral radius).} For a symmetric matrix $M$, the spectral
+radius is the largest absolute eigenvalue; for $M=A^\top A$ this equals
+$\norm{A}_2^2$.
+
+In practice:
+\begin{itemize}[leftmargin=2em]
+    \item If $A$ is convolution with impulse response $h$, then
+    $\norm{A}_2$ is the maximum magnitude of the discrete-time Fourier transform
+    of $h$, so $L$ is the maximum squared magnitude; this can be estimated by FFT.
+    \item A backtracking line search can be used instead of a fixed $L$ if $L$
+    is unknown or hard to estimate.
+\end{itemize}
+
+\subsection{Stopping criteria}
+
+Common criteria:
+\begin{itemize}[leftmargin=2em]
+    \item Relative change in iterate: 
+    $\frac{\norm{x^{k+1}-x^k}_2}{\max(1,\norm{x^k}_2)} < \varepsilon$.
+    \item Relative change in objective:
+    $\frac{|F(x^{k+1})-F(x^k)|}{\max(1,|F(x^k)|)} < \varepsilon$.
+    \item For ADMM: primal and dual residual norms below thresholds, e.g.\
+    $\norm{Ax^{k+1}+Bz^{k+1}-c}_2 < \varepsilon_\text{pri}$ and
+    $\norm{\rho A^\top B(z^{k+1}-z^k)}_2 < \varepsilon_\text{dual}$.
+\end{itemize}
+
+\subsection{Matrix-free implementations}
+
+In signal processing, $A$, $D$, $W$ are often convolution or difference
+operators. Instead of building explicit matrices, we implement \emph{matrix-free}
+operators:
+\begin{itemize}[leftmargin=2em]
+    \item Given $x$, compute $Ax$ via convolution or difference.
+    \item Given $u$, compute $A^\top u$ via correlation or adjoint difference.
+\end{itemize}
+
+\noindent
+\textbf{Reminder (Matrix-free operator).} A matrix-free operator is represented
+by code that applies $x\mapsto Ax$ rather than storing $A$ explicitly.
+
+ISTA/FISTA then only need these operator applications, and ADMM's linear systems
+may be solved in the Fourier domain if $H,D$ are circulant.
+
+\section{Summary}
+
+\begin{itemize}[leftmargin=2em]
+    \item Many BEADS-like and sparse signal processing problems can be written as
+    composite convex optimizations $g(x) + h(x)$ with a smooth data-fidelity term
+    and nonsmooth sparsity-promoting regularizers.
+    \item The key mathematical ingredients are convexity, subgradients, and
+    proximal operators; in particular, the prox of the $\ell_1$ norm is
+    soft-thresholding.
+    \item ISTA performs proximal gradient descent and converges at rate $O(1/k)$.
+    \item FISTA adds Nesterov momentum and achieves $O(1/k^2)$ convergence while
+    retaining simple shrinkage steps.
+    \item ADMM handles more complicated structures (multiple penalties, explicit
+    constraints) by splitting variables and alternating between quadratic solves
+    and prox steps.
+    \item In the context of BEADS and related baseline+spike decompositions,
+    these algorithms provide practical tools for enforcing sparsity, smoothness,
+    and constraints in large-scale 1D and multi-dimensional signal problems.
+\end{itemize}
+
+As you build BEADS-like models, you can mix and match:
+\begin{itemize}[leftmargin=2em]
+    \item analysis sparsity via $D b$ and $W s$,
+    \item ISTA/FISTA when the structure is simple,
+    \item ADMM when you want to separate baseline, spikes, and constraints cleanly.
+\end{itemize}
+
+\end{document}

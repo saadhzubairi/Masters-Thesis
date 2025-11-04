@@ -1,0 +1,647 @@
+\documentclass[11pt]{article}
+
+\usepackage{amsmath,amssymb,amsfonts}
+\usepackage[margin=1in]{geometry}
+
+\title{Total Variation Denoising:\\
+Optimization, Algorithms, and Examples}
+\author{}
+\date{}
+
+\begin{document}
+\maketitle
+
+\tableofcontents
+
+\section{Introduction}
+
+Total variation denoising (TVD) is a variational denoising method designed to remove noise while preserving sharp edges. 
+In its simplest 1-D form, TVD assumes noisy observations
+\[
+y_n = x_n + w_n,\quad n=0,\dots,N-1,
+\]
+where $x$ is approximately piecewise constant and $w$ is noise, often modeled as white Gaussian.
+
+The TVD estimate is obtained as the solution of the convex optimization problem
+\begin{equation}
+\label{eq:TVD_basic}
+\min_{x \in \mathbb{R}^N} 
+\left\{
+F(x) := \frac{1}{2}\|y - x\|_2^2 + \lambda \, \mathrm{TV}(x)
+\right\},
+\end{equation}
+where $\lambda>0$ is a regularization parameter and $\mathrm{TV}(x)$ is the (discrete) total variation.
+
+This document:
+\begin{itemize}
+  \item Reviews optimization tools: proximal gradient / ISTA, ADMM, and majorization--minimization (MM).
+  \item Defines total variation and formulates TV denoising.
+  \item Derives several algorithms for TVD, including a TVD-specific MM algorithm.
+  \item Discusses optimality conditions, dual viewpoint, and extensions.
+\end{itemize}
+
+\section{Basic notions and definitions}
+
+Here we collect one-line definitions for math terms beyond basic calculus that will be used frequently.
+
+\subsection{Linear algebra and norms}
+
+\begin{itemize}
+  \item \textbf{Vector space $\mathbb{R}^N$:} The set of $N$-dimensional real column vectors with standard addition and scalar multiplication.
+  \item \textbf{Inner product $\langle u,v\rangle$:} For $u,v\in\mathbb{R}^N$, $\langle u,v\rangle := \sum_{n=0}^{N-1} u_n v_n$ is the usual Euclidean inner product.
+  \item \textbf{Norm $\|x\|$:} A function measuring vector size that is nonnegative, homogeneous, and satisfies the triangle inequality.
+  \item \textbf{$\ell_2$ norm $\|x\|_2$:} $\|x\|_2 := \left(\sum_n x_n^2\right)^{1/2}$, the Euclidean norm.
+  \item \textbf{$\ell_1$ norm $\|x\|_1$:} $\|x\|_1 := \sum_n |x_n|$, the sum of absolute values; promotes sparsity.
+  \item \textbf{Matrix transpose $A^\top$:} For a matrix $A$, $A^\top$ is the matrix whose entries are $[A^\top]_{ij} = A_{ji}$.
+  \item \textbf{Positive definite matrix:} A symmetric matrix $Q$ such that $x^\top Q x>0$ for all nonzero $x$.
+  \item \textbf{Tridiagonal matrix:} A matrix whose nonzero entries lie only on the main diagonal and the first upper and lower diagonals.
+\end{itemize}
+
+\subsection{Convex analysis}
+
+\begin{itemize}
+  \item \textbf{Convex set:} A set $C$ such that $\theta x+(1-\theta)y\in C$ for all $x,y\in C$ and $\theta\in[0,1]$.
+  \item \textbf{Convex function:} A function $f$ is convex if $f(\theta x+(1-\theta)y)\le \theta f(x)+(1-\theta)f(y)$ for all $x,y$ and $\theta\in[0,1]$.
+  \item \textbf{Proper, lower semicontinuous (lsc) function:} A function $f$ that never takes value $-\infty$, is not identically $+\infty$, and has closed epigraph; standard assumptions in convex optimization.
+  \item \textbf{Subgradient:} For convex $f$, a vector $g$ is a subgradient of $f$ at $x$ if 
+  \[
+  f(z)\ge f(x)+\langle g,z-x\rangle \quad\forall z.
+  \]
+  \item \textbf{Subdifferential $\partial f(x)$:} The set of all subgradients of $f$ at $x$; $0\in\partial f(x)$ is the optimality condition for unconstrained minimization.
+  \item \textbf{Indicator function:} For a set $C$, $\iota_C(x)=0$ if $x\in C$ and $+\infty$ otherwise; used to encode constraints.
+  \item \textbf{Lipschitz continuous gradient:} $\nabla g$ is $L$-Lipschitz if $\|\nabla g(x)-\nabla g(y)\|_2\le L\|x-y\|_2$ for all $x,y$.
+\end{itemize}
+
+\subsection{Proximal and splitting notions}
+
+\begin{itemize}
+  \item \textbf{Proximal operator:} For proper lsc convex $f$, $\mathrm{prox}_{\tau f}(v) := \arg\min_x \left\{ f(x) + \frac{1}{2\tau}\|x-v\|_2^2\right\}$ is a generalized projection.
+  \item \textbf{Soft-thresholding (shrinkage):} The scalar map 
+  \[
+  S_\alpha(t) := \mathrm{sign}(t)\max(|t|-\alpha,0)
+  \]
+  is the proximal operator of $\alpha|\cdot|$.
+  \item \textbf{Argmin:} $\arg\min_x f(x)$ denotes the set (or element) of minimizers of $f$.
+  \item \textbf{Augmented Lagrangian:} A Lagrangian with an additional quadratic penalty term to stabilize constrained optimization.
+\end{itemize}
+
+\section{Proximal gradient and ISTA}
+
+\subsection{Composite optimization setup}
+
+Consider the composite convex optimization problem
+\begin{equation}
+\label{eq:composite}
+\min_{x\in\mathbb{R}^N} F(x) := g(x) + h(x),
+\end{equation}
+where:
+\begin{itemize}
+  \item $g:\mathbb{R}^N\to\mathbb{R}$ is convex and differentiable with $L$-Lipschitz continuous gradient.
+  \item $h:\mathbb{R}^N\to\mathbb{R}\cup\{+\infty\}$ is convex, possibly nonsmooth, but with an easily computable proximal operator.
+\end{itemize}
+
+\subsection{Proximal gradient (forward--backward) iteration}
+
+The proximal gradient method (a.k.a.\ forward--backward splitting) iterates:
+\begin{equation}
+\label{eq:prox_grad}
+x^{k+1} = \mathrm{prox}_{\alpha_k h}\Big( x^k - \alpha_k \nabla g(x^k)\Big),
+\end{equation}
+where $\alpha_k>0$ is a step size, typically $\alpha_k\in(0,2/L)$.
+
+Intuition:
+\begin{itemize}
+  \item The term $x^k - \alpha_k \nabla g(x^k)$ is a gradient descent step on the smooth part $g$.
+  \item The proximal operator $\mathrm{prox}_{\alpha_k h}$ performs a ``nonsmooth regularization'' step controlled by $h$.
+\end{itemize}
+
+\subsection{Iterative Shrinkage-Thresholding (ISTA)}
+
+For the classical $\ell_1$-regularized least-squares problem
+\[
+\min_x \frac12 \|Ax-b\|_2^2 + \lambda \|x\|_1,
+\]
+we have $g(x)=\frac12\|Ax-b\|_2^2$ and $h(x)=\lambda\|x\|_1$. 
+Then $\nabla g(x)=A^\top(Ax-b)$, and the proximal map of $\lambda\|\cdot\|_1$ is componentwise soft-thresholding:
+\[
+\mathrm{prox}_{\alpha \lambda \|\cdot\|_1}(v)_i = S_{\alpha\lambda}(v_i).
+\]
+
+ISTA is exactly the proximal gradient method \eqref{eq:prox_grad} for this choice:
+\begin{equation}
+\label{eq:ISTA}
+x^{k+1} = S_{\alpha_k \lambda}\big( x^k - \alpha_k A^\top(Ax^k-b)\big).
+\end{equation}
+
+\paragraph{Remark (convergence).}
+If $0<\alpha_k<2/\|A^\top A\|_2$, then ISTA converges to a minimizer of the objective (sublinear rate $O(1/k)$ in function value).
+
+\section{Alternating Direction Method of Multipliers (ADMM)}
+
+\subsection{General form}
+
+ADMM is a splitting method for constrained problems of the form
+\begin{equation}
+\label{eq:ADMM_form}
+\min_{x,z} f(x) + g(z) 
+\quad\text{s.t.}\quad
+Ax + Bz = c,
+\end{equation}
+where $f$ and $g$ are convex, and the linear constraint couples $x$ and $z$.
+
+\subsection{Augmented Lagrangian and scaled form}
+
+The augmented Lagrangian for \eqref{eq:ADMM_form} is
+\[
+\mathcal{L}_\rho(x,z,u)
+= f(x) + g(z) + u^\top(Ax+Bz-c) + \frac{\rho}{2}\|Ax+Bz-c\|_2^2,
+\]
+where $u$ is the dual variable and $\rho>0$ is the penalty parameter.
+
+ADMM updates (in the ``scaled'' form with $u$ replaced by a scaled dual variable) are
+\begin{align}
+x^{k+1} 
+&:= \arg\min_x 
+\left\{
+f(x) + \frac{\rho}{2}\|Ax+Bz^k-c+u^k\|_2^2
+\right\}, \\
+z^{k+1} 
+&:= \arg\min_z
+\left\{
+g(z) + \frac{\rho}{2}\|Ax^{k+1}+Bz-c+u^k\|_2^2
+\right\}, \\
+u^{k+1} 
+&:= u^k + Ax^{k+1} + Bz^{k+1} - c.
+\end{align}
+
+ADMM is attractive when the $x$- and $z$-subproblems are easier to solve than the original problem.
+
+\section{Majorization--Minimization (MM)}
+
+\subsection{Majorizer}
+
+Given an objective $F:\mathbb{R}^N\to\mathbb{R}$, a function $G_k:\mathbb{R}^N\to\mathbb{R}$ is a \emph{majorizer} of $F$ at $x^k$ if:
+\begin{align}
+G_k(x) &\ge F(x) \quad \forall x, \\
+G_k(x^k) &= F(x^k).
+\end{align}
+Intuitively, $G_k$ lies above $F$ everywhere and touches it at $x^k$.
+
+\subsection{MM iteration}
+
+With such a sequence of majorizers, MM iterates
+\begin{equation}
+x^{k+1} := \arg\min_x G_k(x).
+\end{equation}
+For convex $F$, under mild assumptions, $x^k$ converges to a minimizer of $F$. 
+Quadratic majorizers are especially convenient because they lead to linear systems.
+
+\subsection{Example: majorizing $|t|$}
+
+For scalar $f(t)=|t|$ and a current point $t^k\ne 0$, one quadratic majorizer is
+\begin{equation}
+g(t; t^k) = \frac{1}{2|t^k|} t^2 + \frac12 |t^k|.
+\end{equation}
+One checks easily that $g(t;t^k)\ge |t|$ for all $t$, with equality at $t=t^k$.
+
+This scalar majorization extends to vector $\ell_1$ norms and underpins the MM algorithm for TVD.
+
+\section{Discrete total variation and TV denoising}
+
+\subsection{Discrete gradient and TV}
+
+For a 1-D signal $x = (x_0,\dots,x_{N-1})^\top$, define the first-order difference operator $D\in\mathbb{R}^{(N-1)\times N}$ via
+\[
+(Dx)_n = x_{n+1} - x_n,\quad n=0,\dots,N-2.
+\]
+Concretely, $D$ has the form
+\[
+D =
+\begin{bmatrix}
+-1 & 1 & 0 & \dots & 0 \\
+0 & -1 & 1 & \dots & 0 \\
+\vdots & & \ddots & \ddots & \vdots \\
+0 & \dots & 0 & -1 & 1
+\end{bmatrix}.
+\]
+
+\textbf{Discrete total variation} (anisotropic 1-D) is
+\begin{equation}
+\mathrm{TV}(x) := \|Dx\|_1 = \sum_{n=0}^{N-2} |x_{n+1} - x_n|.
+\end{equation}
+It measures the sum of absolute jumps between consecutive samples.
+
+\paragraph{Remark (2-D TV).}
+For images, $x$ is 2-D and $D$ stacks horizontal and vertical finite differences, leading to 2-D anisotropic or isotropic TV, but we focus on 1-D for clarity.
+
+\subsection{TVD optimization problem}
+
+In vector form, the TVD problem is
+\begin{equation}
+\label{eq:TVD_vector}
+\min_{x\in\mathbb{R}^N}
+\left\{
+F(x) = \frac{1}{2}\|y - x\|_2^2 + \lambda \|Dx\|_1
+\right\}.
+\end{equation}
+Here:
+\begin{itemize}
+  \item The data fidelity term $\frac{1}{2}\|y-x\|_2^2$ comes from a Gaussian noise model.
+  \item The regularizer $\lambda\|Dx\|_1$ enforces sparsity of the discrete derivative, i.e., encourages piecewise constant $x$.
+  \item $\lambda>0$ tunes the tradeoff: larger $\lambda$ $\Rightarrow$ stronger smoothing (fewer jumps).
+\end{itemize}
+
+\subsection{TVD as a proximal operator}
+
+Define the functional $R(x) := \mathrm{TV}(x) = \|Dx\|_1$. 
+Then \eqref{eq:TVD_vector} can be written as
+\[
+x^\star = \arg\min_x \left\{ \frac{1}{2}\|x-y\|_2^2 + \lambda R(x)\right\}.
+\]
+Hence $x^\star$ is the \emph{proximal mapping} of $\lambda R$ at $y$:
+\begin{equation}
+\label{eq:TVD_prox}
+x^\star = \mathrm{prox}_{\lambda R}(y).
+\end{equation}
+This is conceptually useful: TVD is just a particular proximal operator. 
+However, unlike separable $\ell_1$-penalties, the prox of $R(x)=\|Dx\|_1$ is nontrivial, which motivates specialized algorithms.
+
+\section{MM algorithm for 1-D TVD}
+
+We now derive a TVD-specific MM algorithm that exploits the structure of $D$.
+
+\subsection{Quadratic majorizer for $\|Dx\|_1$}
+
+Set $v = Dx$ and $v^k = Dx^k$. Using the scalar majorizer of $|t|$ applied componentwise,
+\[
+|v_n| \le \frac{1}{2|v^k_n|} v_n^2 + \frac12 |v^k_n|,
+\]
+and summing over $n$ we obtain a quadratic majorizer of $\|v\|_1$:
+\[
+\|v\|_1 \le \frac12 v^\top \Lambda_k^{-1} v + \frac12 \|v^k\|_1,
+\]
+where
+\[
+\Lambda_k := \mathrm{diag}(|v^k|) = \mathrm{diag}(|Dx^k|).
+\]
+Substituting $v=Dx$ gives 
+\begin{equation}
+\label{eq:TV_majorizer}
+\|Dx\|_1 \le \frac12 x^\top D^\top \Lambda_k^{-1} D x + \frac12 \|Dx^k\|_1.
+\end{equation}
+
+\subsection{Majorizer for the full TVD objective}
+
+Add the data fidelity term to both sides of \eqref{eq:TV_majorizer}:
+\[
+\frac12\|y-x\|_2^2 + \lambda\|Dx\|_1
+\le
+\frac12\|y-x\|_2^2 
++ \lambda\left( \frac12 x^\top D^\top \Lambda_k^{-1} D x + \frac12 \|Dx^k\|_1\right).
+\]
+Define
+\begin{equation}
+G_k(x) := \frac12\|y-x\|_2^2 
++ \frac{\lambda}{2} x^\top D^\top \Lambda_k^{-1} D x 
++ \frac{\lambda}{2} \|Dx^k\|_1.
+\end{equation}
+Then $G_k$ is a majorizer of $F$ at $x^k$:
+\[
+G_k(x)\ge F(x)\ \forall x, \quad 
+G_k(x^k)=F(x^k).
+\]
+
+\subsection{MM update}
+
+The MM step is
+\begin{equation}
+x^{k+1} := \arg\min_x G_k(x).
+\end{equation}
+Ignoring the additive constant $\frac{\lambda}{2}\|Dx^k\|_1$, we minimize the strictly convex quadratic
+\[
+Q_k(x) := \frac12\|y-x\|_2^2 + \frac{\lambda}{2}x^\top D^\top \Lambda_k^{-1} D x.
+\]
+
+Setting the gradient to zero:
+\[
+0 = \nabla Q_k(x) 
+= (x-y) + \lambda D^\top \Lambda_k^{-1} D x,
+\]
+which yields the linear system
+\begin{equation}
+\label{eq:MM_linear_system}
+\left(I + \lambda D^\top \Lambda_k^{-1}D\right) x = y.
+\end{equation}
+Assuming invertibility (which holds because the matrix is symmetric positive definite), the update is
+\begin{equation}
+\label{eq:MM_update_naive}
+x^{k+1} = \left(I + \lambda D^\top \Lambda_k^{-1}D\right)^{-1}y.
+\end{equation}
+
+\subsection{Avoiding $\Lambda_k^{-1}$ blow-up}
+
+As $k$ increases, some entries of $Dx^k$ approach zero, so some entries of $\Lambda_k^{-1}$ blow up.
+To avoid explicit inversion of $\Lambda_k$, one can use the matrix inverse lemma (a.k.a.\ Woodbury identity), whose one form is
+\[
+(A + B C D)^{-1}
+= A^{-1} - A^{-1}B\left(C^{-1} + D A^{-1} B\right)^{-1}D A^{-1}.
+\]
+
+Applying this identity with a suitable choice of $A,B,C,D$ leads to an equivalent expression for the inverse of $I+\lambda D^\top \Lambda_k^{-1}D$ that only involves $\Lambda_k$ (not its inverse). One convenient expression is:
+\begin{equation}
+\label{eq:MM_update_final}
+x^{k+1} = y - D^\top \big( \tfrac{1}{\lambda}\Lambda_k + D D^\top \big)^{-1} Dy,
+\quad \Lambda_k = \mathrm{diag}(|Dx^k|).
+\end{equation}
+
+\paragraph{Banded structure.}
+The matrix $D D^\top$ is tridiagonal, hence $\tfrac{1}{\lambda}\Lambda_k + D D^\top$ is tridiagonal (banded) and can be solved efficiently in $O(N)$ storage and $O(N)$ time using banded linear solvers.
+
+\subsection{Algorithm summary (MM for TVD)}
+
+Given $y$, $\lambda>0$, and iterations $K$:
+\begin{enumerate}
+  \item Initialize $x^0 := y$.
+  \item For $k=0,1,\dots,K-1$:
+    \begin{enumerate}
+      \item Compute $v^k := Dx^k$ and $\Lambda_k := \mathrm{diag}(|v^k|)$.
+      \item Form the tridiagonal matrix
+      \[
+       M_k := \tfrac{1}{\lambda}\Lambda_k + D D^\top.
+      \]
+      \item Solve $M_k z = Dy$ for $z$.
+      \item Set $x^{k+1} := y - D^\top z$.
+    \end{enumerate}
+\end{enumerate}
+Under standard conditions, $x^k$ converges to the TVD solution $x^\star$.
+
+\section{ADMM for TVD}
+
+Another important algorithmic route is ADMM. We use a variable splitting formulation.
+
+\subsection{Splitting formulation}
+
+Rewrite TVD \eqref{eq:TVD_vector} as
+\begin{equation}
+\label{eq:TVD_ADMM_form}
+\min_{x,z} \frac12\|y-x\|_2^2 + \lambda\|z\|_1
+\quad \text{s.t.}\quad z = Dx.
+\end{equation}
+Here:
+\begin{itemize}
+  \item $x$ is the denoised signal.
+  \item $z$ is an auxiliary variable representing the discrete gradient $Dx$.
+\end{itemize}
+
+This matches the ADMM form \eqref{eq:ADMM_form} with
+\[
+f(x) = \frac12\|y-x\|_2^2,\quad g(z) = \lambda\|z\|_1,\quad A = D,\ B = -I,\ c = 0.
+\]
+
+\subsection{Augmented Lagrangian}
+
+Introduce a scaled dual variable $u$ and penalty parameter $\rho>0$. The scaled augmented Lagrangian is
+\[
+\mathcal{L}_\rho(x,z,u)
+= \frac12\|y-x\|_2^2 + \lambda\|z\|_1 
++ \frac{\rho}{2}\|Dx - z + u\|_2^2 - \frac{\rho}{2}\|u\|_2^2,
+\]
+where the last term is a constant w.r.t.\ $x,z$ for fixed $u$.
+
+\subsection{ADMM updates}
+
+ADMM proceeds by alternating minimization over $x$ and $z$, followed by dual ascent on $u$.
+
+\paragraph{$x$-update.}
+\[
+x^{k+1} = \arg\min_x \left\{ 
+\frac12\|y-x\|_2^2 + \frac{\rho}{2}\|Dx - z^k + u^k\|_2^2
+\right\}.
+\]
+This is a strictly convex quadratic; the optimality condition yields
+\[
+\left(I + \rho D^\top D\right)x^{k+1}
+= y + \rho D^\top (z^k - u^k),
+\]
+so
+\begin{equation}
+\label{eq:ADMM_x}
+x^{k+1} = \left(I + \rho D^\top D\right)^{-1}
+\left[y + \rho D^\top (z^k - u^k)\right].
+\end{equation}
+Again $I + \rho D^\top D$ is tridiagonal and can be solved efficiently.
+
+\paragraph{$z$-update.}
+\[
+z^{k+1} = \arg\min_z \left\{ 
+\lambda\|z\|_1 + \frac{\rho}{2}\|Dx^{k+1} - z + u^k\|_2^2
+\right\}.
+\]
+This is the proximal operator of $\lambda\|\cdot\|_1$ applied to $Dx^{k+1}+u^k$, i.e.,
+\begin{equation}
+\label{eq:ADMM_z}
+z^{k+1} = S_{\lambda/\rho}\left(Dx^{k+1} + u^k\right)
+\quad\text{(componentwise soft-thresholding)}.
+\end{equation}
+
+\paragraph{$u$-update (dual variable).}
+\begin{equation}
+\label{eq:ADMM_u}
+u^{k+1} = u^k + Dx^{k+1} - z^{k+1}.
+\end{equation}
+
+\subsection{Algorithm summary (ADMM-TV)}
+
+Given $y$, $\lambda>0$, $\rho>0$, and iterations $K$:
+\begin{enumerate}
+  \item Initialize $x^0 := y$, $z^0 := Dx^0$, $u^0 := 0$.
+  \item For $k=0,\dots,K-1$:
+    \begin{enumerate}
+      \item Solve \eqref{eq:ADMM_x} for $x^{k+1}$.
+      \item Compute $z^{k+1}$ via soft-thresholding \eqref{eq:ADMM_z}.
+      \item Update $u^{k+1}$ via \eqref{eq:ADMM_u}.
+    \end{enumerate}
+\end{enumerate}
+ADMM-TV and MM-TV both exploit the banded structure of $D^\top D$; ADMM has the additional advantage of decoupling the nonsmooth $\ell_1$ term.
+
+\section{Proximal gradient viewpoint for TVD}
+
+Direct application of proximal gradient to \eqref{eq:TVD_vector} is slightly awkward because the nonsmooth part is $h(x) = \lambda \|Dx\|_1$, whose proximal operator is not separable in the canonical basis.
+
+\subsection{Naive forward--backward split}
+
+Take
+\[
+g(x) = \frac12\|y-x\|_2^2,\quad h(x) = \lambda\|Dx\|_1.
+\]
+Then
+\[
+\nabla g(x) = x - y,\quad L = 1 \ \text{(Lipschitz constant for $\nabla g$)}.
+\]
+The proximal gradient step reads
+\[
+x^{k+1} = \mathrm{prox}_{\alpha \lambda \|D\cdot\|_1}\left(
+x^k - \alpha (x^k - y)\right)
+= \mathrm{prox}_{\alpha \lambda \|D\cdot\|_1}\Big((1-\alpha)x^k + \alpha y\Big).
+\]
+
+To implement this, one must compute the TV proximal operator:
+\[
+\mathrm{prox}_{\tau \|D\cdot\|_1}(v) := \arg\min_x \left\{\frac12\|x-v\|_2^2 + \tau\|Dx\|_1\right\},
+\]
+which is exactly a TVD problem again. Thus naive ISTA for TVD is essentially a nested TVD-in-TVD scheme; not attractive algorithmically. 
+This is why MM, ADMM, and dual algorithms that exploit structure are more common for TVD.
+
+\section{Optimality conditions and dual characterization}
+
+\subsection{Subgradient optimality}
+
+The TVD objective is
+\[
+F(x) = \frac12\|y-x\|_2^2 + \lambda\|Dx\|_1.
+\]
+Its subdifferential is
+\[
+\partial F(x) = x - y + \lambda D^\top p,
+\]
+where $p\in \partial \|Dx\|_1$ and
+\[
+p_n \in \partial |(Dx)_n| =
+\begin{cases}
+\{\mathrm{sign}((Dx)_n)\}, & (Dx)_n\neq 0,\\
+[-1,1], & (Dx)_n = 0.
+\end{cases}
+\]
+The condition for $x^\star$ to minimize $F$ is
+\begin{equation}
+0 \in \partial F(x^\star)
+\quad\Leftrightarrow\quad
+y - x^\star \in \lambda D^\top p^\star,\ \ p^\star\in\partial\|Dx^\star\|_1.
+\end{equation}
+
+\subsection{Cumulative-sum characterization (1-D)}
+
+Define the ``discrete antiderivative'' operator $S\in\mathbb{R}^{N\times (N-1)}$ as the strict lower-triangular matrix of ones:
+\[
+S =
+\begin{bmatrix}
+0      & 0      & \cdots & 0 \\
+1      & 0      & \cdots & 0 \\
+1      & 1      & \cdots & 0 \\
+\vdots & \vdots & \ddots & \vdots \\
+1      & 1      & \cdots & 1
+\end{bmatrix}.
+\]
+Then $D S = I_{N-1}$, i.e., $S$ is a discrete integration operator (left inverse of $D$).
+
+Let
+\[
+r := y - x,\quad s := S^\top r.
+\]
+The vector $s$ is the cumulative sum of residuals:
+\[
+s_n = \sum_{k=0}^n (y_k - x_k).
+\]
+
+One can show that the optimality conditions for TVD are equivalent to the following:
+\begin{align}
+|s_n| &\le \lambda,\quad \forall n, \label{eq:opt1}\\
+\text{and} \quad 
+\begin{cases}
+(Dx)_n > 0 \Rightarrow s_n = +\lambda,\\
+(Dx)_n < 0 \Rightarrow s_n = -\lambda,\\
+(Dx)_n = 0 \Rightarrow |s_n| < \lambda.
+\end{cases} \label{eq:opt2}
+\end{align}
+In words:
+\begin{itemize}
+  \item The cumulative sum of residuals stays within the tube $[-\lambda,\lambda]$.
+  \item Whenever the signal has a positive jump, $s_n$ hits the upper boundary; for a negative jump, it hits the lower boundary; in flat regions, $s_n$ remains strictly inside the tube.
+\end{itemize}
+This gives a geometric picture of the TVD solution and underlies fast direct algorithms in 1-D.
+
+\section{Examples and qualitative behavior}
+
+\subsection{Piecewise-constant signal}
+
+Consider a ``blocky'' signal with two levels:
+\[
+x_n =
+\begin{cases}
+0, & 0\le n< N/2,\\
+1, & N/2 \le n < N.
+\end{cases}
+\]
+Add Gaussian noise $w_n\sim\mathcal{N}(0,\sigma^2)$ to get $y_n=x_n+w_n$.
+
+Qualitative behavior of TVD as $\lambda$ changes:
+\begin{itemize}
+  \item Very small $\lambda$: $x^\star$ follows noisy fluctuations, only slightly smoothed; edges are preserved but noise remains.
+  \item Moderate $\lambda$: $x^\star$ becomes nearly piecewise constant, with a well-localized jump near the true edge; noise in flat regions is strongly suppressed.
+  \item Very large $\lambda$: $x^\star$ collapses towards a constant (the global mean of $y$); edges are oversmoothed and disappear.
+\end{itemize}
+
+\subsection{Staircasing on non-blocky signals}
+
+For non-piecewise-constant signals (e.g., ramps or sinusoids), TVD often exhibits ``staircasing'':
+\begin{itemize}
+  \item Slowly varying regions are approximated by a sequence of flat segments separated by small jumps.
+  \item This is because TV explicitly penalizes the $\ell_1$ norm of discrete derivatives, favoring exact zeros in the derivative (flat), rather than small nonzero slopes.
+\end{itemize}
+This motivates higher-order TV (penalizing second-order differences) for signals with smooth trends.
+
+\section{Extensions}
+
+\subsection{2-D TV for images}
+
+For an image $X$ on a 2-D grid, define horizontal and vertical finite differences:
+\[
+(D_x X)_{i,j} = X_{i,j+1}-X_{i,j},\quad
+(D_y X)_{i,j} = X_{i+1,j}-X_{i,j}.
+\]
+\begin{itemize}
+  \item \textbf{Anisotropic TV:} $\mathrm{TV}_{\mathrm{aniso}}(X) = \sum_{i,j} \big(|(D_x X)_{i,j}| + |(D_y X)_{i,j}|\big)$.
+  \item \textbf{Isotropic TV:} $\mathrm{TV}_{\mathrm{iso}}(X) = \sum_{i,j} \sqrt{(D_x X)_{i,j}^2 + (D_y X)_{i,j}^2}$.
+\end{itemize}
+Both forms lead to image denoising problems analogous to \eqref{eq:TVD_vector}. Algorithms like ADMM and primal--dual methods generalize straightforwardly.
+
+\subsection{Higher-order TV}
+
+To reduce staircasing, one can penalize higher-order differences, e.g., second-order TV:
+\[
+\mathrm{TV}_2(x) = \|D_2 x\|_1,
+\]
+where $D_2$ is a discrete second-difference operator, $(D_2 x)_n = x_{n+1} - 2x_n + x_{n-1}$. 
+This encourages piecewise-linear signals instead of piecewise-constant signals.
+
+\subsection{Other noise models and data terms}
+
+TVD is easily adapted to other data terms:
+\begin{itemize}
+  \item Poisson noise $\Rightarrow$ Kullback--Leibler-type data fidelity.
+  \item Laplacian noise $\Rightarrow$ $\ell_1$ data fidelity term.
+  \item Deconvolution and inpainting $\Rightarrow$ $H x$ in place of $x$ in the fidelity term for some linear operator $H$.
+\end{itemize}
+The same splitting and MM strategies apply, with modified linear systems and proximal steps.
+
+\section{Summary}
+
+Total variation denoising is the solution of a convex variational problem that combines a quadratic data fidelity term with an $\ell_1$ penalty on discrete gradients. The TV prior encodes piecewise-constant structure and preserves edges, unlike linear low-pass filters.
+
+We have:
+\begin{itemize}
+  \item Presented proximal gradient / ISTA, ADMM, and MM as core tools from convex optimization.
+  \item Formulated TVD in 1-D as
+  \[
+  \min_x \frac12\|y-x\|_2^2 + \lambda\|Dx\|_1,
+  \]
+  with $D$ the first-difference operator.
+  \item Derived a TVD-specific MM algorithm based on a quadratic majorizer of $\|Dx\|_1$ leading to a banded linear system per iteration.
+  \item Derived an ADMM algorithm for TVD using the splitting $z=Dx$, yielding linear system + soft-thresholding updates.
+  \item Described optimality conditions via cumulative sums of residuals, giving intuition and enabling fast 1-D algorithms.
+  \item Briefly discussed staircasing, higher-order TV, and extensions to 2-D and other data terms.
+\end{itemize}
+
+These tools form the basic mathematical toolkit for understanding and implementing total variation denoising in both 1-D signal and 2-D image settings.
+
+\end{document}

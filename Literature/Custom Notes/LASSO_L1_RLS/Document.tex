@@ -1,0 +1,754 @@
+\documentclass[11pt]{article}
+
+\usepackage{amsmath,amssymb,amsthm}
+\usepackage{geometry}
+\geometry{margin=1in}
+
+\title{A Detailed Introduction to the LASSO and $\ell_1$--Regularized Least Squares}
+\author{}
+\date{}
+
+\newcommand{\R}{\mathbb{R}}
+\newcommand{\E}{\mathbb{E}}
+\newcommand{\prox}{\operatorname{prox}}
+\newcommand{\sgn}{\operatorname{sgn}}
+\newcommand{\supp}{\operatorname{supp}}
+\newcommand{\norm}[1]{\left\lVert #1 \right\rVert}
+\newcommand{\ip}[2]{\left\langle #1, #2 \right\rangle}
+
+\begin{document}
+\maketitle
+
+\tableofcontents
+\pagebreak
+\section{Overview}
+
+The goal of this document is to give a detailed, math--heavy treatment of the
+LASSO (Least Absolute Shrinkage and Selection Operator) and its close relative
+in signal processing, the \emph{basis pursuit denoising} (BPD) formulation.
+
+We start from a generic linear inverse problem
+\[
+    y = A x + w,
+\]
+compare standard least squares to $\ell_1$--based methods, and then study:
+
+\begin{itemize}
+    \item Penalized and constrained LASSO formulations.
+    \item Convexity and optimality conditions (via subgradients and KKT).
+    \item Closed--form solutions in simple cases (soft--thresholding).
+    \item Examples: sparse denoising, deconvolution, missing data, etc.
+    \item First--order algorithms: ISTA, FISTA, and splitting / SALSA--type ideas.
+\end{itemize}
+
+Throughout, we interpret BPD,
+\[
+  \min_x \; \frac{1}{2}\norm{y - A x}_2^2 + \lambda \norm{x}_1,
+\]
+as the canonical \emph{LASSO} problem in the signal--processing setting.
+
+\section{Notation and quick reminders}
+
+We use standard finite--dimensional linear algebra:
+
+\begin{itemize}
+    \item Vectors are columns in $\R^N$; matrices are real $M \times N$ unless otherwise stated.
+    \item For a matrix $A$, $A^T$ is the transpose.
+    \item For $x \in \R^N$, the $\ell_p$--norms for $p \ge 1$ are
+    \[
+        \norm{x}_p = \Big( \sum_{i=1}^N |x_i|^p \Big)^{1/p}, \quad 
+        \norm{x}_\infty = \max_i |x_i|.
+    \]
+    \item The $\ell_0$ \emph{pseudo--norm} is
+    \[
+        \norm{x}_0 = \#\{i : x_i \ne 0\},
+    \]
+    i.e., the number of nonzero entries (\emph{sparsity}).
+\end{itemize}
+
+Below are one--line reminders for all mathematical terms beyond basic calculus
+(derivatives, integrals, limits):
+
+\begin{itemize}
+    \item \textbf{Norm:} A function $\norm{\cdot}$ on $\R^N$ that is nonnegative,
+    positively homogeneous, zero only at $0$, and satisfies the triangle inequality.
+
+    \item \textbf{Inner product:} A map $\ip{\cdot}{\cdot}$ on $\R^N$ that is bilinear,
+    symmetric, and positive definite; it induces a norm via $\norm{x}_2 = \sqrt{\ip{x}{x}}$.
+
+    \item \textbf{Convex set:} A set $C$ such that for any $x,y\in C$ and
+    $\theta \in [0,1]$, $\theta x + (1-\theta) y \in C$.
+
+    \item \textbf{Convex function:} A function $f$ with domain a convex set such that
+    $f(\theta x + (1-\theta)y) \le \theta f(x) + (1-\theta)f(y)$ for all $x,y$, $\theta \in[0,1]$.
+
+    \item \textbf{Subgradient:} For convex $f$, a vector $g$ is a subgradient at $x$ if
+    $f(z) \ge f(x) + \ip{g}{z-x}$ for all $z$; the set of all such $g$ is the \emph{subdifferential} $\partial f(x)$.
+
+    \item \textbf{Proximal operator:} For proper closed convex $g$ and $\tau>0$,
+    \[
+       \prox_{\tau g}(v) = \arg\min_x \left( \frac{1}{2}\norm{x - v}_2^2 + \tau g(x) \right),
+    \]
+    a ``regularized projection'' of $v$.
+
+    \item \textbf{Lipschitz continuous gradient:} A differentiable function $f$ has
+    Lipschitz continuous gradient with constant $L$ if
+    $\norm{\nabla f(x) - \nabla f(y)}_2 \le L\norm{x-y}_2$ for all $x,y$.
+
+    \item \textbf{Spectral norm:} For a matrix $A$, $\norm{A}_2$ is the largest singular
+    value, equivalently $\max_{\norm{x}_2=1} \norm{Ax}_2$.
+
+    \item \textbf{Eigenvalue:} A scalar $\lambda$ such that $A v = \lambda v$ for some
+    nonzero vector $v$ (an eigenvector).
+
+    \item \textbf{Parseval frame (tight frame):} A matrix $A$ whose columns satisfy
+    $A A^T = p I$ for some $p>0$, a generalization of an orthonormal basis.
+
+    \item \textbf{KKT conditions:} Necessary and often sufficient optimality conditions for
+    constrained convex optimization, involving primal feasibility, dual feasibility, and complementary slackness.
+
+    \item \textbf{Restricted isometry property (RIP):} A property of a matrix $A$ stating
+    that all $s$--sparse vectors have nearly preserved $\ell_2$--norm under $A$.
+
+    \item \textbf{Mutual coherence:} For a matrix $A$ with normalized columns $a_i$, 
+    $\mu(A) = \max_{i\ne j} |\ip{a_i}{a_j}|$, measuring how correlated different columns are.
+
+    \item \textbf{Support of a vector:} $\supp(x) = \{ i : x_i \ne 0 \}$, the index set of nonzeros.
+
+    \item \textbf{Soft--thresholding operator:} $S_\alpha(t) = \sgn(t)\max(|t|-\alpha,0)$,
+    applied componentwise to vectors; it is the proximal operator of $\alpha\norm{\cdot}_1$.
+
+    \item \textbf{Iterative shrinkage/thresholding algorithm (ISTA):} A proximal gradient method
+    for problems with smooth + $\ell_1$ terms, using gradient descent plus soft--thresholding.
+
+    \item \textbf{FISTA (Fast ISTA):} An accelerated version of ISTA that uses a momentum term
+    to improve convergence rates from $O(1/k)$ to $O(1/k^2)$ in objective value.
+
+    \item \textbf{Augmented Lagrangian / ADMM:} Splitting methods that solve constrained problems
+    by iteratively minimizing an augmented Lagrangian and updating dual variables.
+
+\end{itemize}
+
+\section{From least squares to the LASSO}
+
+\subsection{Linear inverse problem and least squares}
+
+Consider a linear model
+\begin{equation}
+    y = A x + w,
+    \label{eq:linear-model}
+\end{equation}
+where
+\begin{itemize}
+    \item $y \in \R^M$ is the observed data,
+    \item $A \in \R^{M \times N}$ is a known sensing / design matrix,
+    \item $x \in \R^N$ is an unknown parameter vector or signal,
+    \item $w \in \R^M$ is additive noise or modeling error.
+\end{itemize}
+
+When $M \ge N$ and $A$ has full column rank, the classical least squares estimate is
+\begin{equation}
+    \hat{x}_{\mathrm{LS}} 
+    = \arg\min_x \norm{y - A x}_2^2 
+    = (A^T A)^{-1} A^T y.
+    \label{eq:ls}
+\end{equation}
+When $M < N$ (underdetermined system), $A^T A$ is singular and there are infinitely many
+solutions to $y = A x$. A standard choice is the minimum--norm solution:
+\begin{equation}
+   \hat{x}_{\mathrm{MN}} 
+   = \arg\min_x \norm{x}_2^2 \quad \text{s.t. } y = A x
+   = A^T (A A^T)^{-1} y,
+   \label{eq:mn}
+\end{equation}
+assuming $A A^T$ is invertible.
+
+\medskip
+\noindent
+\emph{Reminder:} In underdetermined problems, least squares (or minimum $\ell_2$--norm) does
+\emph{not} encourage sparsity; it spreads energy among coordinates to reduce the $\ell_2$ norm.
+
+\subsection{Sparsity and the $\ell_0$ formulation}
+
+In many signal processing and statistical settings, we believe that $x$ is
+\emph{sparse}, meaning that only a small number of entries in $x$ are nonzero.
+A natural formulation is
+\begin{equation}
+    \min_x \;\norm{x}_0 
+    \quad \text{s.t.} \quad y = A x,
+    \label{eq:l0}
+\end{equation}
+or in the noisy case,
+\begin{equation}
+    \min_x \;\norm{x}_0
+    \quad \text{s.t.} \quad \norm{y - A x}_2 \le \varepsilon.
+    \label{eq:l0-noisy}
+\end{equation}
+
+\emph{Reminder:} Minimizing $\norm{x}_0$ is combinatorial and NP--hard in general, because
+it essentially searches over subsets of columns of $A$.
+
+\subsection{Relaxation: from $\ell_0$ to $\ell_1$}
+
+The LASSO replaces the nonconvex $\ell_0$ objective by its convex surrogate $\ell_1$.
+Two common forms appear:
+
+\paragraph{Penalized (LASSO / BPD) form.}
+\begin{equation}
+    \min_{x \in \R^N} \; 
+    \frac{1}{2} \norm{y - A x}_2^2 + \lambda \norm{x}_1,
+    \qquad \lambda > 0.
+    \label{eq:lasso-penalized}
+\end{equation}
+In signal processing this is frequently called \emph{basis pursuit denoising (BPD)}.
+
+\paragraph{Constrained (classic LASSO) form.}
+\begin{equation}
+    \min_{x \in \R^N} \; 
+    \frac{1}{2} \norm{y - A x}_2^2 
+    \quad \text{s.t.} \quad \norm{x}_1 \le \tau,
+    \label{eq:lasso-constrained}
+\end{equation}
+for some radius $\tau > 0$.
+
+For every $\tau$ under mild conditions, there exists a $\lambda$ such that the constrained
+and penalized forms have the same solution set (this follows from convex duality and KKT).
+
+\medskip
+\noindent
+\emph{Reminder:} The $\ell_1$ norm is the tightest convex lower bound of $\norm{\cdot}_0$
+on the unit $\ell_\infty$ ball, which explains why it is the standard convex surrogate for sparsity.
+
+\subsection{Geometric intuition: $\ell_1$ vs.\ $\ell_2$}
+
+To understand sparsity promotion, consider a very small case $N=2$, $M=2$.
+The least squares solution minimizes $\norm{y - A x}_2^2$ with an implicit quadratic
+regularizer, while the constrained LASSO solves
+\[
+   \min_x \norm{y - A x}_2^2 \quad \text{s.t. } \norm{x}_1 \le \tau.
+\]
+The feasible set $\{ x : \norm{x}_1 \le \tau \}$ is a diamond in $\R^2$, while
+$\{ x : \norm{x}_2 \le r \}$ is a disk. The optimum of a convex quadratic over
+a diamond tends to occur at a vertex, i.e., at points where one coordinate is
+exactly zero. Over a disk, the optimum rarely occurs on coordinate axes.
+
+\medskip
+\noindent
+\emph{Reminder:} This geometric picture explains why $\ell_1$ regularization naturally yields
+sparse solutions (many coordinates pinned to zero), whereas $\ell_2$ regularization does not.
+
+\section{Optimality conditions for LASSO}
+
+We now analyze the penalized LASSO / BPD problem
+\begin{equation}
+    \min_{x \in \R^N} F(x) 
+    := \frac{1}{2}\norm{y - A x}_2^2 + \lambda \norm{x}_1.
+    \label{eq:F-def}
+\end{equation}
+The objective $F$ is the sum of a smooth convex function and a nonsmooth convex function.
+
+\subsection{Convexity and existence of a minimizer}
+
+The function $f(x) = \frac{1}{2}\norm{y - A x}_2^2$ is convex because it is a composition
+of affine and convex functions:
+\[
+   f(x) = \frac{1}{2}\norm{A x - y}_2^2 = \frac{1}{2} (A x - y)^T (A x - y),
+\]
+and its Hessian is $A^T A \succeq 0$ (positive semidefinite).
+The function $g(x) = \lambda \norm{x}_1$ is also convex as a norm scaled by $\lambda>0$.
+Therefore, $F = f + g$ is convex.
+
+If $A$ has full column rank (or more generally if $\ker(A)$ intersects the level sets of
+$g$ in a nice way), $F(x) \to \infty$ as $\norm{x}_2 \to \infty$ (coercivity), so a minimizer
+exists and the set of minimizers is nonempty and convex.
+
+\subsection{Subgradient optimality conditions}
+
+Because $g$ is nonsmooth, we use subgradients. For
+\[
+    f(x) = \frac{1}{2}\norm{y - A x}_2^2,
+\]
+the gradient is
+\begin{equation}
+    \nabla f(x) = A^T (A x - y).
+    \label{eq:grad-f}
+\end{equation}
+For $g(x) = \lambda \norm{x}_1$, the subdifferential $\partial g(x)$ can be described componentwise:
+\[
+    \partial (\lambda |x_i|) = 
+    \begin{cases}
+       \{ \lambda \,\sgn(x_i) \}, & x_i \ne 0,\\[4pt]
+       [-\lambda, \lambda], & x_i = 0,
+    \end{cases}
+\]
+and $\partial g(x) = \{ v \in \R^N : v_i \in \partial(\lambda |x_i|)\}$.
+
+A point $x^\star$ is optimal if and only if
+\begin{equation}
+   0 \in \nabla f(x^\star) + \partial g(x^\star) 
+   \quad \Longleftrightarrow \quad
+   -A^T (A x^\star - y) \in \partial g(x^\star).
+   \label{eq:subgrad-opt}
+\end{equation}
+Componentwise, this means:
+\[
+   -[A^T (A x^\star - y)]_i =
+   \begin{cases}
+      \lambda \,\sgn(x^\star_i), & x^\star_i \ne 0,\\[4pt]
+      \in [-\lambda, \lambda],   & x^\star_i = 0.
+   \end{cases}
+\]
+
+\medskip
+\noindent
+\emph{Reminder:} Subgradient optimality conditions generalize the condition $\nabla F(x^\star) = 0$
+to nonsmooth convex problems.
+
+\section{Soft--thresholding examples}
+
+\subsection{Scalar LASSO: closed form solution}
+
+Consider the 1D problem
+\begin{equation}
+    \min_{x \in \R} \; \frac{1}{2} (y - x)^2 + \lambda |x|.
+    \label{eq:scalar-lasso}
+\end{equation}
+This is LASSO with $A=1$ and $\lambda>0$. We can solve it explicitly.
+
+For $x > 0$, the objective is $F(x) = \tfrac12 (y-x)^2 + \lambda x$.
+Differentiating (ordinary derivative) and setting to zero:
+\[
+    F'(x) = -(y-x) + \lambda = x - y + \lambda = 0
+    \quad \Rightarrow \quad x = y - \lambda.
+\]
+This candidate must satisfy $x>0$, so $y - \lambda >0 \Rightarrow y > \lambda$.
+
+Similarly, for $x < 0$, we write $|x|=-x$, so
+$F(x) = \tfrac12 (y-x)^2 + \lambda (-x)$ and
+\[
+    F'(x) = x - y - \lambda = 0
+    \quad \Rightarrow \quad x = y + \lambda,
+\]
+which must satisfy $x<0$, so $y + \lambda <0 \Rightarrow y < -\lambda$.
+
+For $x=0$, we use subgradient optimality. The subdifferential of $\lambda |x|$ at $x=0$ is $[-\lambda,\lambda]$.
+The derivative of $\frac12(y-x)^2$ at 0 is $-(y-0) = -y$. So $x=0$ is optimal if
+\[
+    0 \in -y + [-\lambda,\lambda]
+    \quad \Leftrightarrow \quad y \in [-\lambda,\lambda]
+    \quad \Leftrightarrow \quad |y|\le\lambda.
+\]
+
+Putting these cases together,
+\[
+   x^\star = 
+   \begin{cases}
+      y - \lambda, & y > \lambda,\\
+      0, & |y|\le \lambda,\\
+      y + \lambda, & y < -\lambda.
+   \end{cases}
+\]
+This is exactly the scalar soft--thresholding operator:
+\[
+   x^\star = S_\lambda(y) := \sgn(y)\max(|y|-\lambda,0).
+\]
+
+\medskip
+\noindent
+\emph{Reminder:} Soft--thresholding shrinks $y$ toward zero by $\lambda$ and sets it to zero
+if it is within a $\lambda$--sized deadzone around zero.
+
+\subsection{Orthogonal design: componentwise soft--thresholding}
+
+If $A$ has orthonormal columns, $A^T A = I$, we can express LASSO in a diagonalized form.
+Let $z = A^T y$ (the least squares coefficients), and consider
+\[
+   F(x) = \frac12 \norm{y - A x}_2^2 + \lambda \norm{x}_1.
+\]
+Using $A^T A = I$ and $A A^T = I$ (square orthonormal case),
+\begin{align*}
+   \norm{y - A x}_2^2 
+      &= \norm{A^T y - A^T A x}_2^2
+       = \norm{z - x}_2^2.
+\end{align*}
+Thus the problem becomes
+\[
+   \min_x \frac12 \norm{z - x}_2^2 + \lambda \norm{x}_1
+   = \sum_{i=1}^N \Big[ \frac12 (z_i - x_i)^2 + \lambda |x_i| \Big],
+\]
+which decouples componentwise. Each coordinate solves a scalar LASSO as in
+\eqref{eq:scalar-lasso} with $y=z_i$, so the solution is
+\[
+   x_i^\star = S_\lambda(z_i) = S_\lambda( (A^T y)_i ), \quad i=1,\dots,N.
+\]
+Equivalently,
+\begin{equation}
+   x^\star = S_\lambda (A^T y),
+   \label{eq:orthonormal-lasso}
+\end{equation}
+where $S_\lambda$ acts componentwise.
+
+\medskip
+\noindent
+\emph{Reminder:} An orthonormal design makes LASSO completely separable across coordinates,
+yielding an exact closed form in terms of soft--thresholding of the least squares coefficients.
+
+\section{LASSO as basis pursuit denoising and sparse signal models}
+
+\subsection{Basis pursuit and BPD}
+
+Recall the constrained \emph{basis pursuit} (BP) problem:
+\begin{equation}
+   \min_x \norm{x}_1 \quad \text{s.t. } y = A x,
+   \label{eq:bp}
+\end{equation}
+an $\ell_1$--based replacement for \eqref{eq:l0}. When $y$ is noisy, it is more reasonable to allow
+a misfit and consider
+\begin{equation}
+   \min_x \; \frac12 \norm{y - A x}_2^2 + \lambda \norm{x}_1,
+   \label{eq:bpd}
+\end{equation}
+which is exactly \eqref{eq:lasso-penalized}. This is called \emph{basis pursuit denoising (BPD)}
+in the sparse signal processing literature and \emph{LASSO} in statistics.
+
+\subsection{Sparse representation model}
+
+In many examples, $x$ is not itself the signal of interest, but rather represents
+coefficients in some transform domain. We write
+\begin{equation}
+    s = A x, 
+    \label{eq:rep}
+\end{equation}
+where
+\begin{itemize}
+    \item $s \in \R^M$ is the signal (e.g., a short speech frame),
+    \item $A \in \R^{M \times N}$ is a dictionary (e.g., DFT, wavelets, time--frequency atoms),
+    \item $x \in \R^N$ is the coefficient vector, hoped to be sparse.
+\end{itemize}
+Given data $y$ that is a noisy version of $s$, or data that is $s$ passed through a linear system,
+we can formulate BPD / LASSO in the coefficient domain. Examples include:
+\begin{itemize}
+    \item Denoising: $y = s + w = A x + w$; recover sparse $x$ via LASSO, then reconstruct $s$.
+    \item Deconvolution: $y = H s + w = H A x + w$, where $H$ is convolution; LASSO on $x$.
+    \item Inpainting / missing data: $y = S s = S A x$, where $S$ selects observed samples.
+\end{itemize}
+
+\medskip
+\noindent
+\emph{Reminder:} In all these cases, the success of LASSO critically depends on the assumption
+that $x$ is sparse (or compressible) in the chosen dictionary $A$.
+
+\section{Example: LASSO for denoising}
+
+Consider a 1D signal $s \in \R^M$ that is sparsely represented in some dictionary $A$,
+so $s = A x^\star$ for a sparse vector $x^\star$. We observe
+\[
+   y = s + w = A x^\star + w,
+\]
+with $w$ i.i.d.\ Gaussian noise.
+
+We solve
+\begin{equation}
+    \hat{x}_\lambda = \arg\min_x \frac12 \norm{y - A x}_2^2 + \lambda \norm{x}_1,
+    \label{eq:denoise-lasso}
+\end{equation}
+and reconstruct $\hat{s} = A \hat{x}_\lambda$.
+
+\subsection{Choice of $\lambda$ and bias--variance tradeoff}
+
+For Gaussian noise with variance $\sigma^2$, a common heuristic is 
+\[
+   \lambda \propto \sigma \sqrt{2 \log N}
+\]
+to balance false alarm and detection probabilities of nonzero coefficients. As $\lambda$ increases:
+
+\begin{itemize}
+    \item More coefficients are driven to zero $\Rightarrow$ stronger denoising, but more bias.
+    \item Fewer nonzeros $\Rightarrow$ less variance due to noise in the coefficients.
+\end{itemize}
+
+Thus $\lambda$ controls a bias--variance tradeoff and is typically chosen by cross--validation
+or by analytic risk estimates (Stein's unbiased risk estimate, etc., in some settings).
+
+\subsection{Special case: Parseval frame}
+
+If $A$ is a tight frame with $A A^T = p I$, LASSO structure changes slightly but maintains
+nice properties. In particular, $f(x) = \frac12 \norm{y - A x}_2^2$ has a Lipschitz gradient with
+\[
+   L = \norm{A^T A}_2 = p.
+\]
+This is useful for algorithm design (step--size selection in ISTA / FISTA).
+
+\medskip
+\noindent
+\emph{Reminder:} A tight frame behaves like an orthonormal basis up to a scalar factor,
+so many proofs and algorithm analyses carry over with only minor modifications.
+
+\section{Example: LASSO for sparse deconvolution}
+
+Let $x^\star \in \R^N$ be a sparse spike train, and $h \in \R^L$ be a known impulse response.
+We observe
+\[
+   y = h * x^\star + w,
+\]
+where $*$ denotes linear convolution, and $w$ is noise. Writing this as $y = H x^\star + w$
+with Toeplitz convolution matrix $H \in \R^{M \times N}$ ($M = N+L-1$), we consider
+\begin{equation}
+    \hat{x}_\lambda = \arg\min_x \frac12 \norm{y - H x}_2^2 + \lambda \norm{x}_1.
+    \label{eq:deconv-lasso}
+\end{equation}
+
+\subsection{Comparison with $\ell_2$--regularized deconvolution}
+
+The classical Tikhonov--regularized least squares deconvolution
+\begin{equation}
+    \hat{x}_{\mathrm{Tik}} = \arg\min_x \frac12 \norm{y - H x}_2^2 + \frac{\gamma}{2}\norm{x}_2^2
+    \label{eq:tikhonov}
+\end{equation}
+has the closed form
+\[
+   \hat{x}_{\mathrm{Tik}} = (H^T H + \gamma I)^{-1} H^T y,
+\]
+and tends to produce a \emph{smoothed} version of $x^\star$. When $x^\star$ is sparse (spikes),
+the LASSO formulation \eqref{eq:deconv-lasso} tends to produce sharp, well--localized spikes
+matching the locations of the true impulses, whereas Tikhonov spreads them.
+
+\medskip
+\noindent
+\emph{Reminder:} In deconvolution, $\ell_1$ regularization can recover sparse structures that
+are heavily blurred in the observations, provided that the blur $h$ is not too ill--conditioned.
+
+\section{Iterative algorithms for LASSO}
+
+\subsection{Proximal gradient / ISTA}
+
+We split $F(x) = f(x) + g(x)$ with
+\[
+    f(x) = \frac12 \norm{y - A x}_2^2, \qquad g(x) = \lambda \norm{x}_1.
+\]
+The gradient of $f$ is Lipschitz with constant $L = \norm{A^T A}_2$:
+\[
+    \nabla f(x) = A^T(Ax - y).
+\]
+Proximal gradient (ISTA) iterates
+\begin{equation}
+   x^{k+1} = \prox_{\frac{\lambda}{L}\norm{\cdot}_1}
+             \Big( x^k - \frac{1}{L} \nabla f(x^k) \Big),
+   \label{eq:ista-general}
+\end{equation}
+for any $L \ge \norm{A^T A}_2$. Using the fact that
+\[
+   \prox_{\alpha\norm{\cdot}_1}(v) = S_\alpha(v),
+\]
+we get the explicit iteration
+\begin{equation}
+   x^{k+1} = S_{\lambda/L}\Big( x^k - \frac{1}{L} A^T(Ax^k - y) \Big),
+   \label{eq:ista}
+\end{equation}
+where $S_{\lambda/L}$ is applied componentwise.
+
+\medskip
+\noindent
+\emph{Reminder:} ISTA is guaranteed to converge to a minimizer of $F$ for any
+$L\ge\norm{A^T A}_2$, with convergence rate $O(1/k)$ in objective value.
+
+\subsection{FISTA: accelerated proximal gradient}
+
+FISTA introduces an extrapolated variable $z^k$ and a momentum parameter $t_k$:
+\begin{align}
+   x^{k+1} &= S_{\lambda/L}\Big( z^k - \frac{1}{L} A^T(Az^k - y) \Big),
+   \label{eq:fista-x}\\
+   t_{k+1} &= \frac{1 + \sqrt{1+4 t_k^2}}{2},
+   \label{eq:fista-t}\\
+   z^{k+1} &= x^{k+1} + \frac{t_k - 1}{t_{k+1}}(x^{k+1} - x^k),
+   \label{eq:fista-z}
+\end{align}
+with initial $x^0$, $z^0 = x^0$, $t_0=1$.
+
+FISTA enjoys a faster $O(1/k^2)$ rate in objective value:
+\[
+    F(x^k) - F(x^\star) \le \frac{C}{k^2}
+\]
+for some constant $C$.
+
+\medskip
+\noindent
+\emph{Reminder:} FISTA is often preferred in practice over ISTA because it achieves much
+faster decrease in objective for essentially the same per--iteration cost.
+
+\subsection{Splitting and SALSA--type methods}
+
+Another class of algorithms, often used in signal processing, introduces an auxiliary variable
+$z$ so that the $\ell_1$ term is separated. For example, rewrite
+\[
+   \min_{x,z} \frac12 \norm{y - A x}_2^2 + \lambda\norm{z}_1 
+   \quad\text{s.t.}\quad x = z.
+\]
+The augmented Lagrangian for this constrained problem leads to ADMM--type iterations:
+\begin{align*}
+   x^{k+1} 
+      &:= \arg\min_x \frac12 \norm{y - A x}_2^2 + \frac{\rho}{2}\norm{x - z^k + u^k}_2^2,\\
+   z^{k+1}
+      &:= \arg\min_z \lambda\norm{z}_1 + \frac{\rho}{2}\norm{x^{k+1} - z + u^k}_2^2
+        = S_{\lambda/\rho}(x^{k+1} + u^k),\\
+   u^{k+1} &:= u^k + x^{k+1} - z^{k+1},
+\end{align*}
+where $u$ is a dual / scaled Lagrange multiplier, and $\rho>0$ is a penalty parameter.
+
+\medskip
+\noindent
+\emph{Reminder:} In many signal processing problems $A$ has structure (convolution, transforms)
+that allows efficient solution of the quadratic $x$--update, making such splitting approaches
+very competitive for large--scale LASSO / BPD.
+
+\section{Conditions for sparse recovery}
+
+LASSO not only produces sparse solutions; under conditions on $A$ and noise level,
+it recovers the true sparse $x^\star$ exactly or approximately.
+
+\subsection{Noiseless exact recovery}
+
+In the noiseless case $y = A x^\star$, under appropriate conditions, the BP problem \eqref{eq:bp}
+has a unique solution equal to $x^\star$ if $\norm{x^\star}_0$ is small enough relative to properties
+of $A$.
+
+Two standard sufficient conditions:
+
+\paragraph{Mutual coherence condition.}
+If the columns of $A$ are $\ell_2$--normalized, and $x^\star$ is $s$--sparse, one condition is
+\[
+   s < \frac{1}{2}\Big(1 + \frac{1}{\mu(A)}\Big),
+\]
+where $\mu(A)$ is the mutual coherence.
+
+\paragraph{Restricted isometry property (RIP).}
+If $A$ satisfies RIP of order $2s$ with constant $\delta_{2s} < \sqrt{2}-1$, then every $s$--sparse
+$x^\star$ is the unique minimizer of $\min_x \norm{x}_1 \text{ s.t. } y = A x$.
+
+\medskip
+\noindent
+\emph{Reminder:} These conditions guarantee that $A$ does not mix different sparse supports
+too much, so that sparsity and data consistency together identify a unique solution.
+
+\subsection{Noisy case and LASSO}
+
+In the noisy case $y = A x^\star + w$, under RIP and appropriate choice of $\lambda$
+depending on $\norm{A^T w}_\infty$, LASSO solutions obey bounds of the form
+\[
+   \norm{\hat{x}_\lambda - x^\star}_2 
+   \le C_0 \frac{\sigma_s(x^\star)_1}{\sqrt{s}} + C_1 \frac{\lambda}{\phi},
+\]
+where $\sigma_s(x^\star)_1$ is the best $s$--term approximation error in $\ell_1$ and $\phi$
+is a stability constant derived from RIP. Such results formalize that LASSO
+recovers sparse signals stably even in noise.
+
+\medskip
+\noindent
+\emph{Reminder:} The precise constants and assumptions vary by theorem, but the qualitative
+picture is that $\ell_1$--based methods are near--optimal for sparse recovery under randomness or RIP.
+
+\section{LASSO in the context of Selesnick--style problems}
+
+Here we explicitly connect the generic LASSO formulation to some canonical sparse signal processing
+problems of the type discussed in sparsity notes.
+
+\subsection{Sparse Fourier coefficients}
+
+Let $y \in \R^M$ be a short segment of a real signal, and $A \in \mathbb{C}^{M \times N}$ be
+the first $M$ rows of an inverse $N$--point DFT matrix. We model
+\[
+  y = A c + w,
+\]
+where $c \in \mathbb{C}^N$ are Fourier coefficients. If $y$ consists of a small number of
+pure tones that do not align with the discrete frequency grid, then $c$ is still sparse if we
+allow sufficiently fine $N$ (oversampled grid). The BPD / LASSO problem
+\[
+  \min_c \frac12 \norm{y - A c}_2^2 + \lambda \norm{c}_1
+\]
+selects a sparse set of Fourier components that explain the data, avoiding spectral leakage and
+yielding frequency estimates sharper than standard DFT of the raw samples.
+
+\medskip
+\noindent
+\emph{Reminder:} Here, LASSO is performing \emph{sparse spectral estimation} on an oversampled
+dictionary of sinusoids.
+
+\subsection{Denoising in the Fourier domain}
+
+For noisy speech (or any signal) that is sparse in the Fourier domain, the same formulation
+applies: given $y$ as noisy time--domain samples, we choose $A$ as partial inverse DFT,
+solve LASSO for coefficients $c$, and reconstruct $\hat{s} = A \hat{c}$. The sparsity of $\hat{c}$
+reflects the limited number of dominant frequencies; noise components are suppressed by
+soft--thresholding.
+
+\subsection{Deconvolution with sparse spikes}
+
+Let $x^\star$ be a sparse spike train and $h$ a short blur kernel; then $H \in \R^{M\times N}$
+is a banded convolution matrix. LASSO
+\[
+   \hat{x} = \arg\min_x \frac12 \norm{y - H x}_2^2 + \lambda \norm{x}_1
+\]
+recovers spike locations and amplitudes that are much closer to the true ones than a least--squares
+or $\ell_2$--penalized approach, exploiting the sparsity structure.
+
+\subsection{Missing data / inpainting}
+
+Let $S$ be a selection matrix that picks observed samples of $s$, so $y = S s$, and suppose
+$s = A c$ with sparse $c$. Then $y = S A c$ and we solve
+\[
+   \hat{c} = \arg\min_c \frac12 \norm{y - S A c}_2^2 + \lambda \norm{c}_1,
+\]
+and define $\hat{s} = A \hat{c}$. The missing entries (unobserved components of $S$) are
+filled in by the sparse model. This is a LASSO instance in the coefficient domain.
+
+\subsection{Morphological component separation}
+
+For a signal $y$ consisting of two components $y_1$ and $y_2$, each sparse in different dictionaries
+$A_1$ and $A_2$, respectively,
+\[
+  y = y_1 + y_2 = A_1 c_1 + A_2 c_2,
+\]
+we solve the joint LASSO--type problem
+\[
+   \min_{c_1, c_2} \frac12 \norm{y - A_1 c_1 - A_2 c_2}_2^2 
+   + \lambda_1 \norm{c_1}_1 + \lambda_2 \norm{c_2}_1,
+\]
+and set $y_i = A_i \hat{c}_i$. This is sometimes called ``dual basis pursuit'' but is simply a
+multi--block extension of LASSO.
+
+\medskip
+\noindent
+\emph{Reminder:} The key idea is sparsity in different transform domains (morphologies) that
+allow the optimization to allocate each component to the dictionary in which it is sparse.
+
+\section{Summary}
+
+We have presented an extensive overview of the LASSO / BPD problem
+\[
+   \min_x \frac12 \norm{y - A x}_2^2 + \lambda \norm{x}_1
+\]
+from a signal--processing and inverse--problems perspective. The main messages are:
+
+\begin{itemize}
+    \item LASSO replaces an intractable $\ell_0$ objective with a convex $\ell_1$ surrogate,
+    yielding computationally feasible and theoretically well--understood optimization problems.
+
+    \item The geometric shape of the $\ell_1$--ball favors sparse solutions, in contrast to
+    $\ell_2$--based methods which tend to produce dense, low--energy solutions.
+
+    \item In special cases (scalar, orthogonal design) LASSO admits closed--form solutions
+    via soft--thresholding, illuminating the role of shrinkage and sparsity.
+
+    \item In general, LASSO is efficiently solvable via first--order methods (ISTA, FISTA,
+    and splitting / ADMM--type algorithms), especially when $A$ has structure (frames,
+    convolutions, transforms).
+
+    \item Under appropriate conditions (RIP, coherence bounds), LASSO provides strong
+    guarantees for sparse recovery, both in noiseless and noisy settings.
+
+    \item Many practical signal processing problems --- including denoising, deconvolution,
+    inpainting, and component separation --- can be expressed as LASSO or multi--block
+    LASSO problems by modeling signals as sparse in suitable dictionaries.
+\end{itemize}
+
+\end{document}
