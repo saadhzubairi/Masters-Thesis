@@ -1,0 +1,580 @@
+
+<!DOCTYPE html
+  PUBLIC "-//W3C//DTD HTML 4.01 Transitional//EN">
+<html>
+   <head>
+      <meta http-equiv="Content-Type" content="text/html; charset=utf-8">
+   
+      <!--
+This HTML is auto-generated from an M-file.
+To make changes, update the M-file and republish this document.
+      -->
+      <title>Example: Sparse deconvolution</title>
+      <meta name="generator" content="MATLAB 7.8">
+      <meta name="date" content="2012-11-16">
+      <meta name="m-file" content="Example"><style type="text/css">
+
+body {
+  background-color: white;
+  margin:10px;
+}
+
+h1 {
+  color: #990000; 
+  font-size: x-large;
+}
+
+h2 {
+  color: #990000;
+  font-size: medium;
+}
+
+/* Make the text shrink to fit narrow windows, but not stretch too far in 
+wide windows. */ 
+p,h1,h2,div.content div {
+  max-width: 600px;
+  /* Hack for IE6 */
+  width: auto !important; width: 600px;
+}
+
+pre.codeinput {
+  background: #EEEEEE;
+  padding: 10px;
+}
+@media print {
+  pre.codeinput {word-wrap:break-word; width:100%;}
+} 
+
+span.keyword {color: #0000FF}
+span.comment {color: #228B22}
+span.string {color: #A020F0}
+span.untermstring {color: #B20000}
+span.syscmd {color: #B28C00}
+
+pre.codeoutput {
+  color: #666666;
+  padding: 10px;
+}
+
+pre.error {
+  color: red;
+}
+
+p.footer {
+  text-align: right;
+  font-size: xx-small;
+  font-weight: lighter;
+  font-style: italic;
+  color: gray;
+}
+
+  </style></head>
+   <body>
+      <div class="content">
+         <h1>Example: Sparse deconvolution</h1>
+         <!--introduction-->
+         <p>Deconvolution of a spike signal with a comparison of two penalty functions. The algorithm is based on quadratic MM and uses
+            a fast solver for banded systems.
+         </p><pre>Reference: Penalty and Shrinkage Functions for Sparse Signal Processing
+Ivan Selesnick, NYU-Poly, selesi@poly.edu, 2012</pre><p><a href="http://eeweb.poly.edu/iselesni/lecture_notes/">http://eeweb.poly.edu/iselesni/lecture_notes/</a></p>
+         <!--/introduction-->
+         <h2>Contents</h2>
+         <div>
+            <ul>
+               <li><a href="#1">Start</a></li>
+               <li><a href="#2">Create spike signal</a></li>
+               <li><a href="#3">Create observed signal</a></li>
+               <li><a href="#4">Create convolution matrix H</a></li>
+               <li><a href="#7">Least square solution</a></li>
+               <li><a href="#8">Verify banded system solver</a></li>
+               <li><a href="#9">Sparse deconvolution - L1 norm penalty</a></li>
+               <li><a href="#12">Verify optimality conditions</a></li>
+               <li><a href="#13">Sparse deconvolution - nn garrote penalty</a></li>
+               <li><a href="#16">Verify (local) optimality conditions</a></li>
+               <li><a href="#17">Comparison</a></li>
+            </ul>
+         </div>
+         <h2>Start<a name="1"></a></h2><pre class="codeinput">close <span class="string">all</span>
+clear
+randn(<span class="string">'state'</span>,0);           <span class="comment">% set state so that example can be reproduced</span>
+
+printme = @(txt) print(<span class="string">'-dpdf'</span>, sprintf(<span class="string">'figures/Example_%s'</span>,txt));
+</pre><h2>Create spike signal<a name="2"></a></h2><pre class="codeinput">N = 100;                    <span class="comment">% N : length of signal</span>
+s = zeros(N,1);
+k = [20 45 70];
+a = [2 -1 1];               <span class="comment">% a : spike amplitudes</span>
+s(k) = a;                   <span class="comment">% s : spike signal</span>
+
+figure(1)
+clf
+subplot(2,1,1)
+stem(s, <span class="string">'marker'</span>, <span class="string">'none'</span>)
+box <span class="string">off</span>
+title(<span class="string">'Sparse signal'</span>);
+ylim1 = [-1.5 2.5];
+ylim(ylim1)
+printme(<span class="string">'original'</span>)
+</pre><img vspace="5" hspace="5" src="Example_01.png" alt=""> <h2>Create observed signal<a name="3"></a></h2>
+         <p>The simulated observed signal is obtained by convolving the signal with a 4-point impulse response and adding noise.</p><pre class="codeinput">L = 4;                      <span class="comment">% L : length of impulse response</span>
+h = ones(L,1)/L;            <span class="comment">% h : impulse response</span>
+
+M = N + L - 1;              <span class="comment">% M : length of observed signal</span>
+sigma = 0.03;               <span class="comment">% sigma : standard deviation of AWGN</span>
+w = sigma * randn(M,1);     <span class="comment">% w : additive zero-mean Gaussian noise (AWGN)</span>
+y = conv(h,s) + w;          <span class="comment">% y : observed data</span>
+
+figure(2)
+clf
+subplot(2,1,1)
+plot(y)
+box <span class="string">off</span>
+xlim([0 M])
+title(<span class="string">'Observed signal'</span>);
+printme(<span class="string">'observed'</span>)
+</pre><img vspace="5" hspace="5" src="Example_02.png" alt=""> <h2>Create convolution matrix H<a name="4"></a></h2>
+         <p>Create the convolution matrix H using Matlab sparse matrix functions 'sparse' and 'spdiags'.  By making H a sparse matrix:
+            - less memory is used, - multiplying vectors by H is faster, - fast algorithms for solving banded systems will be used.
+         </p><pre class="codeinput">H = sparse(M,N);
+e = ones(N,1);
+<span class="keyword">for</span> i = 0:L-1
+    H = H + spdiags(h(i+1)*e, -i, M, N);            <span class="comment">% H : convolution matrix (sparse)</span>
+<span class="keyword">end</span>
+issparse(H)                                         <span class="comment">% confirm that H is a sparse matrix</span>
+</pre><pre class="codeoutput">
+ans =
+
+     1
+
+</pre><p>Verify that H*s is the same as conv(h,s)</p><pre class="codeinput">err = H*s - conv(h,s);
+max_err = max(abs(err));
+fprintf(<span class="string">'Maximum error = %g\n'</span>, max_err)
+</pre><pre class="codeoutput">Maximum error = 0
+</pre><p>Display structure of convolution matrix. Note that the matrix is banded (sparse).</p><pre class="codeinput">figure(1)
+clf
+spy(H(1:24,1:21))
+</pre><img vspace="5" hspace="5" src="Example_03.png" alt=""> <h2>Least square solution<a name="7"></a></h2>
+         <p>Find the least square solution to the deconvolution problem.</p><pre class="codeinput">lambda = 0.4;                                       <span class="comment">% lambda : regularization parameter</span>
+
+x_L2 = (H'*H + lambda*speye(N)) \ (H' * y);         <span class="comment">% x_L2 : least square solution</span>
+
+rmse_L2 = sqrt(mean((x_L2 - s).^2));
+fprintf(<span class="string">'Least square solution: RMSE = %f\n'</span>, rmse_L2);
+
+figure(2)
+clf
+subplot(2,1,1)
+stem(x_L2, <span class="string">'marker'</span>, <span class="string">'none'</span>)
+box <span class="string">off</span>
+title(<span class="string">'Deconvolution (least square solution)'</span>);
+axnote(sprintf(<span class="string">'RMSE = %.4f'</span>, rmse_L2))
+printme(<span class="string">'L2'</span>)
+</pre><pre class="codeoutput">Least square solution: RMSE = 0.192453
+</pre><img vspace="5" hspace="5" src="Example_04.png" alt=""> <h2>Verify banded system solver<a name="8"></a></h2>
+         <p>Verify that MATLAB calls LAPACKS's fast algorithm for solving banded systems</p><pre class="codeinput">spparms(<span class="string">'spumoni'</span>, 3);      <span class="comment">% Set sparse monitor flag to obtain diagnostic output</span>
+
+x_L2 = (H'*H + lambda*speye(N)) \ (H' * y);         <span class="comment">% x_L2 : least square solution</span>
+
+<span class="comment">%  Diagnostic output:</span>
+<span class="comment">%</span>
+<span class="comment">% sp\: bandwidth = 3+1+3.</span>
+<span class="comment">% sp\: is A diagonal? no.</span>
+<span class="comment">% sp\: is band density (1.00) &gt; bandden (0.50) to try banded solver? yes.</span>
+<span class="comment">% sp\: is LAPACK's banded solver successful? yes.</span>
+
+spparms(<span class="string">'spumoni'</span>, 0);      <span class="comment">% Reset sparse monitor flag to no diagnostic output</span>
+</pre><pre class="codeoutput">sp\: bandwidth = 3+1+3.
+sp\: is A diagonal? no.
+sp\: is band density (1.00) &gt; bandden (0.50) to try banded solver? yes.
+sp\: is LAPACK's banded solver successful? yes.
+</pre><h2>Sparse deconvolution - L1 norm penalty<a name="9"></a></h2>
+         <p>The penalty function is phi(x) = lam abs(x)</p><pre class="codeinput">T = 3 * sigma * sqrt(sum(abs(h).^2));   <span class="comment">% T : threshold using '3-sigma' rule</span>
+
+lam = T;
+Nit = 50;
+
+phi_L1 = @(x) lam * abs(x);
+wfun_L1 = @(x) abs(x)/lam;
+dphi_L1 = @(x) lam * sign(x);
+
+[x1, cost1] = deconv_MM(y, phi_L1, wfun_L1, H, Nit);
+
+rmse1 = sqrt(mean((x1 - s).^2));
+fprintf(<span class="string">'L1 norm solution: RMSE = %f\n'</span>, rmse1);
+</pre><pre class="codeoutput">L1 norm solution: RMSE = 0.034072
+</pre><p>Display cost function history</p><pre class="codeinput">figure(1)
+clf
+plot(1:Nit, cost1, <span class="string">'.-'</span>)
+title(<span class="string">'Cost function history'</span>);
+xlabel(<span class="string">'Iteration'</span>)
+xlim([0 Nit])
+box <span class="string">off</span>
+printme(<span class="string">'CostFunction_L1'</span>)
+</pre><img vspace="5" hspace="5" src="Example_05.png" alt=""> <p>The L1 solution is quite similar to the original signal (much more so than the least square solution).</p><pre class="codeinput">figure(2)
+clf
+subplot(2,1,1)
+stem(x1, <span class="string">'marker'</span>, <span class="string">'none'</span>)
+box <span class="string">off</span>
+ylim(ylim1);
+title(<span class="string">'Deconvolution (L1 norm penalty)'</span>);
+axnote(sprintf(<span class="string">'RMSE = %.4f'</span>, rmse1))
+printme(<span class="string">'L1'</span>)
+</pre><img vspace="5" hspace="5" src="Example_06.png" alt=""> <h2>Verify optimality conditions<a name="12"></a></h2><pre class="codeinput">v1 = H'*(y-H*x1);
+
+t = [linspace(-2, -eps, 100) linspace(eps, 2, 100)];
+
+figure(1)
+clf
+plot(x1, v1, <span class="string">'.'</span>)
+line(t, dphi_L1(t), <span class="string">'linestyle'</span>, <span class="string">':'</span>)
+box <span class="string">off</span>
+ylim([-1 1]*lam*1.5)
+xlabel(<span class="string">'x'</span>)
+ylabel(<span class="string">'H^T(y - Hx)'</span>)
+title(<span class="string">'Optimality scatter plot - L1 penalty'</span>);
+
+printme(<span class="string">'scatter_L1'</span>)
+</pre><img vspace="5" hspace="5" src="Example_07.png" alt=""> <h2>Sparse deconvolution - nn garrote penalty<a name="13"></a></h2>
+         <p>The penalty function corresponds to the nn garrote shrinkage function.</p><pre class="codeinput">dphi = @(x) 0.5 * (- abs(x) + sqrt( x.^2 + 4*T^2 ) ) .* sign(x);
+
+phi = @(x) T^2*asinh(abs(x)/(2*T)) +0.25 * (abs(x).*sqrt(4*T^2+x.^2)-x.^2) ;
+
+wfun = @(x) 1/(2*T^2) * abs(x) .* ( sqrt(x.^2 + 4*T^2) + abs(x) );  <span class="comment">% x / dphi(x)</span>
+
+[x2, cost2] = deconv_MM(y, phi, wfun, H, Nit);
+
+rmse2 = sqrt(mean((x2 - s).^2));
+fprintf(<span class="string">'nn-garrote solution: RMSE = %f\n'</span>, rmse2);
+</pre><pre class="codeoutput">nn-garrote solution: RMSE = 0.004564
+</pre><p>Display cost function history</p><pre class="codeinput">figure(1)
+clf
+plot(1:Nit, cost2, <span class="string">'.-'</span>)
+title(<span class="string">'Cost function history'</span>);
+xlabel(<span class="string">'Iteration'</span>)
+xlim([0 Nit])
+box <span class="string">off</span>
+printme(<span class="string">'CostFunction_garrote'</span>)
+</pre><img vspace="5" hspace="5" src="Example_08.png" alt=""> <pre class="codeinput">figure(2)
+clf
+subplot(2,1,1)
+stem(x2, <span class="string">'marker'</span>, <span class="string">'none'</span>)
+box <span class="string">off</span>
+ylim(ylim1);
+title(<span class="string">'Deconvolution (nn-garrote)'</span>);
+axnote(sprintf(<span class="string">'RMSE = %.4f'</span>, rmse2))
+printme(<span class="string">'garrote'</span>)
+</pre><img vspace="5" hspace="5" src="Example_09.png" alt=""> <h2>Verify (local) optimality conditions<a name="16"></a></h2><pre class="codeinput">v2 = H'*(y-H*x2);
+
+figure(1)
+clf
+plot(x2, v2, <span class="string">'.'</span>)
+line(t, dphi(t), <span class="string">'linestyle'</span>, <span class="string">':'</span>)
+box <span class="string">off</span>
+ylim([-1 1]*T*1.5)
+xlim(t([1 end]))
+xlabel(<span class="string">'x'</span>)
+ylabel(<span class="string">'H^T(y - Hx)'</span>)
+title(<span class="string">'(local) optimality scatter plot - nn garrote penalty'</span>);
+printme(<span class="string">'scatter_garrote'</span>)
+</pre><img vspace="5" hspace="5" src="Example_10.png" alt=""> <h2>Comparison<a name="17"></a></h2>
+         <p>The nn garrote penalty is more accurate than the L1 norm penalty. The result obtained using the L1 norm penalty is attenuated
+            compared with the true signal.
+         </p><pre class="codeinput">n = 1:N;
+
+k = abs(s) &gt; 1e-5;
+k1 = abs(x1) &gt; 1e-5;
+k2 = abs(x2) &gt; 1e-5;
+
+figure(1)
+clf
+subplot(3,1,[1 2])
+plot(n(k), s(k), <span class="string">'o'</span>)
+hold <span class="string">on</span>
+plot(n(k2), x2(k2),<span class="string">'+'</span>, n(k1), x1(k1),<span class="string">'x'</span>)
+line([0 N], [0 0])
+hold <span class="string">off</span>
+xlim([0 N])
+legend(<span class="string">'true'</span>, <span class="string">'nn garrote'</span>, <span class="string">'L1'</span>, <span class="string">'location'</span>, <span class="string">'se'</span>)
+box <span class="string">off</span>
+xlabel(<span class="string">'n'</span>)
+ylabel(<span class="string">'x(n)'</span>)
+printme(<span class="string">'compare'</span>)
+</pre><img vspace="5" hspace="5" src="Example_11.png" alt=""> <p class="footer"><br>
+            Published with MATLAB&reg; 7.8<br></p>
+      </div>
+      <!--
+##### SOURCE BEGIN #####
+%% Example: Sparse deconvolution
+% Deconvolution of a spike signal with a comparison of two penalty functions. 
+% The algorithm is based on quadratic MM and uses a fast solver
+% for banded systems.
+%
+%  Reference: Penalty and Shrinkage Functions for Sparse Signal Processing
+% Ivan Selesnick, NYU-Poly, selesi@poly.edu, 2012
+%
+% http://eeweb.poly.edu/iselesni/lecture_notes/
+
+
+%% Start
+
+close all
+clear
+randn('state',0);           % set state so that example can be reproduced
+
+printme = @(txt) print('-dpdf', sprintf('figures/Example_%s',txt));
+
+
+%% Create spike signal
+
+N = 100;                    % N : length of signal
+s = zeros(N,1);
+k = [20 45 70];
+a = [2 -1 1];               % a : spike amplitudes
+s(k) = a;                   % s : spike signal
+
+figure(1)
+clf
+subplot(2,1,1)
+stem(s, 'marker', 'none')
+box off
+title('Sparse signal');
+ylim1 = [-1.5 2.5];
+ylim(ylim1)
+printme('original')
+
+%% Create observed signal
+% The simulated observed signal is obtained by convolving
+% the signal with a 4-point impulse response and adding noise.
+
+L = 4;                      % L : length of impulse response
+h = ones(L,1)/L;            % h : impulse response
+
+M = N + L - 1;              % M : length of observed signal
+sigma = 0.03;               % sigma : standard deviation of AWGN
+w = sigma * randn(M,1);     % w : additive zero-mean Gaussian noise (AWGN)
+y = conv(h,s) + w;          % y : observed data
+
+figure(2)
+clf
+subplot(2,1,1)
+plot(y)
+box off
+xlim([0 M])
+title('Observed signal');
+printme('observed')
+
+
+%% Create convolution matrix H
+% Create the convolution matrix H using Matlab sparse matrix functions
+% 'sparse' and 'spdiags'.  By making H a sparse matrix:
+% - less memory is used,
+% - multiplying vectors by H is faster,
+% - fast algorithms for solving banded systems will be used.
+
+H = sparse(M,N);
+e = ones(N,1);
+for i = 0:L-1
+    H = H + spdiags(h(i+1)*e, -i, M, N);            % H : convolution matrix (sparse)
+end
+issparse(H)                                         % confirm that H is a sparse matrix
+
+%%
+% Verify that H*s is the same as conv(h,s)
+
+err = H*s - conv(h,s);
+max_err = max(abs(err));
+fprintf('Maximum error = %g\n', max_err)
+
+%%
+% Display structure of convolution matrix.
+% Note that the matrix is banded (sparse).
+
+figure(1)
+clf
+spy(H(1:24,1:21))
+
+%% Least square solution
+% Find the least square solution to the deconvolution problem.
+
+lambda = 0.4;                                       % lambda : regularization parameter
+
+x_L2 = (H'*H + lambda*speye(N)) \ (H' * y);         % x_L2 : least square solution
+
+rmse_L2 = sqrt(mean((x_L2 - s).^2));
+fprintf('Least square solution: RMSE = %f\n', rmse_L2);
+
+figure(2)
+clf
+subplot(2,1,1)
+stem(x_L2, 'marker', 'none')
+box off
+title('Deconvolution (least square solution)');
+axnote(sprintf('RMSE = %.4f', rmse_L2))
+printme('L2')
+
+%% Verify banded system solver
+% Verify that MATLAB calls LAPACKS's fast algorithm for solving banded systems
+
+spparms('spumoni', 3);      % Set sparse monitor flag to obtain diagnostic output
+
+x_L2 = (H'*H + lambda*speye(N)) \ (H' * y);         % x_L2 : least square solution
+
+%  Diagnostic output:
+%
+% sp\: bandwidth = 3+1+3.
+% sp\: is A diagonal? no.
+% sp\: is band density (1.00) > bandden (0.50) to try banded solver? yes.
+% sp\: is LAPACK's banded solver successful? yes.
+
+spparms('spumoni', 0);      % Reset sparse monitor flag to no diagnostic output
+
+
+%% Sparse deconvolution - L1 norm penalty
+% The penalty function is phi(x) = lam abs(x)
+
+T = 3 * sigma * sqrt(sum(abs(h).^2));   % T : threshold using '3-sigma' rule
+
+lam = T;
+Nit = 50;
+
+phi_L1 = @(x) lam * abs(x);
+wfun_L1 = @(x) abs(x)/lam;
+dphi_L1 = @(x) lam * sign(x);
+
+[x1, cost1] = deconv_MM(y, phi_L1, wfun_L1, H, Nit);
+
+rmse1 = sqrt(mean((x1 - s).^2));
+fprintf('L1 norm solution: RMSE = %f\n', rmse1);
+
+%%
+% Display cost function history
+
+figure(1)
+clf
+plot(1:Nit, cost1, '.-')
+title('Cost function history');
+xlabel('Iteration')
+xlim([0 Nit])
+box off
+printme('CostFunction_L1')
+
+%%
+% The L1 solution is quite similar to the original signal
+% (much more so than the least square solution).
+
+figure(2)
+clf
+subplot(2,1,1)
+stem(x1, 'marker', 'none')
+box off
+ylim(ylim1);
+title('Deconvolution (L1 norm penalty)');
+axnote(sprintf('RMSE = %.4f', rmse1))
+printme('L1')
+
+%% Verify optimality conditions
+
+v1 = H'*(y-H*x1);
+
+t = [linspace(-2, -eps, 100) linspace(eps, 2, 100)];
+
+figure(1)
+clf
+plot(x1, v1, '.') 
+line(t, dphi_L1(t), 'linestyle', ':') 
+box off
+ylim([-1 1]*lam*1.5)
+xlabel('x')
+ylabel('H^T(y - Hx)')
+title('Optimality scatter plot - L1 penalty');
+
+printme('scatter_L1')
+
+
+%% Sparse deconvolution - nn garrote penalty
+% The penalty function corresponds to the nn garrote shrinkage function.
+
+dphi = @(x) 0.5 * (- abs(x) + sqrt( x.^2 + 4*T^2 ) ) .* sign(x);
+
+phi = @(x) T^2*asinh(abs(x)/(2*T)) +0.25 * (abs(x).*sqrt(4*T^2+x.^2)-x.^2) ;    
+
+wfun = @(x) 1/(2*T^2) * abs(x) .* ( sqrt(x.^2 + 4*T^2) + abs(x) );  % x / dphi(x)
+
+[x2, cost2] = deconv_MM(y, phi, wfun, H, Nit);
+
+rmse2 = sqrt(mean((x2 - s).^2));
+fprintf('nn-garrote solution: RMSE = %f\n', rmse2);
+
+%%
+% Display cost function history
+
+figure(1)
+clf
+plot(1:Nit, cost2, '.-')
+title('Cost function history');
+xlabel('Iteration')
+xlim([0 Nit])
+box off
+printme('CostFunction_garrote')
+
+%%
+
+figure(2)
+clf
+subplot(2,1,1)
+stem(x2, 'marker', 'none')
+box off
+ylim(ylim1);
+title('Deconvolution (nn-garrote)');
+axnote(sprintf('RMSE = %.4f', rmse2))
+printme('garrote')
+
+
+%% Verify (local) optimality conditions
+
+v2 = H'*(y-H*x2);
+
+figure(1)
+clf
+plot(x2, v2, '.')
+line(t, dphi(t), 'linestyle', ':')
+box off
+ylim([-1 1]*T*1.5)
+xlim(t([1 end]))
+xlabel('x')
+ylabel('H^T(y - Hx)')
+title('(local) optimality scatter plot - nn garrote penalty');
+printme('scatter_garrote')
+
+
+%% Comparison
+% The nn garrote penalty is more accurate than the L1 norm penalty.
+% The result obtained using the L1 norm penalty is attenuated
+% compared with the true signal.
+
+n = 1:N;
+
+k = abs(s) > 1e-5;
+k1 = abs(x1) > 1e-5;
+k2 = abs(x2) > 1e-5;
+
+figure(1)
+clf
+subplot(3,1,[1 2])
+plot(n(k), s(k), 'o') 
+hold on
+plot(n(k2), x2(k2),'+', n(k1), x1(k1),'x') 
+line([0 N], [0 0])
+hold off
+xlim([0 N])
+legend('true', 'nn garrote', 'L1', 'location', 'se')
+box off
+xlabel('n')
+ylabel('x(n)')
+printme('compare')
+
+%%
+
+##### SOURCE END #####
+-->
+   </body>
+</html>

@@ -1,0 +1,427 @@
+
+<!DOCTYPE html
+  PUBLIC "-//W3C//DTD HTML 4.01 Transitional//EN">
+<html><head>
+      <meta http-equiv="Content-Type" content="text/html; charset=utf-8">
+   <!--
+This HTML was auto-generated from MATLAB code.
+To make changes, update the MATLAB code and republish this document.
+      --><title>Example1: Sparse Deconvolution</title><meta name="generator" content="MATLAB 7.12"><link rel="schema.DC" href="http://purl.org/dc/elements/1.1/"><meta name="DC.date" content="2014-01-01"><meta name="DC.source" content="Example1.m"><style type="text/css">
+
+body {
+  background-color: white;
+  margin:10px;
+}
+
+h1 {
+  color: #990000; 
+  font-size: x-large;
+}
+
+h2 {
+  color: #990000;
+  font-size: medium;
+}
+
+/* Make the text shrink to fit narrow windows, but not stretch too far in 
+wide windows. */ 
+p,h1,h2,div.content div {
+  max-width: 600px;
+  /* Hack for IE6 */
+  width: auto !important; width: 600px;
+}
+
+pre.codeinput {
+  background: #EEEEEE;
+  padding: 10px;
+}
+@media print {
+  pre.codeinput {word-wrap:break-word; width:100%;}
+} 
+
+span.keyword {color: #0000FF}
+span.comment {color: #228B22}
+span.string {color: #A020F0}
+span.untermstring {color: #B20000}
+span.syscmd {color: #B28C00}
+
+pre.codeoutput {
+  color: #666666;
+  padding: 10px;
+}
+
+pre.error {
+  color: red;
+}
+
+p.footer {
+  text-align: right;
+  font-size: xx-small;
+  font-weight: lighter;
+  font-style: italic;
+  color: gray;
+}
+
+  </style></head><body><div class="content"><h1>Example1: Sparse Deconvolution</h1><!--introduction--><p>Sparse deconvolution by L1 norm minimization using majorization-minimization and fast solvers for banded systems.</p><p>Ivan Selesnick, Polytechnic Institute of New York University, October 2012</p><!--/introduction--><h2>Contents</h2><div><ul><li><a href="#1">Start</a></li><li><a href="#2">Create data</a></li><li><a href="#5">Verify banded matrices</a></li><li><a href="#6">Sparse deconvolution</a></li><li><a href="#7">Verify optimality conditions</a></li><li><a href="#8">Optimality condition - bound</a></li><li><a href="#9">Selection of lambda</a></li><li><a href="#11">Least squares solution</a></li></ul></div><h2>Start<a name="1"></a></h2><pre class="codeinput">clear
+close <span class="string">all</span>
+printme = @(filename) print(<span class="string">'-dpdf'</span>, sprintf(<span class="string">'figures/Example1_%s'</span>, filename));
+</pre><h2>Create data<a name="2"></a></h2><pre class="codeinput">N = 300;                                <span class="comment">% N : signal length</span>
+x = zeros(N,1);
+x(50) = 1;
+x(80) = 0.5;
+x(100) = -0.3;
+
+b = [1 0.8];                            <span class="comment">% Define filter</span>
+r = 0.9; om = 0.95;
+a = [1 -2*r*cos(om) r^2];
+hx = filter(b,a,x);
+
+h = filter(b, a, [1 zeros(1,N)]);       <span class="comment">% Calculate impulse response.</span>
+
+randn(<span class="string">'state'</span>,0);                       <span class="comment">% Set seed to example reproducible</span>
+sigma = 0.2;
+noise = sigma*randn(N,1);
+y = hx + noise;
+
+figure(1)
+clf
+subplot(2,1,1)
+plot(x)
+box <span class="string">off</span>
+title(<span class="string">'Sparse Signal'</span>);
+
+subplot(2,1,2)
+plot(hx)
+box <span class="string">off</span>
+title(<span class="string">'Convolution'</span>);
+
+printme(<span class="string">'original'</span>)
+</pre><img vspace="5" hspace="5" src="Example1_01.png" alt=""> <pre class="codeinput">3*sigma*sqrt(sum(abs(h).^2))
+</pre><pre class="codeoutput">
+ans =
+
+    2.0091
+
+</pre><pre class="codeinput">figure(2)
+clf
+subplot(2,1,1)
+plot(y);
+box <span class="string">off</span>
+title(<span class="string">'Noisy data'</span>);
+
+printme(<span class="string">'data'</span>)
+</pre><img vspace="5" hspace="5" src="Example1_02.png" alt=""> <h2>Verify banded matrices<a name="5"></a></h2><p>Verify that the banded matrics (A,B) implement the difference equation. It should be consistent with the 'filter' commaned.</p><pre class="codeinput">Nb = length(b);
+Na = length(a);
+e = ones(N, 1);
+B = spdiags(b(ones(N,1), :), 0:-1:1-Nb, N, N);
+A = spdiags(a(ones(N,1), :), 0:-1:1-Na, N, N);
+
+H = @(x) A\(B*x);                                       <span class="comment">% filter</span>
+
+err = H(noise) - filter(b,a,noise);
+max(abs(err))
+
+<span class="comment">% This verifies that inv(A)*B*x is the same as filter(b,a,x)</span>
+</pre><pre class="codeoutput">
+ans =
+
+   4.4409e-16
+
+</pre><h2>Sparse deconvolution<a name="6"></a></h2><pre class="codeinput">lam = 2.0;                                      <span class="comment">% lam : regularization parameter</span>
+Nit = 100;                                      <span class="comment">% Nit : number of iterations</span>
+[x_, cost] = deconvL1(y, lam, b, a, Nit);       <span class="comment">% Run algorithm</span>
+
+figure(2)
+clf
+subplot(2,1,1)
+plot(1:Nit, cost, <span class="string">'.-'</span>)
+box <span class="string">off</span>
+title(<span class="string">'Cost function history'</span>);
+xlabel(<span class="string">'Iteration'</span>)
+xlim([0 20])
+
+printme(<span class="string">'cost'</span>)
+
+figure(1)
+clf
+subplot(2,1,1)
+plot(x_)
+ylim([-0.5 1])
+box <span class="string">off</span>
+title(<span class="string">'Sparse deconvolution'</span>);
+axnote(sprintf(<span class="string">'\\lambda = %.2f'</span>, lam))
+
+printme(<span class="string">'deconv_L1'</span>)
+</pre><img vspace="5" hspace="5" src="Example1_03.png" alt=""> <img vspace="5" hspace="5" src="Example1_04.png" alt=""> <h2>Verify optimality conditions<a name="7"></a></h2><p>Verify that the solution produced by 'deconvL1' satifies the optimality conditions. The points in the scatter plot should lie on the dashed lines.</p><pre class="codeinput">HT = @(x) B'*(A'\x);            <span class="comment">% filter transpose H'</span>
+z = HT(y - H(x_));
+
+figure(1)
+clf
+
+m = max(abs(x_));
+line([-m 0 0 m]*1.2, [-1 -1 1 1]*lam, <span class="string">'color'</span>, [1 1 1]*0.5)
+
+line(x_, z, <span class="string">'marker'</span>, <span class="string">'.'</span>, <span class="string">'linestyle'</span>, <span class="string">'none'</span>)
+title(<span class="string">'Optimality conditions'</span>)
+
+ylim([-1 1]*1.5*lam)
+xlim([-1 1]*1.2*m)
+
+ylabel(<span class="string">'H^T(y-Hx)'</span>)
+xlabel(<span class="string">'x'</span>)
+box <span class="string">off</span>
+
+set(gca,<span class="string">'fontname'</span>,<span class="string">'symbol'</span>)
+set(gca, <span class="string">'ytick'</span>, [-1 0 1]*lam, <span class="string">'yticklabel'</span>, {<span class="string">'-l'</span>, <span class="string">'0'</span>, <span class="string">'l'</span>});
+
+printme(<span class="string">'optim'</span>)
+</pre><img vspace="5" hspace="5" src="Example1_05.png" alt=""> <h2>Optimality condition - bound<a name="8"></a></h2><p>The signal H^T(y - Hx) should lie within the bounds [-lambda, lambda]</p><pre class="codeinput">figure(1)
+clf
+subplot(2,1,1)
+plot(z)
+xlim([0 N])
+box <span class="string">off</span>
+line([0 N],[1 1]*lam, <span class="string">'linestyle'</span>, <span class="string">'--'</span>)
+line([0 N],-[1 1]*lam, <span class="string">'linestyle'</span>, <span class="string">'--'</span>)
+title(<span class="string">'H^T(y - Hx)'</span>);
+ylim([-1.5 2]*lam)
+
+set(gca,<span class="string">'fontname'</span>,<span class="string">'symbol'</span>)
+set(gca, <span class="string">'ytick'</span>, [-1 0 1]*lam, <span class="string">'yticklabel'</span>, {<span class="string">'-l'</span>, <span class="string">'0'</span>, <span class="string">'l'</span>});
+
+printme(<span class="string">'bound'</span>)
+</pre><img vspace="5" hspace="5" src="Example1_06.png" alt=""> <h2>Selection of lambda<a name="9"></a></h2><p>lambda may be chosen as the minimum of H^T(noise)</p><pre class="codeinput">figure(2)
+clf
+subplot(2,1,1)
+plot(HT(noise))
+xlim([0 N])
+box <span class="string">off</span>
+title(<span class="string">'H^{T}w'</span>);
+ylim([-1.5 2]*lam)
+
+printme(<span class="string">'HTnoise'</span>)
+</pre><img vspace="5" hspace="5" src="Example1_07.png" alt=""> <pre class="codeinput">max(abs(HT(noise)))
+</pre><pre class="codeoutput">
+ans =
+
+    1.8953
+
+</pre><h2>Least squares solution<a name="11"></a></h2><pre class="codeinput">lam = 2;                                    <span class="comment">% lam : regularization parameter</span>
+AAT = A*A';                                 <span class="comment">% A*A' : banded matrix</span>
+g = (1/lam) * (A'\(B'*y));                  <span class="comment">% (1/lam) H'*y</span>
+F = lam*AAT + B*B';                         <span class="comment">% F : banded matrix</span>
+s = g - (B'*(F\(B*g)));
+
+figure(2)
+clf
+subplot(2,1,1)
+plot(s)
+box <span class="string">off</span>
+ylim([-0.5 1])
+title(<span class="string">'Least square deconvolution'</span>);
+
+printme(<span class="string">'deconv_L2'</span>)
+</pre><img vspace="5" hspace="5" src="Example1_08.png" alt=""> <p class="footer"><br>
+      Published with MATLAB&reg; 7.12<br></p></div><!--
+##### SOURCE BEGIN #####
+%% Example1: Sparse Deconvolution
+% Sparse deconvolution by L1 norm minimization
+% using majorization-minimization
+% and fast solvers for banded systems.
+%
+% Ivan Selesnick, 
+% Polytechnic Institute of New York University,
+% October 2012
+
+%% Start
+
+clear
+close all
+printme = @(filename) print('-dpdf', sprintf('figures/Example1_%s', filename));
+
+%% Create data
+
+N = 300;                                % N : signal length
+x = zeros(N,1);
+x(50) = 1;
+x(80) = 0.5;
+x(100) = -0.3;
+
+b = [1 0.8];                            % Define filter
+r = 0.9; om = 0.95;
+a = [1 -2*r*cos(om) r^2];
+hx = filter(b,a,x);
+
+h = filter(b, a, [1 zeros(1,N)]);       % Calculate impulse response.
+
+randn('state',0);                       % Set seed to example reproducible
+sigma = 0.2;
+noise = sigma*randn(N,1);
+y = hx + noise;
+
+figure(1)
+clf
+subplot(2,1,1)
+plot(x)
+box off
+title('Sparse Signal');
+
+subplot(2,1,2)
+plot(hx)
+box off
+title('Convolution');
+
+printme('original')
+
+%%
+
+3*sigma*sqrt(sum(abs(h).^2))
+
+%%
+
+figure(2)
+clf
+subplot(2,1,1)
+plot(y);
+box off
+title('Noisy data');
+
+printme('data')
+
+
+%% Verify banded matrices
+% Verify that the banded matrics (A,B) implement the difference
+% equation. It should be consistent with the 'filter' commaned.
+
+Nb = length(b);
+Na = length(a);
+e = ones(N, 1);
+B = spdiags(b(ones(N,1), :), 0:-1:1-Nb, N, N);
+A = spdiags(a(ones(N,1), :), 0:-1:1-Na, N, N);
+
+H = @(x) A\(B*x);                                       % filter
+
+err = H(noise) - filter(b,a,noise);
+max(abs(err))
+
+% This verifies that inv(A)*B*x is the same as filter(b,a,x)
+
+%% Sparse deconvolution
+
+lam = 2.0;                                      % lam : regularization parameter
+Nit = 100;                                      % Nit : number of iterations
+[x_, cost] = deconvL1(y, lam, b, a, Nit);       % Run algorithm
+
+figure(2)
+clf
+subplot(2,1,1)
+plot(1:Nit, cost, '.-')
+box off
+title('Cost function history');
+xlabel('Iteration')
+xlim([0 20])
+
+printme('cost')
+
+figure(1)
+clf
+subplot(2,1,1)
+plot(x_)
+ylim([-0.5 1])
+box off
+title('Sparse deconvolution');
+axnote(sprintf('\\lambda = %.2f', lam))
+
+printme('deconv_L1')
+
+
+%% Verify optimality conditions
+% Verify that the solution produced by 'deconvL1'
+% satifies the optimality conditions.
+% The points in the scatter plot should lie on
+% the dashed lines.
+
+HT = @(x) B'*(A'\x);            % filter transpose H'
+z = HT(y - H(x_));
+
+figure(1)
+clf
+
+m = max(abs(x_));
+line([-m 0 0 m]*1.2, [-1 -1 1 1]*lam, 'color', [1 1 1]*0.5)
+
+line(x_, z, 'marker', '.', 'linestyle', 'none')
+title('Optimality conditions')
+
+ylim([-1 1]*1.5*lam)
+xlim([-1 1]*1.2*m)
+
+ylabel('H^T(y-Hx)')
+xlabel('x')
+box off
+
+set(gca,'fontname','symbol')
+set(gca, 'ytick', [-1 0 1]*lam, 'yticklabel', {'-l', '0', 'l'});
+
+printme('optim')
+
+%% Optimality condition - bound 
+% The signal H^T(y - Hx) should lie within the bounds [-lambda, lambda]
+
+figure(1)
+clf
+subplot(2,1,1)
+plot(z)
+xlim([0 N])
+box off
+line([0 N],[1 1]*lam, 'linestyle', 'REPLACE_WITH_DASH_DASH')
+line([0 N],-[1 1]*lam, 'linestyle', 'REPLACE_WITH_DASH_DASH')
+title('H^T(y - Hx)');
+ylim([-1.5 2]*lam)
+
+set(gca,'fontname','symbol')
+set(gca, 'ytick', [-1 0 1]*lam, 'yticklabel', {'-l', '0', 'l'});
+
+printme('bound')
+
+
+%% Selection of lambda
+% lambda may be chosen as the minimum of H^T(noise)
+
+figure(2)
+clf
+subplot(2,1,1)
+plot(HT(noise))
+xlim([0 N])
+box off
+title('H^{T}w');
+ylim([-1.5 2]*lam)
+
+printme('HTnoise')
+
+%%
+
+max(abs(HT(noise)))
+
+%% Least squares solution
+
+lam = 2;                                    % lam : regularization parameter
+AAT = A*A';                                 % A*A' : banded matrix
+g = (1/lam) * (A'\(B'*y));                  % (1/lam) H'*y
+F = lam*AAT + B*B';                         % F : banded matrix
+s = g - (B'*(F\(B*g)));
+
+figure(2)
+clf
+subplot(2,1,1)
+plot(s)
+box off
+ylim([-0.5 1])
+title('Least square deconvolution');
+
+printme('deconv_L2')
+
+
+
+##### SOURCE END #####
+--></body></html>

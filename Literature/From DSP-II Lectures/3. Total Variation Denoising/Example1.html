@@ -1,0 +1,256 @@
+
+<!DOCTYPE html
+  PUBLIC "-//W3C//DTD HTML 4.01 Transitional//EN">
+<html><head>
+      <meta http-equiv="Content-Type" content="text/html; charset=utf-8">
+   <!--
+This HTML was auto-generated from MATLAB code.
+To make changes, update the MATLAB code and republish this document.
+      --><title>Example: TV Denoising using MM</title><meta name="generator" content="MATLAB 7.12"><link rel="schema.DC" href="http://purl.org/dc/elements/1.1/"><meta name="DC.date" content="2017-01-23"><meta name="DC.source" content="Example1.m"><style type="text/css">
+
+body {
+  background-color: white;
+  margin:10px;
+}
+
+h1 {
+  color: #990000; 
+  font-size: x-large;
+}
+
+h2 {
+  color: #990000;
+  font-size: medium;
+}
+
+/* Make the text shrink to fit narrow windows, but not stretch too far in 
+wide windows. */ 
+p,h1,h2,div.content div {
+  max-width: 600px;
+  /* Hack for IE6 */
+  width: auto !important; width: 600px;
+}
+
+pre.codeinput {
+  background: #EEEEEE;
+  padding: 10px;
+}
+@media print {
+  pre.codeinput {word-wrap:break-word; width:100%;}
+} 
+
+span.keyword {color: #0000FF}
+span.comment {color: #228B22}
+span.string {color: #A020F0}
+span.untermstring {color: #B20000}
+span.syscmd {color: #B28C00}
+
+pre.codeoutput {
+  color: #666666;
+  padding: 10px;
+}
+
+pre.error {
+  color: red;
+}
+
+p.footer {
+  text-align: right;
+  font-size: xx-small;
+  font-weight: lighter;
+  font-style: italic;
+  color: gray;
+}
+
+  </style></head><body><div class="content"><h1>Example: TV Denoising using MM</h1><!--introduction--><p>TV denoising using an algorithm derived using majorization-minimization (MM) and solvers for sparse banded systems. See accompanying notes.</p><p>Ivan Selesnick, <a href="mailto:selesi@nyu.edu">selesi@nyu.edu</a>, 2011. Revised 2017</p><!--/introduction--><h2>Contents</h2><div><ul><li><a href="#1">Start</a></li><li><a href="#2">Create data</a></li><li><a href="#3">TV Denoising</a></li><li><a href="#4">Compare two algorithms</a></li><li><a href="#5">Optimality condition</a></li><li><a href="#6">Optimality scatter plot</a></li></ul></div><h2>Start<a name="1"></a></h2><pre class="codeinput">clear
+
+printme = @(filename) print(<span class="string">'-dpdf'</span>, sprintf(<span class="string">'Example1_%s'</span>, filename));
+</pre><h2>Create data<a name="2"></a></h2><pre class="codeinput">s = load(<span class="string">'blocks.txt'</span>);         <span class="comment">% blocks signal</span>
+y = load(<span class="string">'blocks_noisy.txt'</span>);   <span class="comment">% noisy blocks signal</span>
+
+N = 256;                        <span class="comment">% N : signal length</span>
+sigma = 0.5;                    <span class="comment">% sigma : standard deviation of noise</span>
+
+figure(1)
+clf
+subplot(2,1,1)
+plot(s)
+ax = [0 N -3 6];
+axis(ax)
+title(<span class="string">'Clean signal'</span>)
+
+subplot(2,1,2)
+plot(y)
+axis(ax)
+title(<span class="string">'Noisy signal'</span>)
+
+printme(<span class="string">'fig1'</span>)
+</pre><img vspace="5" hspace="5" src="Example1_01.png" alt=""> <h2>TV Denoising<a name="3"></a></h2><p>Run TV denoising algorithm (MM algorithm)</p><pre class="codeinput">lam = 1.5;                         <span class="comment">% lam: regularization parameter</span>
+Nit = 50;                          <span class="comment">% Nit: number of iterations</span>
+[x, cost] = tvd_mm(y, lam, Nit);   <span class="comment">% Run MM TV denoising algorithm</span>
+
+figure(2)
+clf
+subplot(2,1,1)
+plot(1:Nit, cost, <span class="string">'.-'</span>)
+title(<span class="string">'Cost function history'</span>)
+xlabel(<span class="string">'Iteration'</span>)
+
+subplot(2,1,2)
+plot(x)
+axis(ax)
+title(<span class="string">'TV denoising'</span>)
+
+printme(<span class="string">'fig2'</span>)
+</pre><img vspace="5" hspace="5" src="Example1_02.png" alt=""> <h2>Compare two algorithms<a name="4"></a></h2><p>Compare convergence behavour of two algorithms: Iterative clipping and MM</p><pre class="codeinput">[x, cost] = tvd_mm(y, lam, Nit);
+[x2,cost2] = tvd_ic(y, 2*lam, Nit);
+
+figure(1)
+clf
+plot(1:Nit, cost2/2,<span class="string">'--'</span>, 1:Nit, cost,<span class="string">'-'</span>)
+legend(<span class="string">'Iterative Clipping Algorithm'</span>,<span class="string">'Majorization-Minimization Algorithm'</span>)
+xlabel(<span class="string">'Iteration'</span>)
+title(<span class="string">'Cost function history'</span>)
+
+printme(<span class="string">'fig3'</span>)
+</pre><img vspace="5" hspace="5" src="Example1_03.png" alt=""> <h2>Optimality condition<a name="5"></a></h2><p>Illustrate optimality condition: abs(cumsum(x-y)) &lt;= lambda</p><pre class="codeinput">z = cumsum(x-y) / lam;
+
+figure(1)
+clf
+subplot(2,1,1)
+plot(z)
+xlim([0 N])
+line([0 N], [1 1], <span class="string">'linestyle'</span>, <span class="string">'--'</span>)
+line([0 N], -[1 1], <span class="string">'linestyle'</span>, <span class="string">'--'</span>)
+ylabel(<span class="string">'s(n) / \lambda'</span>)
+title(<span class="string">'s(n) = cumsum(y-x)'</span>);
+
+printme(<span class="string">'optim'</span>)
+</pre><img vspace="5" hspace="5" src="Example1_04.png" alt=""> <h2>Optimality scatter plot<a name="6"></a></h2><p>Illustrate optimality conidition using scatter plot diagram</p><pre class="codeinput">z = cumsum(x-y);
+
+m = 1.2*max(abs(diff(x)));
+
+figure(1)
+clf
+plot([-m 0 0 m], [-1 -1 1 1], <span class="string">'k'</span>, diff(x), z(1:end-1)/lam, <span class="string">'or'</span>)
+ylabel(<span class="string">'cumsum(y-x) / \lambda'</span>)
+xlabel(<span class="string">'diff(x)'</span>)
+xlim([-m m])
+
+printme(<span class="string">'optim_scatter'</span>)
+</pre><img vspace="5" hspace="5" src="Example1_05.png" alt=""> <p class="footer"><br>
+      Published with MATLAB&reg; 7.12<br></p></div><!--
+##### SOURCE BEGIN #####
+%% Example: TV Denoising using MM
+% TV denoising using an algorithm derived using majorization-minimization (MM)
+% and solvers for sparse banded systems.
+% See accompanying notes.
+%
+% Ivan Selesnick, selesi@nyu.edu, 2011.
+% Revised 2017
+
+%% Start
+
+clear
+
+printme = @(filename) print('-dpdf', sprintf('Example1_%s', filename));
+
+%% Create data
+
+s = load('blocks.txt');         % blocks signal
+y = load('blocks_noisy.txt');   % noisy blocks signal
+
+N = 256;                        % N : signal length
+sigma = 0.5;                    % sigma : standard deviation of noise
+
+figure(1)
+clf
+subplot(2,1,1)
+plot(s)
+ax = [0 N -3 6];
+axis(ax)
+title('Clean signal')
+
+subplot(2,1,2)
+plot(y)
+axis(ax)
+title('Noisy signal')
+
+printme('fig1')
+
+%% TV Denoising
+% Run TV denoising algorithm (MM algorithm)
+
+lam = 1.5;                         % lam: regularization parameter
+Nit = 50;                          % Nit: number of iterations
+[x, cost] = tvd_mm(y, lam, Nit);   % Run MM TV denoising algorithm
+
+figure(2)
+clf
+subplot(2,1,1)
+plot(1:Nit, cost, '.-')
+title('Cost function history')
+xlabel('Iteration')
+
+subplot(2,1,2)
+plot(x)
+axis(ax)
+title('TV denoising')
+
+printme('fig2')
+
+%% Compare two algorithms
+% Compare convergence behavour of two algorithms:
+% Iterative clipping and MM
+
+[x, cost] = tvd_mm(y, lam, Nit);
+[x2,cost2] = tvd_ic(y, 2*lam, Nit);
+
+figure(1)
+clf
+plot(1:Nit, cost2/2,'REPLACE_WITH_DASH_DASH', 1:Nit, cost,'-')
+legend('Iterative Clipping Algorithm','Majorization-Minimization Algorithm')
+xlabel('Iteration')
+title('Cost function history')
+
+printme('fig3')
+
+
+%% Optimality condition
+% Illustrate optimality condition: abs(cumsum(x-y)) <= lambda
+
+z = cumsum(x-y) / lam;
+
+figure(1)
+clf
+subplot(2,1,1)
+plot(z)
+xlim([0 N])
+line([0 N], [1 1], 'linestyle', 'REPLACE_WITH_DASH_DASH')
+line([0 N], -[1 1], 'linestyle', 'REPLACE_WITH_DASH_DASH')
+ylabel('s(n) / \lambda')
+title('s(n) = cumsum(y-x)');
+
+printme('optim')
+
+
+%% Optimality scatter plot
+% Illustrate optimality conidition using scatter plot diagram
+
+z = cumsum(x-y);
+
+m = 1.2*max(abs(diff(x)));
+
+figure(1)
+clf
+plot([-m 0 0 m], [-1 -1 1 1], 'k', diff(x), z(1:end-1)/lam, 'or')
+ylabel('cumsum(y-x) / \lambda')
+xlabel('diff(x)')
+xlim([-m m])
+
+printme('optim_scatter')
+
+
+
+##### SOURCE END #####
+--></body></html>

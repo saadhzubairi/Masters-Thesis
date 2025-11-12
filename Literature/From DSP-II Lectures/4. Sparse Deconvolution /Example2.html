@@ -1,0 +1,362 @@
+
+<!DOCTYPE html
+  PUBLIC "-//W3C//DTD HTML 4.01 Transitional//EN">
+<html>
+   <head>
+      <meta http-equiv="Content-Type" content="text/html; charset=utf-8">
+   
+      <!--
+This HTML is auto-generated from an M-file.
+To make changes, update the M-file and republish this document.
+      -->
+      <title>Example2 : Sparse deconvolution of speech</title>
+      <meta name="generator" content="MATLAB 7.8">
+      <meta name="date" content="2012-10-10">
+      <meta name="m-file" content="Example2"><style type="text/css">
+
+body {
+  background-color: white;
+  margin:10px;
+}
+
+h1 {
+  color: #990000; 
+  font-size: x-large;
+}
+
+h2 {
+  color: #990000;
+  font-size: medium;
+}
+
+/* Make the text shrink to fit narrow windows, but not stretch too far in 
+wide windows. */ 
+p,h1,h2,div.content div {
+  max-width: 600px;
+  /* Hack for IE6 */
+  width: auto !important; width: 600px;
+}
+
+pre.codeinput {
+  background: #EEEEEE;
+  padding: 10px;
+}
+@media print {
+  pre.codeinput {word-wrap:break-word; width:100%;}
+} 
+
+span.keyword {color: #0000FF}
+span.comment {color: #228B22}
+span.string {color: #A020F0}
+span.untermstring {color: #B20000}
+span.syscmd {color: #B28C00}
+
+pre.codeoutput {
+  color: #666666;
+  padding: 10px;
+}
+
+pre.error {
+  color: red;
+}
+
+p.footer {
+  text-align: right;
+  font-size: xx-small;
+  font-weight: lighter;
+  font-style: italic;
+  color: gray;
+}
+
+  </style></head>
+   <body>
+      <div class="content">
+         <h1>Example2 : Sparse deconvolution of speech</h1>
+         <!--introduction-->
+         <p>Apply sparse deconvolution to a segment of voiced speech</p>
+         <!--/introduction-->
+         <h2>Contents</h2>
+         <div>
+            <ul>
+               <li><a href="#1">Start</a></li>
+               <li><a href="#4">Find AR model</a></li>
+               <li><a href="#5">Pole-zero diagram</a></li>
+               <li><a href="#6">Sparse deconvolution</a></li>
+               <li><a href="#7">Display sparse input signal</a></li>
+               <li><a href="#8">Approximate reconstruction</a></li>
+               <li><a href="#9">Exact deconvolution</a></li>
+            </ul>
+         </div>
+         <h2>Start<a name="1"></a></h2><pre class="codeinput">clear
+close <span class="string">all</span>
+printme = @(filename) print(<span class="string">'-dpdf'</span>, sprintf(<span class="string">'figures/Example2_%s'</span>, filename));
+</pre><pre class="codeinput">load <span class="string">mtlb</span>
+
+figure(1)
+clf
+subplot(2,1,1)
+plot(mtlb)
+
+[bb,aa] = butter(2, 0.05, <span class="string">'high'</span>);
+z = filtfilt(bb, aa, mtlb);
+
+subplot(2,1,2)
+plot(z)
+xlim([1000 1600])
+box <span class="string">off</span>
+</pre><img vspace="5" hspace="5" src="Example2_01.png" alt=""> <pre class="codeinput">y = z(1000:1600);
+N = length(y);
+n = 0:N-1;
+t = n/Fs;
+
+ylim1 = [-3 3];
+
+figure(2)
+clf
+subplot(2,1,1)
+plot(t, y)
+box <span class="string">off</span>
+ylim(ylim1)
+xlim([0 N/Fs])
+xlabel(<span class="string">'Time (sec)'</span>)
+title(<span class="string">'Speech waveform [y]'</span>)
+
+orient <span class="string">landscape</span>
+printme(<span class="string">'waveform_y'</span>)
+</pre><img vspace="5" hspace="5" src="Example2_02.png" alt=""> <h2>Find AR model<a name="4"></a></h2><pre class="codeinput">a = arburg(y, 12);          <span class="comment">% AR model from data. Order 12</span>
+
+h = filter(1, a, [1 zeros(1,100)]);         <span class="comment">% impulse response of filter</span>
+
+figure(1)
+clf
+plot(0:100, h)
+box <span class="string">off</span>
+xlabel(<span class="string">'Time (samples)'</span>)
+title(<span class="string">'Impulse response h [AR model]'</span>)
+
+printme(<span class="string">'impulse_response'</span>)
+</pre><img vspace="5" hspace="5" src="Example2_03.png" alt=""> <h2>Pole-zero diagram<a name="5"></a></h2><pre class="codeinput">figure(1)
+clf
+[zh, ph, lh] = zplane(1, a);
+xlabel(<span class="string">' '</span>)
+ylabel(<span class="string">' '</span>)
+title(<span class="string">'Poles/Zeros'</span>)
+box <span class="string">off</span>
+MS = 6;
+set(zh, <span class="string">'markersize'</span>, MS)
+set(ph, <span class="string">'markersize'</span>, MS)
+set(lh(2), <span class="string">'fontsize'</span>, 7)
+
+printme(<span class="string">'pole_zero'</span>)
+</pre><img vspace="5" hspace="5" src="Example2_04.png" alt=""> <h2>Sparse deconvolution<a name="6"></a></h2><pre class="codeinput">lam = 0.8;                                      <span class="comment">% lam : regularization parameter</span>
+Nit = 100;                                      <span class="comment">% Nit : number of iterations</span>
+[x, cost] = deconvL1(y, lam, 1, a, Nit);        <span class="comment">% Run sparse deconvolution algorithm</span>
+
+figure(2)
+clf
+subplot(2,1,1)
+plot(1:Nit, cost, <span class="string">'.-'</span>)
+box <span class="string">off</span>
+title(<span class="string">'Cost function history'</span>);
+xlabel(<span class="string">'Iteration'</span>)
+xlim([10 Nit])
+</pre><img vspace="5" hspace="5" src="Example2_05.png" alt=""> <h2>Display sparse input signal<a name="7"></a></h2><pre class="codeinput">figure(2)
+clf
+subplot(2,1,1)
+plot(t, x)
+xlim([0 N/Fs])
+xlabel(<span class="string">'Time (sec)'</span>)
+box <span class="string">off</span>
+title(<span class="string">'Sparse deconvolution [x]'</span>)
+axnote(sprintf(<span class="string">'\\lambda = %.2f'</span>, lam))
+</pre><img vspace="5" hspace="5" src="Example2_06.png" alt=""> <h2>Approximate reconstruction<a name="8"></a></h2>
+         <p>Approximate reconstruction of original speech waveform</p><pre class="codeinput">r = filter(1, a, x);
+
+subplot(2,1,2)
+plot(t, r)
+xlim([0 N/Fs])
+xlabel(<span class="string">'Time (sec)'</span>)
+box <span class="string">off</span>
+ylim(ylim1)
+title(<span class="string">'Approximate reconstruction [r = h conv x]'</span>)
+
+orient <span class="string">landscape</span>
+printme(<span class="string">'sparse_deconv'</span>)
+</pre><img vspace="5" hspace="5" src="Example2_07.png" alt=""> <h2>Exact deconvolution<a name="9"></a></h2>
+         <p>using A(z)</p><pre class="codeinput">g = filter(a, 1, y);
+
+<span class="comment">% verify:</span>
+err = y - filter(1, a, g);
+max(abs(err))
+
+figure(1)
+clf
+subplot(2,1,1)
+plot(t, g)
+xlim([0 N/Fs])
+xlabel(<span class="string">'Time (sec)'</span>)
+box <span class="string">off</span>
+title(<span class="string">'Exact deconvolution (inverse filter)'</span>)
+
+orient <span class="string">landscape</span>
+printme(<span class="string">'exact_deconv'</span>)
+</pre><pre class="codeoutput">
+ans =
+
+   1.6653e-15
+
+</pre><img vspace="5" hspace="5" src="Example2_08.png" alt=""> <p class="footer"><br>
+            Published with MATLAB&reg; 7.8<br></p>
+      </div>
+      <!--
+##### SOURCE BEGIN #####
+%% Example2 : Sparse deconvolution of speech
+% Apply sparse deconvolution to a segment of voiced speech
+
+%% Start
+
+clear
+close all
+printme = @(filename) print('-dpdf', sprintf('figures/Example2_%s', filename));
+
+%%
+
+load mtlb
+
+figure(1)
+clf
+subplot(2,1,1)
+plot(mtlb)
+
+[bb,aa] = butter(2, 0.05, 'high');
+z = filtfilt(bb, aa, mtlb);
+
+subplot(2,1,2)
+plot(z)
+xlim([1000 1600])
+box off
+
+%%
+
+y = z(1000:1600);
+N = length(y);
+n = 0:N-1;
+t = n/Fs;
+
+ylim1 = [-3 3];
+
+figure(2)
+clf
+subplot(2,1,1)
+plot(t, y)
+box off
+ylim(ylim1)
+xlim([0 N/Fs])
+xlabel('Time (sec)')
+title('Speech waveform [y]')
+
+orient landscape
+printme('waveform_y')
+
+%% Find AR model
+
+a = arburg(y, 12);          % AR model from data. Order 12
+
+h = filter(1, a, [1 zeros(1,100)]);         % impulse response of filter 
+
+figure(1)
+clf
+plot(0:100, h)
+box off
+xlabel('Time (samples)')
+title('Impulse response h [AR model]')
+
+printme('impulse_response')
+
+%% Pole-zero diagram
+
+figure(1)
+clf
+[zh, ph, lh] = zplane(1, a);
+xlabel(' ')
+ylabel(' ')
+title('Poles/Zeros')
+box off
+MS = 6;
+set(zh, 'markersize', MS)
+set(ph, 'markersize', MS)
+set(lh(2), 'fontsize', 7)
+
+printme('pole_zero')
+
+
+%% Sparse deconvolution
+
+lam = 0.8;                                      % lam : regularization parameter
+Nit = 100;                                      % Nit : number of iterations
+[x, cost] = deconvL1(y, lam, 1, a, Nit);        % Run sparse deconvolution algorithm
+
+figure(2)
+clf
+subplot(2,1,1)
+plot(1:Nit, cost, '.-')
+box off
+title('Cost function history');
+xlabel('Iteration')
+xlim([10 Nit])
+
+%% Display sparse input signal
+
+figure(2)
+clf
+subplot(2,1,1)
+plot(t, x)
+xlim([0 N/Fs])
+xlabel('Time (sec)')
+box off
+title('Sparse deconvolution [x]')
+axnote(sprintf('\\lambda = %.2f', lam))
+
+%% Approximate reconstruction
+% Approximate reconstruction of original speech waveform
+
+r = filter(1, a, x);
+
+subplot(2,1,2)
+plot(t, r)
+xlim([0 N/Fs])
+xlabel('Time (sec)')
+box off
+ylim(ylim1)
+title('Approximate reconstruction [r = h conv x]')
+
+orient landscape
+printme('sparse_deconv')
+
+
+%% Exact deconvolution 
+% using A(z)
+
+g = filter(a, 1, y);
+
+% verify:
+err = y - filter(1, a, g);
+max(abs(err))
+
+figure(1)
+clf
+subplot(2,1,1)
+plot(t, g)
+xlim([0 N/Fs])
+xlabel('Time (sec)')
+box off
+title('Exact deconvolution (inverse filter)')
+
+orient landscape
+printme('exact_deconv')
+
+
+##### SOURCE END #####
+-->
+   </body>
+</html>
