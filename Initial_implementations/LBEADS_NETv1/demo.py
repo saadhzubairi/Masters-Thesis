@@ -3,6 +3,13 @@ Demo script for LBEADS-NET
 
 This script demonstrates the LBEADS-NET model on a single example,
 comparing it with the original BEADS algorithm.
+
+- the high-pass and low-pass filters became small learnable Conv1D kernels, 
+- the asymmetric regularization became a learnable shrinkage operator, and 
+- the BEADS hyperparameters (λ₀, λ₁, λ₂, r) became trainable scalars that can vary across layers. 
+
+By stacking K of these modified BEADS steps, the resulting model acts as a deep, interpretable network whose forward pass mimics the classical iterations but whose parameters are optimized end-to-end from data
+
 """
 
 import torch
@@ -30,12 +37,9 @@ def main():
     print("=" * 60)
     print("LBEADS-NET Demo")
     print("=" * 60)
-    
-    # Get data directory
     script_dir = os.path.dirname(os.path.abspath(__file__))
     data_dir = os.path.join(os.path.dirname(script_dir), 'BEADS', 'data')
-    
-    # Load data
+    print("=" * 60)
     print("\nLoading data...")
     noise_data = sio.loadmat(os.path.join(data_dir, 'noise.mat'))
     chromatograms_data = sio.loadmat(os.path.join(data_dir, 'chromatograms.mat'))
@@ -43,7 +47,7 @@ def main():
     noise = noise_data['noise'].flatten()
     X = chromatograms_data['X']
     
-    # Create noisy signal (same as main.py in BEADS)
+    # Create noisy signal
     y = X[:, 2] + noise * 0.5
     N = len(y)
     
