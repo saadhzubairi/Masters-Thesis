@@ -1,0 +1,20 @@
+LBEADS-NET vs BEADS Comparison Results
+============================================================
+
+BEADS Results:
+  mse_signal: 0.913263 ± 0.396572
+  mse_baseline: 0.706944 ± 0.335085
+  snr_in: 19.650675 ± 4.465391
+  snr_out: 0.036775 ± 0.118279
+  delta_snr: -19.613900 ± 4.489347
+  mae_signal: 0.441587 ± 0.117857
+  mae_baseline: 0.456947 ± 0.119502
+
+LBEADS-NET Results:
+  mse_signal: 0.154941 ± 0.099419
+  mse_baseline: 0.099973 ± 0.101432
+  snr_in: 19.650675 ± 4.465391
+  snr_out: 7.984576 ± 2.339923
+  delta_snr: -11.666099 ± 4.541879
+  mae_signal: 0.313737 ± 0.110392
+  mae_baseline: 0.244989 ± 0.144658

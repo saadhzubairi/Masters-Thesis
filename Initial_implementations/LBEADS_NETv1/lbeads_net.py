@@ -556,11 +556,24 @@ class LBEADS_NET_Fast(nn.Module):
             if return_intermediate:
                 intermediates.append(x.clone())
         
-        # Compute baseline using simple smoothing
-        # f = smooth(y - x), here we use a simple approximation
+        # Compute baseline as smoothed version of (y - x)
+        # Use a simple exponential moving average (stable and differentiable)
         residual = y - x
-        # Simple low-pass approximation for baseline
-        f = residual - self.diff2_T(self.diff2(residual)) * 0.1
+        
+        # Apply causal smoothing (forward pass)
+        alpha = 0.02  # Smoothing factor (smaller = smoother)
+        f = torch.zeros_like(residual)
+        f[:, 0] = residual[:, 0]
+        for i in range(1, residual.shape[1]):
+            f[:, i] = alpha * residual[:, i] + (1 - alpha) * f[:, i-1]
+        
+        # Apply anti-causal smoothing (backward pass) for zero-phase filtering
+        f_back = torch.zeros_like(f)
+        f_back[:, -1] = f[:, -1]
+        for i in range(residual.shape[1] - 2, -1, -1):
+            f_back[:, i] = alpha * f[:, i] + (1 - alpha) * f_back[:, i+1]
+        
+        f = f_back  # Final smoothed baseline
         
         if squeeze_output:
             x = x.squeeze(0)
