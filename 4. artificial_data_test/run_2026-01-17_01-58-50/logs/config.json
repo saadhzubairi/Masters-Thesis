@@ -1,0 +1,93 @@
+{
+  "data": {
+    "signal_length": 1024,
+    "n_train": 200,
+    "n_val": 50,
+    "n_test": 50,
+    "seed": 42,
+    "noise_types": [
+      "gaussian"
+    ],
+    "noise_level_range": [
+      0.03,
+      0.15
+    ],
+    "noise_level_choices": null,
+    "baseline_type": "mixed",
+    "poly_degree_range": [
+      2,
+      3
+    ],
+    "poly_coeff_range": [
+      -0.5,
+      0.5
+    ],
+    "sine_freq_range": [
+      0.2,
+      1.5
+    ],
+    "sine_amp_range": [
+      0.05,
+      0.25
+    ],
+    "lowpass_sigma_range": [
+      20.0,
+      80.0
+    ],
+    "lowpass_scale_range": [
+      0.05,
+      0.2
+    ],
+    "peak_num_range": [
+      3,
+      6
+    ],
+    "peak_width_range": [
+      4.0,
+      20.0
+    ],
+    "peak_amplitude_range": [
+      0.5,
+      2.5
+    ],
+    "peak_center_margin": 0.1,
+    "positive_dominant": true,
+    "negative_peak_prob": 0.15,
+    "negative_peak_scale": 0.5
+  },
+  "model": {
+    "model_type": "full",
+    "d": 1,
+    "fc": 0.006,
+    "num_layers": 12,
+    "init_lam0": 0.3,
+    "init_lam1": 1.5,
+    "init_lam2": 1.5,
+    "init_r": 6.0,
+    "learn_r": true,
+    "init_step_size": 0.1,
+    "shared_params": false
+  },
+  "training": {
+    "batch_size": 8,
+    "epochs": 50,
+    "learning_rate": 0.001,
+    "weight_decay": 1e-05,
+    "signal_loss_weight": 1.0,
+    "baseline_loss_weight": 0.5,
+    "early_stop_patience": 10,
+    "lr_scheduler_patience": 5,
+    "grad_clip": 1.0
+  },
+  "evaluation": {
+    "support_threshold_ratio": 0.1,
+    "psnr_max_value": null
+  },
+  "run_root": "C:\\Users\\saadh\\OneDrive\\Desktop\\THESIS_GIT\\4. artificial_data_test",
+  "device": null,
+  "plot_samples": [
+    0,
+    1,
+    2
+  ]
+}
