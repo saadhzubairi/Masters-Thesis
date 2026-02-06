@@ -41,8 +41,32 @@ def load_trained_model(script_dir: str, N: int = 1024):
         model: Loaded LBEADS_NET_Fast model
         checkpoint: Full checkpoint dictionary
     """
-    # Find most recent model file
-    model_files = glob.glob(os.path.join(script_dir, 'lbeads_net_synthetic_*.pth'))
+    print(f"Looking for models in: {script_dir}")
+    
+    # Escape square brackets for glob (they're special characters)
+    escaped_dir = script_dir.replace('[', '[[]').replace(']', '[]]')
+    
+    # Find most recent model file (try sparsity models first, then synthetic)
+    model_files = glob.glob(os.path.join(escaped_dir, 'lbeads_net_sparsity_*.pth'))
+    print(f"  Found {len(model_files)} sparsity models")
+    
+    if not model_files:
+        model_files = glob.glob(os.path.join(escaped_dir, 'lbeads_net_synthetic_*.pth'))
+        print(f"  Found {len(model_files)} synthetic models")
+    
+    if not model_files:
+        # Fallback: use os.listdir instead of glob to avoid pattern issues
+        print("  Trying fallback with os.listdir...")
+        try:
+            all_files = os.listdir(script_dir)
+            model_files = [os.path.join(script_dir, f) for f in all_files 
+                          if f.startswith('lbeads_net_sparsity_') and f.endswith('.pth')]
+            if not model_files:
+                model_files = [os.path.join(script_dir, f) for f in all_files 
+                              if f.startswith('lbeads_net_synthetic_') and f.endswith('.pth')]
+            print(f"  Found {len(model_files)} models via listdir")
+        except Exception as e:
+            print(f"  Fallback failed: {e}")
     
     if not model_files:
         print("No trained model found. Please run train.py first.")
@@ -57,6 +81,8 @@ def load_trained_model(script_dir: str, N: int = 1024):
     
     # Create model with saved config
     config = checkpoint['model_config']
+    print(f"Model config: {config}")
+    
     model = LBEADS_NET_Fast(
         N=config['N'],
         d=config['d'],
@@ -122,7 +148,14 @@ def main():
     else:
         trained = True
         print("\nLoaded trained model!")
-        print("Training metrics:")
+        
+        # Show loss config if available (sparsity-based model)
+        if 'loss_config' in checkpoint:
+            print("\nLoss configuration:")
+            for k, v in checkpoint['loss_config'].items():
+                print(f"  {k}: {v}")
+        
+        print("\nTraining metrics:")
         if 'test_metrics' in checkpoint:
             for k, v in checkpoint['test_metrics'].items():
                 print(f"  {k}: {v:.4f}")
