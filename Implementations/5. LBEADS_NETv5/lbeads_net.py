@@ -108,6 +108,22 @@ def compute_lowpass_matrix(A_dense, B_dense):
     return eye - (B_dense @ A_inv)
 
 
+def compute_iterated_lowpass_matrix(A_dense, B_dense, iterations=3):
+    """
+    Compute iterated low-pass matrix for stronger baseline smoothing.
+    
+    Applying the low-pass filter multiple times suppresses any residual
+    high-frequency content (peak leakage) more aggressively.
+    
+    L_iter = L^iterations where L = I - B @ inv(A)
+    """
+    L = compute_lowpass_matrix(A_dense, B_dense)
+    L_iter = L.clone()
+    for _ in range(iterations - 1):
+        L_iter = L_iter @ L
+    return L_iter
+
+
 def apply_lowpass_filter(residual, lowpass_matrix):
     """
     Apply low-pass matrix to residual.
@@ -127,6 +143,18 @@ def apply_lowpass_filter(residual, lowpass_matrix):
     if squeeze_output:
         baseline = baseline.squeeze(0)
     return baseline
+
+
+def apply_highpass_filter(signal, lowpass_matrix):
+    """
+    Apply complementary high-pass operator H = I - L using the low-pass matrix L.
+
+    Args:
+        signal: (N,) or (batch, N)
+        lowpass_matrix: (N, N), column-operator form
+    """
+    low = apply_lowpass_filter(signal, lowpass_matrix)
+    return signal - low
 
 
 class BEADSLayer(nn.Module):
@@ -319,7 +347,8 @@ class LBEADS_NET(nn.Module):
     def __init__(self, N, d=1, fc=0.006, num_layers=10,
                  shared_params=False,
                  init_lam0=0.4, init_lam1=4.0, init_lam2=3.2,
-                 init_r=6.0, learn_r=False):
+                 init_r=6.0, learn_r=False,
+                 lowpass_iterations=1):
         super(LBEADS_NET, self).__init__()
         
         self.N = N
@@ -338,7 +367,7 @@ class LBEADS_NET(nn.Module):
         self.register_buffer('B_dense', torch.tensor(B.toarray(), dtype=torch.float64))
         self.register_buffer(
             'lowpass_dense',
-            compute_lowpass_matrix(self.A_dense, self.B_dense),
+            compute_iterated_lowpass_matrix(self.A_dense, self.B_dense, iterations=lowpass_iterations),
             persistent=False,
         )
         
@@ -466,7 +495,8 @@ class LBEADS_NET_Fast(nn.Module):
     
     def __init__(self, N, d=1, fc=0.006, num_layers=10,
                  init_lam0=0.4, init_lam1=4.0, init_lam2=3.2,
-                 init_r=6.0, init_step_size=0.1):
+                 init_r=6.0, init_step_size=0.1,
+                 lowpass_iterations=3):
         super(LBEADS_NET_Fast, self).__init__()
         
         self.N = N
@@ -488,7 +518,7 @@ class LBEADS_NET_Fast(nn.Module):
         self.register_buffer('BTB_dense', torch.tensor(BTB.toarray(), dtype=torch.float64))
         self.register_buffer(
             'lowpass_dense',
-            compute_lowpass_matrix(self.A_dense, self.B_dense),
+            compute_iterated_lowpass_matrix(self.A_dense, self.B_dense, iterations=lowpass_iterations),
             persistent=False,
         )
         
@@ -603,8 +633,11 @@ class LBEADS_NET_Fast(nn.Module):
         else:
             squeeze_output = False
         
-        # Initialize x = 0 (sparse initialization - peaks start at zero)
-        x = torch.zeros_like(y)
+        # Initialize x from high-pass filtered y: x0 = y - lowpass(y)
+        # This gives a MUCH better starting point than zeros!
+        # Without this, small peaks (< threshold) are permanently zeroed.
+        f_init = apply_lowpass_filter(y, self.lowpass_dense)
+        x = y - f_init
         intermediates = [x.clone()] if return_intermediate else None
         
         for k in range(self.num_layers):
@@ -624,9 +657,9 @@ class LBEADS_NET_Fast(nn.Module):
             # Residual: what's left after removing current peak estimate
             residual = y - x
             
-            # The data fidelity term encourages x to capture the high-frequency
-            # component of y. Gradient step toward residual.
-            data_grad = residual
+            # Use the high-pass residual for data fidelity so baseline (low-freq)
+            # is not pulled into x during optimization updates.
+            data_grad = apply_highpass_filter(residual, self.lowpass_dense)
             
             # ===== SMOOTHNESS PENALTY GRADIENTS =====
             # These penalize non-smooth variations in x (but peaks ARE non-smooth!)

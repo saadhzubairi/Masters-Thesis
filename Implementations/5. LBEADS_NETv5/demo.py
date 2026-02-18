@@ -22,6 +22,7 @@ import os
 import sys
 import time
 import glob
+import scipy.io as sio
 
 from lbeads_net import LBEADS_NET, LBEADS_NET_Fast
 
@@ -84,7 +85,11 @@ def load_trained_model(script_dir: str, N: int = 4096):
     model_path = None
     checkpoint = None
     for candidate_path in model_files:
-        candidate_ckpt = torch.load(candidate_path, map_location='cpu', weights_only=False)
+        try:
+            candidate_ckpt = torch.load(candidate_path, map_location='cpu', weights_only=False)
+        except Exception as e:
+            print(f"  Skipping corrupt file {os.path.basename(candidate_path)}: {e}")
+            continue
         config = candidate_ckpt.get('model_config', {})
         if config.get('N') == N:
             model_path = candidate_path
@@ -110,7 +115,8 @@ def load_trained_model(script_dir: str, N: int = 4096):
         init_lam1=4.0,
         init_lam2=3.2,
         init_r=6.0,
-        init_step_size=0.001
+        init_step_size=0.001,
+        lowpass_iterations=config.get('lowpass_iterations', 1),
     )
     
     # Load weights
@@ -333,10 +339,196 @@ def main():
     plt.savefig(os.path.join(script_dir, 'demo_detailed_analysis.png'), dpi=150)
     print(f"  Saved to {os.path.join(script_dir, 'demo_detailed_analysis.png')}")
     
-    plt.show()
-    
-    print("\nDemo complete!")
+    print("\nSynthetic demo complete!")
+    return model, trained
 
+
+# =============================================================================
+# Legacy Signal Data Demo
+# =============================================================================
+
+def demo_legacy_data(model=None, trained: bool = False):
+    """
+    Run inference on legacy chromatogram data from the BEADS paper.
+    
+    Data location: Implementations/0. BEADS/data/
+    - chromatograms.mat: 8 chromatogram signals of length 4000 (key 'X', shape 4000x8)
+    - noise.mat: noise vector of length 4000 (key 'noise', shape 4000x1)
+    
+    Since the model is trained on N=4096, we pad the 4000-length signals with
+    reflection padding and crop back after inference.
+    """
+    print("\n" + "=" * 60)
+    print("LBEADS-NET Demo on Legacy BEADS Signal Data")
+    print("=" * 60)
+    
+    script_dir = os.path.dirname(os.path.abspath(__file__))
+    N_model = 4096  # Model's expected signal length
+    
+    # --- Load legacy data ---
+    data_dir = os.path.join(script_dir, '..', '0. BEADS', 'data')
+    data_dir = os.path.normpath(data_dir)
+    
+    if not os.path.isdir(data_dir):
+        print(f"Legacy data directory not found: {data_dir}")
+        print("Skipping legacy demo.")
+        return
+    
+    print(f"Loading data from: {data_dir}")
+    chromatograms_data = sio.loadmat(os.path.join(data_dir, 'chromatograms.mat'))
+    noise_data = sio.loadmat(os.path.join(data_dir, 'noise.mat'))
+    
+    X = chromatograms_data['X']       # (4000, 8)
+    noise = noise_data['noise'].flatten()  # (4000,)
+    N_legacy = X.shape[0]
+    n_chromatograms = X.shape[1]
+    
+    print(f"  Chromatograms: {X.shape} ({n_chromatograms} signals of length {N_legacy})")
+    print(f"  Noise: {noise.shape}")
+    
+    # --- Load or use provided model ---
+    if model is None:
+        model, checkpoint = load_trained_model(script_dir, N_model)
+        if model is None:
+            print("No trained model available. Run train.py first.")
+            return
+        trained = True
+    
+    model.eval()
+    
+    # --- Pad helper functions ---
+    pad_amount = N_model - N_legacy  # 96 samples to pad
+    
+    def pad_signal(sig):
+        """Reflect-pad a (N_legacy,) signal to (N_model,)."""
+        return np.pad(sig, (0, pad_amount), mode='reflect')
+    
+    def crop_signal(sig):
+        """Crop back from (N_model,) to (N_legacy,)."""
+        return sig[:N_legacy]
+
+    def infer_signal(sig):
+        """
+        Normalize -> infer -> denormalize for one legacy signal.
+
+        The model is trained on per-sample unit-scale inputs, so inference
+        must apply the same scaling to avoid distribution mismatch.
+        """
+        y_padded = pad_signal(sig)
+        y_scale = np.max(np.abs(y_padded))
+        y_scale = max(y_scale, 1e-8)
+        y_normed = y_padded / y_scale
+        y_tensor = torch.tensor(y_normed, dtype=torch.float64).unsqueeze(0)
+        with torch.no_grad():
+            x_pred, f_pred = model(y_tensor)
+        x_pred_np = crop_signal(x_pred[0].numpy()) * y_scale
+        f_pred_np = crop_signal(f_pred[0].numpy()) * y_scale
+        return x_pred_np, f_pred_np
+    
+    # --- Noise levels to test ---
+    noise_levels = [0.0, 0.3, 0.5]
+    
+    # --- Pick a subset of chromatogram columns to display ---
+    # Use columns 0-5 (6 chromatograms) to fill a 2x3 grid per noise level
+    cols_to_show = list(range(min(6, n_chromatograms)))
+    
+    # --- Run inference on the classic BEADS test case first (col 2, noise*0.5) ---
+    print("\n--- Classic BEADS test case (column 3, noise x0.5) ---")
+    y_classic = X[:, 2] + noise * 0.5
+    x_pred_np, f_pred_np = infer_signal(y_classic)
+    
+    # Classic figure (matches BEADS paper figure)
+    fig_classic, axes_c = plt.subplots(4, 1, figsize=(14, 10), sharex=True)
+    
+    axes_c[0].plot(y_classic, 'b', linewidth=0.5)
+    axes_c[0].set_title('Data (Chromatogram 3 + noise x0.5)')
+    axes_c[0].set_ylabel('Amplitude')
+    axes_c[0].set_xlim([0, N_legacy])
+    axes_c[0].grid(True, alpha=0.3)
+    
+    axes_c[1].plot(y_classic, 'gray', alpha=0.5, linewidth=0.5, label='Observed')
+    axes_c[1].plot(f_pred_np, 'r', linewidth=1.5, label='Estimated Baseline')
+    axes_c[1].set_title('Baseline Estimation')
+    axes_c[1].set_ylabel('Amplitude')
+    axes_c[1].legend(loc='upper right')
+    axes_c[1].grid(True, alpha=0.3)
+    
+    axes_c[2].plot(x_pred_np, 'b', linewidth=0.8)
+    axes_c[2].set_title('Baseline-Corrected Signal (Estimated Peaks)')
+    axes_c[2].set_ylabel('Amplitude')
+    axes_c[2].grid(True, alpha=0.3)
+    
+    residual_classic = y_classic - x_pred_np - f_pred_np
+    axes_c[3].plot(residual_classic, 'gray', linewidth=0.5)
+    axes_c[3].set_title('Residual (y - x - f)')
+    axes_c[3].set_xlabel('Sample Index')
+    axes_c[3].set_ylabel('Amplitude')
+    axes_c[3].grid(True, alpha=0.3)
+    
+    model_tag = "Trained" if trained else "Untrained"
+    fig_classic.suptitle(f'LBEADS-NET ({model_tag}) — Classic BEADS Test Case', fontsize=14)
+    plt.tight_layout()
+    plt.savefig(os.path.join(script_dir, 'demo_legacy_classic.png'), dpi=150)
+    print(f"  Saved to demo_legacy_classic.png")
+    
+    # --- Grid figure: all chromatograms at multiple noise levels ---
+    print(f"\n--- All chromatograms at noise levels {noise_levels} ---")
+    
+    fig_grid, axes_g = plt.subplots(
+        len(noise_levels), len(cols_to_show),
+        figsize=(3.5 * len(cols_to_show), 3.5 * len(noise_levels)),
+        sharex=True,
+    )
+    if len(noise_levels) == 1:
+        axes_g = axes_g[np.newaxis, :]
+    if len(cols_to_show) == 1:
+        axes_g = axes_g[:, np.newaxis]
+    
+    for row, nl in enumerate(noise_levels):
+        for col_idx, chromatogram_col in enumerate(cols_to_show):
+            ax = axes_g[row, col_idx]
+            
+            # Build observed signal
+            clean = X[:, chromatogram_col]
+            y_obs = clean + noise * nl if nl > 0 else clean.copy()
+            
+            # Pad → infer → crop
+            xp_np, fp_np = infer_signal(y_obs)
+            
+            # Plot
+            ax.plot(y_obs, 'gray', alpha=0.5, linewidth=0.4, label='Observed')
+            ax.plot(xp_np, 'b', linewidth=0.8, label='Peaks')
+            ax.plot(fp_np, 'r', linewidth=1.0, alpha=0.8, label='Baseline')
+            ax.set_xlim([0, N_legacy])
+            
+            if row == 0:
+                ax.set_title(f'Chrom {chromatogram_col + 1}', fontsize=10)
+            if col_idx == 0:
+                ax.set_ylabel(f'noise x{nl}', fontsize=10)
+            if row == 0 and col_idx == len(cols_to_show) - 1:
+                ax.legend(fontsize=7, loc='upper right')
+    
+    fig_grid.suptitle(
+        f'LBEADS-NET ({model_tag}) — Legacy Chromatogram Data',
+        fontsize=14,
+    )
+    plt.tight_layout()
+    plt.savefig(os.path.join(script_dir, 'demo_legacy_grid.png'), dpi=150)
+    print(f"  Saved to demo_legacy_grid.png")
+    
+    print("\nLegacy data demo complete!")
+
+
+# =============================================================================
+# Entry Point
+# =============================================================================
 
 if __name__ == "__main__":
-    main()
+    # Part 1 & 2: Synthetic data demo
+    model, trained = main()
+    
+    # Part 3: Legacy BEADS signal data demo
+    demo_legacy_data(model=model, trained=trained)
+    
+    # Show all plots at once
+    plt.show()

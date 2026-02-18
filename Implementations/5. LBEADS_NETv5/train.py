@@ -41,13 +41,20 @@ class SyntheticSignal:
 
 class SyntheticDataGenerator:
     """
-    Generate synthetic chromatogram-like data with:
-    - Sparse Gaussian peaks
-    - Smooth polynomial/sinusoidal baseline drift
-    - Additive Gaussian noise
+    Generate realistic synthetic chromatogram data matching real LC/GC data.
+    
+    Real chromatogram characteristics (measured from 8 real signals, N=4000):
+    - Peak heights: 10 to 2600+ (huge dynamic range), mean ~174
+    - Peak widths (FWHM): 3 to 370+ samples, median ~10, mean ~16
+    - Peaks per signal: 29 to 58
+    - Peaks are often asymmetric (tailing) and overlapping in clusters
+    - Baseline: smooth, slowly varying, amplitude 0-35
+    - Noise std: ~5
+    
+    Signal model: y = x_true (peaks) + f_true (baseline) + noise
     """
     
-    def __init__(self, N: int = 1024, seed: Optional[int] = None):
+    def __init__(self, N: int = 4096, seed: Optional[int] = None):
         """
         Args:
             N: Signal length
@@ -59,132 +66,221 @@ class SyntheticDataGenerator:
     
     def generate_baseline(
         self,
-        poly_degree_range: Tuple[int, int] = (2, 5),
-        poly_coeff_range: Tuple[float, float] = (-2.5, 2.5),
-        sine_freq_range: Tuple[float, float] = (0.15, 3.0),
-        sine_amp_range: Tuple[float, float] = (0.5, 3.0),
-        num_sine_components_range: Tuple[int, int] = (2, 4),
-        wide_bump_amp_range: Tuple[float, float] = (0.5, 2.5),
-        wide_bump_width_range: Tuple[float, float] = (0.08, 0.30),
-        baseline_scale_range: Tuple[float, float] = (3.0, 10.0),
-        baseline_offset_range: Tuple[float, float] = (-2.0, 2.0),
+        amplitude_range: Tuple[float, float] = (2.0, 35.0),
+        num_knots_range: Tuple[int, int] = (4, 8),
+        drift_type: Optional[str] = None,
     ) -> Tuple[np.ndarray, Dict]:
         """
-        Generate stronger and more varied smooth baseline drift.
-
-        Baseline components:
-        - centered polynomial drift (global trend)
-        - multiple low-frequency sinusoidal drifts (wavy behavior)
-        - one very wide Gaussian bump (local baseline swelling)
-        Then we normalize and scale to a target baseline strength range.
+        Generate a smooth, realistic chromatogram baseline.
+        
+        Real baselines are smooth, slowly varying, mostly positive,
+        with amplitude 0-35 and gentle broad humps.
+        
+        Uses cubic spline interpolation of random knot points for
+        realistic smooth baseline shapes.
         """
+        from scipy.interpolate import CubicSpline
+        
         meta = {}
         
-        # Polynomial component - slow drift around the center.
-        centered_t = self.t - 0.5
-        degree = int(self.rng.integers(poly_degree_range[0], poly_degree_range[1] + 1))
-        coeffs = self.rng.uniform(poly_coeff_range[0], poly_coeff_range[1], degree + 1)
-        poly = np.zeros(self.N)
-        for i, coeff in enumerate(coeffs):
-            poly += coeff * (centered_t ** i)
-        meta["poly_degree"] = degree
-        meta["poly_coeffs"] = coeffs.tolist()
+        # Choose baseline type
+        if drift_type is None:
+            drift_type = self.rng.choice(['spline', 'exponential_decay', 'mixed'])
+        meta['drift_type'] = drift_type
         
-        # Multi-sine component - low-frequency wiggles.
-        num_sines = int(self.rng.integers(num_sine_components_range[0], num_sine_components_range[1] + 1))
-        sine_sum = np.zeros(self.N)
-        sine_components: List[Dict] = []
-        for _ in range(num_sines):
-            freq = float(self.rng.uniform(sine_freq_range[0], sine_freq_range[1]))
-            amp = float(self.rng.uniform(sine_amp_range[0], sine_amp_range[1]))
-            phase = float(self.rng.uniform(0.0, 2.0 * np.pi))
-            use_cos = bool(self.rng.integers(0, 2))
-            basis = np.cos if use_cos else np.sin
-            sine_component = amp * basis(2.0 * np.pi * freq * self.t + phase)
-            sine_sum += sine_component
-            sine_components.append({
-                "freq": freq,
-                "amp": amp,
-                "phase": phase,
-                "type": "cos" if use_cos else "sin",
-            })
-        meta["num_sine_components"] = num_sines
-        meta["sine_components"] = sine_components
-
-        # One broad Gaussian bump to create a local baseline swell.
-        indices = np.arange(self.N)
-        bump_center = int(self.rng.integers(int(0.1 * self.N), int(0.9 * self.N)))
-        bump_sigma = float(self.rng.uniform(wide_bump_width_range[0], wide_bump_width_range[1]) * self.N)
-        bump_amp = float(self.rng.uniform(wide_bump_amp_range[0], wide_bump_amp_range[1]))
-        if bool(self.rng.integers(0, 2)):
-            bump_amp = -bump_amp
-        wide_bump = bump_amp * np.exp(-((indices - bump_center) ** 2) / (2.0 * bump_sigma ** 2))
-        meta["wide_bump_center"] = bump_center
-        meta["wide_bump_sigma"] = bump_sigma
-        meta["wide_bump_amp"] = bump_amp
-
-        baseline_raw = poly + sine_sum + wide_bump
-        baseline_raw = baseline_raw - np.mean(baseline_raw)
-
-        raw_std = float(np.std(baseline_raw))
-        if raw_std < 1e-8:
-            raw_std = 1.0
-
-        baseline_scale = float(self.rng.uniform(baseline_scale_range[0], baseline_scale_range[1]))
-        baseline_offset = float(self.rng.uniform(baseline_offset_range[0], baseline_offset_range[1]))
-        baseline = (baseline_raw / raw_std) * baseline_scale + baseline_offset
-
-        meta["baseline_scale"] = baseline_scale
-        meta["baseline_offset"] = baseline_offset
-        meta["baseline_std_before_scale"] = raw_std
+        indices = np.arange(self.N, dtype=float)
+        
+        if drift_type == 'spline':
+            # Smooth spline through random knot points
+            num_knots = int(self.rng.integers(num_knots_range[0], num_knots_range[1] + 1))
+            knot_x = np.sort(self.rng.uniform(0, self.N, num_knots))
+            knot_x = np.concatenate([[0], knot_x, [self.N - 1]])  # Include endpoints
+            
+            amp = float(self.rng.uniform(amplitude_range[0], amplitude_range[1]))
+            knot_y = self.rng.uniform(0, amp, len(knot_x))
+            # Ensure endpoints are low (common in chromatograms)
+            knot_y[0] = float(self.rng.uniform(0, amp * 0.3))
+            knot_y[-1] = float(self.rng.uniform(0, amp * 0.3))
+            
+            cs = CubicSpline(knot_x, knot_y, bc_type='natural')
+            baseline = cs(indices)
+            meta['num_knots'] = num_knots
+            meta['amplitude'] = amp
+            
+        elif drift_type == 'exponential_decay':
+            # Exponential decay + gentle hump (common in LC)
+            amp = float(self.rng.uniform(amplitude_range[0], amplitude_range[1]))
+            decay_rate = float(self.rng.uniform(0.5, 3.0))
+            baseline = amp * np.exp(-decay_rate * self.t)
+            
+            # Add a broad Gaussian hump
+            hump_center = float(self.rng.uniform(0.2, 0.8)) * self.N
+            hump_sigma = float(self.rng.uniform(0.15, 0.4)) * self.N
+            hump_amp = float(self.rng.uniform(0.5, max(1.0, amp * 0.5)))
+            baseline += hump_amp * np.exp(-((indices - hump_center) ** 2) / (2.0 * hump_sigma ** 2))
+            meta['decay_rate'] = decay_rate
+            meta['amplitude'] = amp
+            
+        else:  # mixed: polynomial + sine
+            # Low-order polynomial drift + very low-freq sine
+            amp = float(self.rng.uniform(amplitude_range[0], amplitude_range[1]))
+            degree = int(self.rng.integers(2, 4))
+            coeffs = self.rng.uniform(-1, 1, degree + 1)
+            centered_t = self.t - 0.5
+            poly = np.zeros(self.N)
+            for i, c in enumerate(coeffs):
+                poly += c * (centered_t ** i)
+            # Normalize to [0, 1] then scale
+            poly = (poly - poly.min()) / (poly.max() - poly.min() + 1e-10)
+            baseline = poly * amp
+            
+            # Add 1-2 very low-frequency sine components
+            num_sines = int(self.rng.integers(1, 3))
+            for _ in range(num_sines):
+                freq = float(self.rng.uniform(0.3, 2.0))
+                s_amp = float(self.rng.uniform(0.5, max(1.5, amp * 0.3)))
+                phase = float(self.rng.uniform(0, 2 * np.pi))
+                baseline += s_amp * np.sin(2 * np.pi * freq * self.t + phase)
+            
+            meta['amplitude'] = amp
+            meta['poly_degree'] = degree
+        
+        # Ensure baseline is mostly non-negative (shift if needed)
+        if baseline.min() < -2.0:
+            baseline -= baseline.min() - float(self.rng.uniform(0, 2.0))
+        
+        meta['final_range'] = (float(baseline.min()), float(baseline.max()))
         return baseline, meta
+    
+    def _emg_peak(self, indices: np.ndarray, center: float, sigma: float,
+                  amplitude: float, tau: float) -> np.ndarray:
+        """
+        Asymmetric chromatographic peak using bi-Gaussian model.
+        
+        This is a numerically stable alternative to the Exponentially Modified
+        Gaussian (EMG). Uses different widths for left and right halves:
+        - sigma_left = sigma (leading edge)
+        - sigma_right = sigma + tau (trailing edge / tailing)
+        
+        Args:
+            indices: Sample indices
+            center: Peak center (mu)
+            sigma: Base Gaussian width
+            amplitude: Peak height
+            tau: Extra width on right side (0 = symmetric Gaussian)
+        """
+        sigma_left = sigma
+        sigma_right = sigma + tau  # tau adds width to the right (tailing) side
+        
+        peak = np.zeros_like(indices, dtype=float)
+        left_mask = indices <= center
+        right_mask = indices > center
+        
+        peak[left_mask] = amplitude * np.exp(
+            -((indices[left_mask] - center) ** 2) / (2.0 * sigma_left ** 2)
+        )
+        peak[right_mask] = amplitude * np.exp(
+            -((indices[right_mask] - center) ** 2) / (2.0 * sigma_right ** 2)
+        )
+        
+        return peak
     
     def generate_peaks(
         self,
-        num_peaks_range: Tuple[int, int] = (5, 15),
-        center_margin: float = 0.05,
-        width_range: Tuple[float, float] = (1.0, 4.0),  # SHARP peaks: 1-4 samples (real data: 1-7)
-        amplitude_range: Tuple[float, float] = (10.0, 100.0),  # HIGH amplitude (real: 13x-215x baseline)
-        negative_peak_prob: float = 0.0,  # Chromatogram peaks are always positive
+        num_peaks_range: Tuple[int, int] = (20, 55),
+        sigma_range: Tuple[float, float] = (1.5, 25.0),
+        amplitude_range: Tuple[float, float] = (15.0, 2500.0),
+        cluster_prob: float = 0.4,
+        tail_prob: float = 0.6,
+        tail_tau_range: Tuple[float, float] = (1.0, 15.0),
     ) -> Tuple[np.ndarray, Dict]:
         """
-        Generate sparse Gaussian peaks (chromatogram-like).
+        Generate realistic chromatographic peaks.
         
-        Real chromatogram characteristics (from data analysis):
-        - Peaks are VERY SHARP: width 1-7 samples for N=1024
-        - Peaks are HIGH: 13x-215x the baseline level
-        - Peaks are ALWAYS POSITIVE
+        Features matched to real data:
+        - Wide range of widths: FWHM 3-60+ samples (sigma 1.5-25)
+        - Huge dynamic range: amplitude 15-2500
+        - Log-normal amplitude distribution (few tall peaks, many small ones)
+        - Peak clusters (overlapping peaks)
+        - Asymmetric tailing (EMG model)
+        - Always positive
+        
+        Args:
+            num_peaks_range: Min/max number of peaks
+            sigma_range: Range of Gaussian sigma (width) in samples
+            amplitude_range: Range of peak amplitudes
+            cluster_prob: Probability of generating a peak cluster
+            tail_prob: Probability of a peak having asymmetric tail
+            tail_tau_range: Range of tailing parameter
         """
         num_peaks = int(self.rng.integers(num_peaks_range[0], num_peaks_range[1] + 1))
         
         x_true = np.zeros(self.N)
         peak_info: List[Dict] = []
+        indices = np.arange(self.N, dtype=float)
         
-        min_center = int(center_margin * self.N)
-        max_center = int((1.0 - center_margin) * self.N)
-        indices = np.arange(self.N)
+        margin = int(0.02 * self.N)  # 2% margin from edges
         
-        for _ in range(num_peaks):
-            center = int(self.rng.integers(min_center, max_center))
-            # Sharp peaks with sigma (width) of 1-4 samples
-            width = float(self.rng.uniform(width_range[0], width_range[1]))
-            # High amplitude - peaks should dominate over baseline
-            amplitude = float(self.rng.uniform(amplitude_range[0], amplitude_range[1]))
+        # Generate peak centers - mix of random placement and clusters
+        centers = []
+        i = 0
+        while i < num_peaks:
+            if self.rng.random() < cluster_prob and i > 0 and num_peaks - i >= 2:
+                # Generate a cluster of 2-4 peaks near a random position
+                cluster_size = min(int(self.rng.integers(2, 5)), num_peaks - i)
+                cluster_center = int(self.rng.integers(margin, self.N - margin))
+                cluster_spread = float(self.rng.uniform(15, 80))
+                for j in range(cluster_size):
+                    c = cluster_center + int(self.rng.normal(0, cluster_spread))
+                    c = np.clip(c, margin, self.N - margin - 1)
+                    centers.append(int(c))
+                i += cluster_size
+            else:
+                # Random isolated peak
+                centers.append(int(self.rng.integers(margin, self.N - margin)))
+                i += 1
+        
+        centers = sorted(centers[:num_peaks])
+        
+        for center in centers:
+            # Width: log-uniform distribution favoring narrower peaks (matching real data)
+            # Real data: median FWHM ~10, so median sigma ~4.2
+            log_sigma = float(self.rng.uniform(
+                np.log(sigma_range[0]), np.log(sigma_range[1])
+            ))
+            sigma = np.exp(log_sigma)
             
-            # Chromatogram peaks are always positive
-            sign = 1.0
+            # Amplitude: log-normal distribution (few very tall peaks, many shorter ones)
+            # Real data: heights 10-2600, mean ~174
+            log_amp = float(self.rng.uniform(
+                np.log(amplitude_range[0]), np.log(amplitude_range[1])
+            ))
+            amplitude = np.exp(log_amp)
             
-            peak = sign * amplitude * np.exp(-((indices - center) ** 2) / (2.0 * width ** 2))
+            # Occasionally generate a very tall "dominant" peak
+            if self.rng.random() < 0.08:
+                amplitude = float(self.rng.uniform(1000.0, amplitude_range[1]))
+            
+            # Tailing (EMG)
+            tau = 0.0
+            if self.rng.random() < tail_prob:
+                tau = float(self.rng.uniform(tail_tau_range[0], tail_tau_range[1]))
+                # Scale tau with sigma for consistent shape
+                tau = tau * sigma / 5.0
+            
+            peak = self._emg_peak(indices, float(center), sigma, amplitude, tau)
             x_true += peak
             
             peak_info.append({
                 "center": center,
-                "width": width,
-                "amplitude": sign * amplitude,
+                "sigma": float(sigma),
+                "fwhm": float(2.355 * sigma),
+                "amplitude": float(amplitude),
+                "tau": float(tau),
             })
         
         params = {
-            "num_peaks": num_peaks,
+            "num_peaks": len(centers),
             "peaks": peak_info,
         }
         
@@ -192,11 +288,13 @@ class SyntheticDataGenerator:
     
     def generate_noise(
         self, 
-        noise_level: float = 1.0
+        noise_level: float = 3.0
     ) -> Tuple[np.ndarray, Dict]:
         """
         Generate additive Gaussian noise.
-        Noise level is relative to baseline (typically 0.5-2.0).
+        
+        Real chromatogram noise has std ~5.
+        We use 2-6 range to cover various instrument noise levels.
         """
         noise = self.rng.normal(0.0, noise_level, self.N)
         params = {"noise_level": float(noise_level)}
@@ -204,36 +302,44 @@ class SyntheticDataGenerator:
     
     def generate_signal(
         self,
-        noise_level: float = 0.1,
-        **kwargs
+        noise_level: float = 3.0,
+        baseline_peak_ratio_range: Tuple[float, float] = (0.01, 0.5),
     ) -> SyntheticSignal:
         """
-        Generate a complete synthetic signal.
-        
-        Args:
-            noise_level: Standard deviation of Gaussian noise
-            **kwargs: Additional parameters for baseline/peaks generation
+        Generate a complete synthetic chromatogram signal.
+
+        The baseline is rescaled per sample so max(|f_true|)/max(|x_true|)
+        spans a broad range. This prevents training from collapsing to
+        peak-dominant synthetic regimes where baseline is always tiny.
         
         Returns:
             SyntheticSignal with y, x_true, f_true, noise, and metadata
         """
-        baseline_prefixes = (
-            'poly',
-            'sine',
-            'num_sine',
-            'wide_bump',
-            'baseline',
-        )
-        f_true, baseline_meta = self.generate_baseline(**{k: v for k, v in kwargs.items()
-                                                          if k.startswith(baseline_prefixes)})
-        x_true, peak_meta = self.generate_peaks(**{k: v for k, v in kwargs.items() 
-                                                   if k.startswith('num_peaks') or k.startswith('center') 
-                                                   or k.startswith('width') or k.startswith('amplitude')
-                                                   or k.startswith('negative')})
+        x_true, peak_meta = self.generate_peaks()
+        f_true, baseline_meta = self.generate_baseline()
+
+        # Match a target baseline/peak strength ratio in log-space.
+        ratio_min, ratio_max = baseline_peak_ratio_range
+        ratio_min = max(float(ratio_min), 1e-6)
+        ratio_max = max(float(ratio_max), ratio_min + 1e-6)
+        target_ratio = float(np.exp(self.rng.uniform(np.log(ratio_min), np.log(ratio_max))))
+
+        peak_scale = float(np.max(np.abs(x_true)))
+        baseline_scale = float(np.max(np.abs(f_true)))
+        baseline_rescale = 1.0
+        if peak_scale > 1e-8 and baseline_scale > 1e-8:
+            baseline_rescale = (target_ratio * peak_scale) / baseline_scale
+            f_true = f_true * baseline_rescale
+
         noise, noise_meta = self.generate_noise(noise_level)
         
         # Observed signal: peaks + baseline + noise
         y = x_true + f_true + noise
+
+        achieved_ratio = float(np.max(np.abs(f_true)) / (peak_scale + 1e-8))
+        baseline_meta["target_peak_ratio"] = target_ratio
+        baseline_meta["achieved_peak_ratio"] = achieved_ratio
+        baseline_meta["rescale_factor"] = float(baseline_rescale)
         
         metadata = {
             "N": self.N,
@@ -253,16 +359,14 @@ class SyntheticDataGenerator:
     def generate_dataset(
         self,
         n_samples: int,
-        noise_level_range: Tuple[float, float] = (0.7, 2.4),  # Slightly stronger high-frequency noise
-        **kwargs
+        noise_level_range: Tuple[float, float] = (2.0, 6.0),
     ) -> List[SyntheticSignal]:
         """
-        Generate a dataset of synthetic signals.
+        Generate a dataset of synthetic chromatogram signals.
         
         Args:
             n_samples: Number of samples to generate
-            noise_level_range: Range of noise levels to sample from
-            **kwargs: Additional generation parameters
+            noise_level_range: Range of noise standard deviations
         
         Returns:
             List of SyntheticSignal objects
@@ -270,7 +374,7 @@ class SyntheticDataGenerator:
         dataset = []
         for _ in range(n_samples):
             noise_level = float(self.rng.uniform(noise_level_range[0], noise_level_range[1]))
-            signal = self.generate_signal(noise_level=noise_level, **kwargs)
+            signal = self.generate_signal(noise_level=noise_level)
             dataset.append(signal)
         return dataset
 
@@ -278,15 +382,21 @@ class SyntheticDataGenerator:
 def create_train_test_split(
     dataset: List[SyntheticSignal],
     train_ratio: float = 0.8,
-    seed: Optional[int] = None
+    seed: Optional[int] = None,
+    normalize: bool = True,
 ) -> Tuple[Tuple[torch.Tensor, torch.Tensor, torch.Tensor], Tuple[torch.Tensor, torch.Tensor, torch.Tensor]]:
     """
     Create 80/20 train/test split from synthetic dataset.
+    
+    Per-sample normalization: each signal is divided by max(|y|) so the
+    model always sees inputs in a consistent amplitude range. This is
+    CRITICAL because the learnable thresholds work at a single scale.
     
     Args:
         dataset: List of SyntheticSignal objects
         train_ratio: Fraction for training (default 0.8)
         seed: Random seed for shuffling
+        normalize: If True, normalize each sample by max(|y|)
     
     Returns:
         (train_y, train_x_true, train_f_true), (test_y, test_x_true, test_f_true)
@@ -300,14 +410,21 @@ def create_train_test_split(
     train_indices = indices[:split_idx]
     test_indices = indices[split_idx:]
     
-    # Stack into arrays - now including baseline ground truth!
-    train_y = np.stack([dataset[i].y for i in train_indices])
-    train_x_true = np.stack([dataset[i].x_true for i in train_indices])
-    train_f_true = np.stack([dataset[i].f_true for i in train_indices])
+    def stack_and_normalize(idxs):
+        ys = np.stack([dataset[i].y for i in idxs])
+        xs = np.stack([dataset[i].x_true for i in idxs])
+        fs = np.stack([dataset[i].f_true for i in idxs])
+        if normalize:
+            # Per-sample normalization: divide by max(|y|) per row
+            scales = np.max(np.abs(ys), axis=1, keepdims=True)
+            scales = np.maximum(scales, 1e-8)  # avoid div by zero
+            ys = ys / scales
+            xs = xs / scales
+            fs = fs / scales
+        return ys, xs, fs
     
-    test_y = np.stack([dataset[i].y for i in test_indices])
-    test_x_true = np.stack([dataset[i].x_true for i in test_indices])
-    test_f_true = np.stack([dataset[i].f_true for i in test_indices])
+    train_y, train_x_true, train_f_true = stack_and_normalize(train_indices)
+    test_y, test_x_true, test_f_true = stack_and_normalize(test_indices)
     
     # Convert to tensors
     train_y_tensor = torch.tensor(train_y, dtype=torch.float64)
@@ -334,7 +451,9 @@ class SparsityLoss(nn.Module):
     3. Total Variation (TV) on peaks - encourage piecewise constant (sharp peaks)
     4. Baseline smoothness - penalize non-smooth baselines
     5. Non-negativity penalty - peaks should be positive
-    6. **NEW** Baseline reconstruction - match ground truth baseline (FIXES LEAKAGE!)
+    6. Baseline reconstruction - match ground truth baseline (FIXES LEAKAGE!)
+    7. Peak-baseline orthogonality - penalize correlation between peaks and baseline
+    8. Baseline TV (3rd derivative) - penalize high-freq content in baseline
     
     The key insight: chromatogram peaks are:
     - SPARSE: Most of the signal is zero (only peaks have values)
@@ -344,17 +463,20 @@ class SparsityLoss(nn.Module):
     The baseline should be:
     - SMOOTH: No high-frequency content
     - MATCH GROUND TRUTH: Supervised learning on baseline too!
+    - ORTHOGONAL to peaks: No bumps where peaks exist!
     """
     
     def __init__(self, 
-                 alpha_mse: float = 1.0,        # Peak reconstruction weight
-                 alpha_l1: float = 0.01,        # L1 sparsity on peaks
-                 alpha_tv: float = 0.01,        # Total Variation on peaks
-                 alpha_smooth: float = 0.01,    # Baseline smoothness (regularization)
-                 alpha_neg: float = 0.1,        # Non-negativity penalty
-                 alpha_baseline: float = 1.0,   # **NEW** Baseline reconstruction weight
-                 use_huber: bool = True,        # Use Huber loss instead of MSE
-                 huber_delta: float = 1.0):     # Huber delta parameter
+                 alpha_mse: float = 1.0,          # Peak reconstruction weight
+                 alpha_l1: float = 0.01,          # L1 sparsity on peaks
+                 alpha_tv: float = 0.01,          # Total Variation on peaks
+                 alpha_smooth: float = 0.01,      # Baseline smoothness (2nd deriv)
+                 alpha_neg: float = 0.1,          # Non-negativity penalty
+                 alpha_baseline: float = 1.0,     # Baseline reconstruction weight
+                 alpha_ortho: float = 0.5,        # Peak-baseline orthogonality weight
+                 alpha_baseline_tv: float = 0.1,  # Baseline 3rd derivative penalty
+                 use_huber: bool = True,          # Use Huber loss instead of MSE
+                 huber_delta: float = 1.0):       # Huber delta parameter
         super(SparsityLoss, self).__init__()
         self.alpha_mse = alpha_mse
         self.alpha_l1 = alpha_l1
@@ -362,6 +484,8 @@ class SparsityLoss(nn.Module):
         self.alpha_smooth = alpha_smooth
         self.alpha_neg = alpha_neg
         self.alpha_baseline = alpha_baseline
+        self.alpha_ortho = alpha_ortho
+        self.alpha_baseline_tv = alpha_baseline_tv
         self.use_huber = use_huber
         self.huber_delta = huber_delta
         
@@ -378,7 +502,7 @@ class SparsityLoss(nn.Module):
             x_pred: Predicted peaks (batch, N) or (N,)
             x_target: Ground truth peaks (batch, N) or (N,)
             f_pred: Predicted baseline (optional)
-            f_target: Ground truth baseline (optional) - NEW for baseline supervision!
+            f_target: Ground truth baseline (optional) - for baseline supervision!
             
         Returns:
             total_loss: Combined loss value
@@ -416,7 +540,7 @@ class SparsityLoss(nn.Module):
             loss_dict['total_variation'] = tv_loss.item()
             total_loss = total_loss + self.alpha_tv * tv_loss
         
-        # 4. BASELINE SMOOTHNESS - penalize non-smooth baselines (regularization)
+        # 4. BASELINE SMOOTHNESS - penalize non-smooth baselines (2nd derivative)
         if self.alpha_smooth > 0 and f_pred is not None:
             if f_pred.dim() == 1:
                 f_pred_batch = f_pred.unsqueeze(0)
@@ -436,7 +560,7 @@ class SparsityLoss(nn.Module):
             loss_dict['non_negativity'] = neg_loss.item()
             total_loss = total_loss + self.alpha_neg * neg_loss
         
-        # 6. **NEW** BASELINE RECONSTRUCTION LOSS - match ground truth baseline!
+        # 6. BASELINE RECONSTRUCTION LOSS - match ground truth baseline!
         # This is the KEY fix for baseline leakage!
         if self.alpha_baseline > 0 and f_pred is not None and f_target is not None:
             if f_pred.dim() == 1:
@@ -454,6 +578,44 @@ class SparsityLoss(nn.Module):
                 baseline_loss = torch.mean((f_pred_batch - f_target_batch) ** 2)
             loss_dict['baseline_recon'] = baseline_loss.item()
             total_loss = total_loss + self.alpha_baseline * baseline_loss
+        
+        # 7. PEAK-BASELINE ORTHOGONALITY - penalize baseline gradient at peak locations
+        # Where peaks are large, baseline should NOT have slope (should be flat there)
+        # This directly fights leakage: if x has a peak, f should be smooth there
+        if self.alpha_ortho > 0 and f_pred is not None:
+            if f_pred.dim() == 1:
+                f_pred_batch = f_pred.unsqueeze(0)
+            else:
+                f_pred_batch = f_pred
+            
+            # Compute first derivative of baseline (should be ~0 at peak locations)
+            f_diff1 = f_pred_batch[:, 1:] - f_pred_batch[:, :-1]
+            
+            # Weight by peak magnitude: penalize baseline changes MORE where peaks exist
+            # Use absolute peak values as weights (detached so we don't affect peak gradients)
+            peak_weights = torch.abs(x_pred[:, :-1]).detach()
+            # Normalize weights to avoid scale issues
+            peak_weights = peak_weights / (peak_weights.max() + 1e-8)
+            
+            # Penalize baseline gradient at peak locations
+            ortho_loss = torch.mean(peak_weights * f_diff1 ** 2)
+            loss_dict['peak_baseline_ortho'] = ortho_loss.item()
+            total_loss = total_loss + self.alpha_ortho * ortho_loss
+        
+        # 8. BASELINE TOTAL VARIATION (3rd derivative) - penalize high-freq in baseline
+        # The baseline should be ultra-smooth; any rapid changes are leakage
+        # Third derivative catches localized bumps that 2nd derivative misses
+        if self.alpha_baseline_tv > 0 and f_pred is not None:
+            if f_pred.dim() == 1:
+                f_pred_batch = f_pred.unsqueeze(0)
+            else:
+                f_pred_batch = f_pred
+            
+            diff3 = (f_pred_batch[:, 3:] - 3 * f_pred_batch[:, 2:-1] 
+                     + 3 * f_pred_batch[:, 1:-2] - f_pred_batch[:, :-3])
+            baseline_tv_loss = torch.mean(diff3 ** 2)
+            loss_dict['baseline_tv'] = baseline_tv_loss.item()
+            total_loss = total_loss + self.alpha_baseline_tv * baseline_tv_loss
         
         loss_dict['total'] = total_loss.item()
         
@@ -559,13 +721,15 @@ def train_lbeads_net(model: nn.Module,
     if loss_config is None:
         loss_config = {
             'alpha_mse': 1.0,          # Peak reconstruction (main objective)
-            'alpha_l1': 0.001,         # L1 sparsity on peaks
-            'alpha_tv': 0.001,         # Total Variation
-            'alpha_smooth': 0.1,       # Baseline smoothness (INCREASED)
-            'alpha_neg': 0.1,          # Non-negativity
-            'alpha_baseline': 1.0,     # **NEW** Baseline reconstruction (FIXES LEAKAGE!)
+            'alpha_l1': 0.01,          # L1 sparsity on peaks
+            'alpha_tv': 0.01,          # Total Variation
+            'alpha_smooth': 2.0,       # Baseline smoothness 2nd deriv
+            'alpha_neg': 0.5,          # Non-negativity
+            'alpha_baseline': 10.0,    # Baseline reconstruction - VERY STRONG
+            'alpha_ortho': 1.0,        # Peak-baseline orthogonality
+            'alpha_baseline_tv': 0.5,  # Baseline 3rd derivative penalty
             'use_huber': True,
-            'huber_delta': 1.0
+            'huber_delta': 0.1
         }
     
     criterion = SparsityLoss(**loss_config)
@@ -639,6 +803,8 @@ def train_lbeads_net(model: nn.Module,
                   f"L1={avg_loss_dict.get('l1_sparsity', 0):.4f}, "
                   f"TV={avg_loss_dict.get('total_variation', 0):.4f}, "
                   f"baseline={avg_loss_dict.get('baseline_recon', 0):.4f}, "
+                  f"ortho={avg_loss_dict.get('peak_baseline_ortho', 0):.4f}, "
+                  f"bltv={avg_loss_dict.get('baseline_tv', 0):.6f}, "
                   f"neg={avg_loss_dict.get('non_negativity', 0):.6f}")
             # Print current learned parameters
             params = model.get_learned_params()
@@ -723,7 +889,7 @@ def main():
     
     # Synthetic data parameters
     N = 4096           # Signal length
-    n_samples = 200    # Total number of samples
+    n_samples = 500    # Total number of samples (more diversity)
     train_ratio = 0.8  # 80% train, 20% test
     seed = 42          # For reproducibility
     
@@ -736,8 +902,17 @@ def main():
     generator = SyntheticDataGenerator(N=N, seed=seed)
     dataset = generator.generate_dataset(
         n_samples=n_samples,
-        noise_level_range=(0.7, 2.4),  # Slightly stronger high-frequency noise
+        noise_level_range=(2.0, 6.0),  # Realistic noise (real data has std ~5)
     )
+
+    peak_baseline_ratios = np.array([
+        np.max(np.abs(s.f_true)) / (np.max(np.abs(s.x_true)) + 1e-8)
+        for s in dataset
+    ])
+    print("  Baseline/peak max-ratio stats:")
+    print(f"    mean={peak_baseline_ratios.mean():.4f}, median={np.median(peak_baseline_ratios):.4f}, "
+          f"p10={np.percentile(peak_baseline_ratios, 10):.4f}, "
+          f"p90={np.percentile(peak_baseline_ratios, 90):.4f}")
     
     # Create train/test split (80/20) - now includes baseline ground truth!
     print("\nCreating train/test split...")
@@ -748,6 +923,7 @@ def main():
     print(f"  Training samples: {train_y.shape[0]}")
     print(f"  Test samples: {test_y.shape[0]}")
     print(f"  Signal length: {train_y.shape[1]}")
+    print(f"  Per-sample normalization: enabled (all signals scaled to unit max)")
     print(f"  Baseline supervision enabled: True")
     
     # Visualize a few examples
@@ -774,13 +950,14 @@ def main():
     model = LBEADS_NET_Fast(
         N=N,
         d=1,
-        fc=0.01,  # Slightly higher cutoff for sharper separation
-        num_layers=15,  # More iterations for better convergence
-        init_lam0=0.5,  # Asymmetric sparsity penalty
-        init_lam1=1.0,  # First derivative (smoothness)
-        init_lam2=1.0,  # Second derivative (smoothness)
+        fc=0.006,  # Match classical BEADS cutoff (0.6% of Nyquist)
+        num_layers=20,  # Sufficient for refinement (x starts from highpass init)
+        init_lam0=0.01, # Small threshold - x is already initialized well
+        init_lam1=0.5,  # Moderate: don't kill wide peaks during refinement
+        init_lam2=0.5,  # Moderate: same reasoning
         init_r=6.0,     # Asymmetry ratio (penalize negative 6x more)
-        init_step_size=0.01  # Larger step size for faster convergence
+        init_step_size=0.05,  # Moderate step size for stable refinement
+        lowpass_iterations=1,  # Single-pass lowpass (same as classical BEADS)
     )
     
     # Count parameters
@@ -796,15 +973,18 @@ def main():
         print(f"  {k}: {v:.4f}")
     
     # Configure sparsity-based loss function with BASELINE SUPERVISION
+    # With per-sample normalization all signals are in [0, 1] range
     loss_config = {
-        'alpha_mse': 1.0,         # Main reconstruction objective (peaks)
-        'alpha_l1': 0.001,        # L1 sparsity - encourage zeros in non-peak regions
-        'alpha_tv': 0.001,        # Total Variation - sharp transitions
-        'alpha_smooth': 1.0,      # Baseline smoothness (STRONGLY INCREASED)
-        'alpha_neg': 0.1,         # Non-negativity - peaks are positive
-        'alpha_baseline': 5.0,    # Baseline reconstruction - STRONG to prevent leakage!
-        'use_huber': True,        # Huber loss is more robust than MSE
-        'huber_delta': 1.0
+        'alpha_mse': 1.0,           # Main reconstruction objective (peaks)
+        'alpha_l1': 0.01,           # L1 sparsity (for unit-scale signals)
+        'alpha_tv': 0.01,           # Total Variation
+        'alpha_smooth': 2.0,        # Baseline smoothness 2nd deriv
+        'alpha_neg': 0.5,           # Non-negativity - peaks are positive
+        'alpha_baseline': 10.0,     # Baseline reconstruction - VERY STRONG to prevent leakage!
+        'alpha_ortho': 1.0,         # Peak-baseline orthogonality - penalize baseline slope at peaks
+        'alpha_baseline_tv': 0.5,   # Baseline 3rd derivative smoothness - catch localized bumps
+        'use_huber': True,          # Huber loss is more robust than MSE
+        'huber_delta': 0.1          # Appropriate for unit-scale signals
     }
     
     print("\nLoss function configuration:")
@@ -823,10 +1003,10 @@ def main():
         model,
         train_y,
         train_x_true,
-        train_f_true,  # **NEW** Baseline ground truth for supervision!
-        num_epochs=22,
-        learning_rate=1e-2,
-        batch_size=2,  # N=4096 is much heavier; use smaller batch for stability
+        train_f_true,  # Baseline ground truth for supervision
+        num_epochs=50,           # Sufficient for normalized data
+        learning_rate=5e-3,      # Moderate LR
+        batch_size=4,            # Slightly larger batch for normalized data
         device=device,
         verbose=True,
         loss_config=loss_config
@@ -876,6 +1056,8 @@ def main():
     plt.plot(epochs, [d.get('baseline_recon', 0) for d in loss_details], label='Baseline Recon')
     plt.plot(epochs, [d.get('l1_sparsity', 0) for d in loss_details], label='L1 Sparsity')
     plt.plot(epochs, [d.get('total_variation', 0) for d in loss_details], label='Total Variation')
+    plt.plot(epochs, [d.get('peak_baseline_ortho', 0) for d in loss_details], label='Ortho')
+    plt.plot(epochs, [d.get('baseline_tv', 0) for d in loss_details], label='Baseline TV')
     plt.xlabel('Epoch')
     plt.ylabel('Loss Component')
     plt.title('Loss Components')
@@ -965,8 +1147,9 @@ def main():
         'model_config': {
             'N': N,
             'd': 1,
-            'fc': 0.01,
-            'num_layers': 15
+            'fc': 0.006,
+            'num_layers': 20,
+            'lowpass_iterations': 1
         },
         'loss_config': loss_config,
         'final_params': final_params,
