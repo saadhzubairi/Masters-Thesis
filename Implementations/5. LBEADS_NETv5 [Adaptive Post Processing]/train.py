@@ -19,6 +19,7 @@ import numpy as np
 import matplotlib.pyplot as plt
 import os
 import time
+import random
 from typing import Tuple, List, Optional, Dict
 from dataclasses import dataclass
 
@@ -892,6 +893,13 @@ def main():
     n_samples = 500    # Total number of samples (more diversity)
     train_ratio = 0.8  # 80% train, 20% test
     seed = 42          # For reproducibility
+
+    # Reproducibility: stabilize training variance across runs/checkpoints.
+    random.seed(seed)
+    np.random.seed(seed)
+    torch.manual_seed(seed)
+    if torch.cuda.is_available():
+        torch.cuda.manual_seed_all(seed)
     
     # Generate synthetic dataset
     print("\nGenerating synthetic dataset...")

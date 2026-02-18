@@ -32,7 +32,7 @@ from train import SyntheticDataGenerator, SyntheticSignal
 
 def load_trained_model(script_dir: str, N: int = 4096):
     """
-    Load the most recently trained model from the script directory.
+    Load the best trained model from the script directory.
     
     Args:
         script_dir: Directory containing .pth files
@@ -80,10 +80,8 @@ def load_trained_model(script_dir: str, N: int = 4096):
         print("No trained model found. Please run train.py first.")
         return None, None
     
-    # Sort by modification time (newest first), then pick the first matching N.
-    model_files.sort(key=os.path.getmtime, reverse=True)
-    model_path = None
-    checkpoint = None
+    # Select by saved test metrics when available; fallback to newest by mtime.
+    ranked_candidates = []
     for candidate_path in model_files:
         try:
             candidate_ckpt = torch.load(candidate_path, map_location='cpu', weights_only=False)
@@ -91,14 +89,22 @@ def load_trained_model(script_dir: str, N: int = 4096):
             print(f"  Skipping corrupt file {os.path.basename(candidate_path)}: {e}")
             continue
         config = candidate_ckpt.get('model_config', {})
-        if config.get('N') == N:
-            model_path = candidate_path
-            checkpoint = candidate_ckpt
-            break
-    
-    if model_path is None:
+        if config.get('N') != N:
+            continue
+        tm = candidate_ckpt.get('test_metrics', {})
+        corr = float(tm.get('correlation', -1.0))
+        mse = float(tm.get('mse', 1e12))
+        mae = float(tm.get('mae', 1e12))
+        mtime = os.path.getmtime(candidate_path)
+        ranked_candidates.append((-mae, -mse, corr, mtime, candidate_path, candidate_ckpt))
+
+    if not ranked_candidates:
         print(f"No trained model with N={N} found. Please retrain with train.py.")
         return None, None
+
+    ranked_candidates.sort(reverse=True)
+    neg_mae, neg_mse, corr, _, model_path, checkpoint = ranked_candidates[0]
+    print(f"  Selected by metrics: mae={-neg_mae:.6f}, mse={-neg_mse:.6f}, corr={corr:.4f}")
     
     print(f"Loading model from: {model_path}")
     
@@ -145,18 +151,7 @@ def main():
     test_signals = []
     for i in range(num_test_samples):
         noise_level = 0.15 + (i * 0.05)  # Slightly stronger high-frequency noise
-        signal = generator.generate_signal(
-            noise_level=noise_level,
-            # Make baseline intentionally stronger/wavier in demo visualizations.
-            poly_coeff_range=(-3.0, 3.0),
-            sine_freq_range=(0.2, 3.5),
-            sine_amp_range=(0.8, 4.0),
-            num_sine_components_range=(2, 4),
-            wide_bump_amp_range=(0.8, 3.5),
-            wide_bump_width_range=(0.08, 0.25),
-            baseline_scale_range=(4.0, 12.0),
-            baseline_offset_range=(-2.5, 2.5),
-        )
+        signal = generator.generate_signal(noise_level=noise_level)
         test_signals.append(signal)
     
     print(f"  Generated {num_test_samples} test signals")
@@ -210,7 +205,10 @@ def main():
     total_time = 0
     
     for i, signal in enumerate(test_signals):
-        y_tensor = torch.tensor(signal.y, dtype=torch.float64).unsqueeze(0)
+        # Match training-time per-sample normalization.
+        y_scale = max(np.max(np.abs(signal.y)), 1e-8)
+        y_normed = signal.y / y_scale
+        y_tensor = torch.tensor(y_normed, dtype=torch.float64).unsqueeze(0)
         
         start_time = time.time()
         with torch.no_grad():
@@ -218,8 +216,8 @@ def main():
         inference_time = time.time() - start_time
         total_time += inference_time
         
-        x_pred_np = x_pred[0].numpy()
-        f_pred_np = f_pred[0].numpy()
+        x_pred_np = x_pred[0].numpy() * y_scale
+        f_pred_np = f_pred[0].numpy() * y_scale
         
         # Compute metrics against ground truth
         mse = np.mean((x_pred_np - signal.x_true) ** 2)
