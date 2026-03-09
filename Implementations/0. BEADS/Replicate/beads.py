@@ -32,7 +32,7 @@ def BAfilt(d, fc, N):
     for i in range(d - 1):
         b1 = np.convolve(b1, np.array([-1, 2, -1]))
     b = np.convolve(b1, np.array([-1, 1]))
-    
+
     omc = 2 * np.pi * fc
     t = ((1 - np.cos(omc)) / (1 + np.cos(omc))) ** d
     

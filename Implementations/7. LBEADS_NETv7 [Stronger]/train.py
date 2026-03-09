@@ -29,6 +29,7 @@ from lbeads_net import (
     LBEADS_NET,
     apply_highpass_filter,
     apply_highpass_filter_np,
+    apply_lowpass_filter,
     apply_lowpass_filter_np,
     beads_classic_with_init,
     compute_lowpass_matrix_np,
@@ -564,7 +565,7 @@ class SparsityLoss(nn.Module):
     - ORTHOGONAL to peaks: No bumps where peaks exist!
     """
     
-    def __init__(self, 
+    def __init__(self,
                  alpha_mse: float = 1.0,          # Peak reconstruction weight
                  alpha_l1: float = 0.005,         # L1 sparsity on peaks
                  alpha_tv: float = 0.005,         # Total Variation on peaks
@@ -572,8 +573,12 @@ class SparsityLoss(nn.Module):
                  alpha_neg: float = 0.1,          # Non-negativity penalty
                  alpha_baseline: float = 2.0,     # Baseline reconstruction weight (masked to non-peak areas)
                  alpha_leakage: float = 1.0,      # High-frequency baseline leakage penalty at peak locations
-                 alpha_ortho: float = 0.5,        # Peak-baseline orthogonality weight
+                 alpha_ortho: float = 0.5,        # Peak-baseline orthogonality weight (element-wise)
                  alpha_baseline_tv: float = 0.0,  # Baseline 3rd derivative penalty
+                 alpha_asym_baseline: float = 1.0,# Asymmetric baseline over-estimation penalty
+                 asym_alpha: float = 0.9,         # Asymmetry ratio (over-est:under-est)
+                 alpha_envelope: float = 0.5,     # Envelope constraint (baseline <= local min)
+                 alpha_freq: float = 0.05,        # Frequency separation penalty
                  peak_mask_rel_threshold: float = 0.02,  # Peak mask threshold as fraction of max x_true
                  peak_mask_abs_min: float = 1e-4,        # Absolute floor for peak mask threshold
                  use_huber: bool = True,          # Use Huber loss instead of MSE
@@ -588,27 +593,124 @@ class SparsityLoss(nn.Module):
         self.alpha_leakage = alpha_leakage
         self.alpha_ortho = alpha_ortho
         self.alpha_baseline_tv = alpha_baseline_tv
+        self.alpha_asym_baseline = alpha_asym_baseline
+        self.asym_alpha = asym_alpha
+        self.alpha_envelope = alpha_envelope
+        self.alpha_freq = alpha_freq
         self.peak_mask_rel_threshold = peak_mask_rel_threshold
         self.peak_mask_abs_min = peak_mask_abs_min
         self.use_huber = use_huber
         self.huber_delta = huber_delta
-        
+
         if use_huber:
             self.huber = nn.HuberLoss(reduction='mean', delta=huber_delta)
-    
+
+    def _soft_local_min(self, y: torch.Tensor, window: int = 51, tau: float = 0.1) -> torch.Tensor:
+        """
+        Compute differentiable approximation to sliding-window local minimum.
+        Uses log-sum-exp trick for numerical stability.
+
+        Args:
+            y: Signal (batch, N)
+            window: Window size
+            tau: Temperature (smaller = sharper approximation)
+
+        Returns:
+            local_min: (batch, N) tensor of local minima
+        """
+        pad = window // 2
+        # Pad with reflection mode
+        y_pad = F.pad(y.unsqueeze(1), (pad, pad), mode='reflect')  # (batch, 1, N+2*pad)
+        # Unfold to get windows
+        y_unf = y_pad.unfold(-1, window, 1).squeeze(1)  # (batch, N, window)
+        # Soft minimum via log-sum-exp
+        local_min = -tau * torch.logsumexp(-y_unf / tau, dim=-1)
+        return local_min
+
+    def _asymmetric_baseline_loss(self, f_pred: torch.Tensor, f_true: torch.Tensor,
+                                  alpha: float = None) -> torch.Tensor:
+        """
+        Asymmetric baseline loss: penalize over-estimation alpha times more than under-estimation.
+
+        Args:
+            f_pred: Predicted baseline (batch, N)
+            f_true: Ground truth baseline (batch, N)
+            alpha: Asymmetry ratio (default: self.asym_alpha, typically 0.9)
+
+        Returns:
+            Scalar loss
+        """
+        if alpha is None:
+            alpha = self.asym_alpha
+        residual = f_pred - f_true
+        loss = torch.where(
+            residual > 0,
+            alpha * residual ** 2,         # over-estimation: heavy penalty
+            (1 - alpha) * residual ** 2    # under-estimation: light penalty
+        )
+        return loss.mean()
+
+    def _envelope_loss(self, f_pred: torch.Tensor, y: torch.Tensor,
+                       window: int = 51) -> torch.Tensor:
+        """
+        Baseline should not exceed local signal minimum (envelope constraint).
+        Prevents baseline from rising into peak regions.
+
+        Args:
+            f_pred: Predicted baseline (batch, N)
+            y: Observed signal (batch, N)
+            window: Window size for local minimum computation
+
+        Returns:
+            Scalar loss
+        """
+        local_min = self._soft_local_min(y, window=window).detach()
+        # Penalize where baseline exceeds local min (ReLU on positive violation)
+        violation = F.relu(f_pred - local_min)
+        return violation.pow(2).mean()
+
+    def _freq_separation_loss(self, x_pred: torch.Tensor, f_pred: torch.Tensor,
+                              fc: float = 0.005) -> torch.Tensor:
+        """
+        Frequency separation loss: penalize high-freq content in baseline
+        and low-freq content in peaks.
+
+        Args:
+            x_pred: Predicted peaks (batch, N)
+            f_pred: Predicted baseline (batch, N)
+            fc: Cutoff frequency (0-0.5)
+
+        Returns:
+            Scalar loss
+        """
+        # FFT
+        X_peak = torch.fft.rfft(x_pred, dim=-1)
+        X_base = torch.fft.rfft(f_pred, dim=-1)
+        # Frequency grid
+        freqs = torch.fft.rfftfreq(x_pred.shape[-1], device=x_pred.device)
+        # Masks
+        hpf = (freqs > fc).float()  # High-pass filter mask
+        lpf = (freqs <= fc).float()  # Low-pass filter mask
+        # Loss: penalize high-freq in baseline and low-freq in peaks
+        loss = (X_base.abs() * hpf).pow(2).mean() + (X_peak.abs() * lpf).pow(2).mean()
+        return loss
+
     def forward(self, x_pred: torch.Tensor, x_target: torch.Tensor,
                 f_pred: Optional[torch.Tensor] = None,
                 f_target: Optional[torch.Tensor] = None,
-                f_pred_highpass: Optional[torch.Tensor] = None) -> Tuple[torch.Tensor, Dict[str, float]]:
+                f_pred_highpass: Optional[torch.Tensor] = None,
+                y: Optional[torch.Tensor] = None) -> Tuple[torch.Tensor, Dict[str, float]]:
         """
         Compute total loss with breakdown.
-        
+
         Args:
             x_pred: Predicted peaks (batch, N) or (N,)
             x_target: Ground truth peaks (batch, N) or (N,)
             f_pred: Predicted baseline (optional)
             f_target: Ground truth baseline (optional) - for baseline supervision!
-            
+            f_pred_highpass: High-pass filtered baseline (optional)
+            y: Observed signal (optional) - needed for envelope constraint
+
         Returns:
             total_loss: Combined loss value
             loss_dict: Dictionary with individual loss components
@@ -623,7 +725,9 @@ class SparsityLoss(nn.Module):
             f_target = f_target.unsqueeze(0)
         if f_pred_highpass is not None and f_pred_highpass.dim() == 1:
             f_pred_highpass = f_pred_highpass.unsqueeze(0)
-        
+        if y is not None and y.dim() == 1:
+            y = y.unsqueeze(0)
+
         loss_dict = {}
         
         # 1. RECONSTRUCTION LOSS - match ground truth peaks
@@ -714,38 +818,52 @@ class SparsityLoss(nn.Module):
             loss_dict['baseline_leakage'] = leakage_loss.item()
             total_loss = total_loss + self.alpha_leakage * leakage_loss
         
-        # 7. PEAK-BASELINE ORTHOGONALITY - penalize baseline gradient at peak locations
-        # Where peaks are large, baseline should NOT have slope (should be flat there)
-        # This directly fights leakage: if x has a peak, f should be smooth there
+        # 7. PEAK-BASELINE ORTHOGONALITY - element-wise product penalty
+        # Directly penalize regions where BOTH peaks and baseline are simultaneously active
+        # This enforces mutual exclusivity: peaks XOR baseline, not peaks AND baseline
         if self.alpha_ortho > 0 and f_pred is not None:
             f_pred_batch = f_pred
-            
-            # Compute first derivative of baseline (should be ~0 at peak locations)
-            f_diff1 = f_pred_batch[:, 1:] - f_pred_batch[:, :-1]
-            
-            # Weight by true peak support so this term remains active even when x_pred collapses.
-            peak_weights = torch.abs(x_target[:, :-1]).detach()
-            peak_weights = peak_weights / (torch.amax(peak_weights, dim=1, keepdim=True) + 1e-8)
-            
-            # Penalize baseline gradient at peak locations
-            ortho_loss = torch.mean(peak_weights * f_diff1 ** 2)
+            # Element-wise product: penalize where both |x_pred| and |f_pred| are large
+            ortho_loss = (torch.abs(x_pred) * torch.abs(f_pred_batch)).mean()
             loss_dict['peak_baseline_ortho'] = ortho_loss.item()
             total_loss = total_loss + self.alpha_ortho * ortho_loss
-        
+
         # 8. BASELINE TOTAL VARIATION (3rd derivative) - penalize high-freq in baseline
         # The baseline should be ultra-smooth; any rapid changes are leakage
         # Third derivative catches localized bumps that 2nd derivative misses
         if self.alpha_baseline_tv > 0 and f_pred is not None:
             f_pred_batch = f_pred
-            
-            diff3 = (f_pred_batch[:, 3:] - 3 * f_pred_batch[:, 2:-1] 
+
+            diff3 = (f_pred_batch[:, 3:] - 3 * f_pred_batch[:, 2:-1]
                      + 3 * f_pred_batch[:, 1:-2] - f_pred_batch[:, :-3])
             baseline_tv_loss = torch.mean(diff3 ** 2)
             loss_dict['baseline_tv'] = baseline_tv_loss.item()
             total_loss = total_loss + self.alpha_baseline_tv * baseline_tv_loss
-        
+
+        # 9. ASYMMETRIC BASELINE LOSS - penalize over-estimation much more than under-estimation
+        # The main culprit of baseline leakage: the baseline rising into peak regions
+        # We heavily penalize this (alpha ratio ~0.9) but forgive small under-estimation
+        if self.alpha_asym_baseline > 0 and f_pred is not None and f_target is not None:
+            asym_loss = self._asymmetric_baseline_loss(f_pred, f_target, alpha=self.asym_alpha)
+            loss_dict['asym_baseline'] = asym_loss.item()
+            total_loss = total_loss + self.alpha_asym_baseline * asym_loss
+
+        # 10. ENVELOPE CONSTRAINT - baseline should not exceed local signal minimum
+        # Prevents the baseline from rising above the true signal baseline in sparse regions
+        if self.alpha_envelope > 0 and f_pred is not None and y is not None:
+            env_loss = self._envelope_loss(f_pred, y)
+            loss_dict['envelope'] = env_loss.item()
+            total_loss = total_loss + self.alpha_envelope * env_loss
+
+        # 11. FREQUENCY SEPARATION LOSS - penalize high-freq in baseline, low-freq in peaks
+        # Enforces spectral separation: peaks are broadband, baseline is low-pass
+        if self.alpha_freq > 0:
+            freq_loss = self._freq_separation_loss(x_pred, f_pred)
+            loss_dict['freq_separation'] = freq_loss.item()
+            total_loss = total_loss + self.alpha_freq * freq_loss
+
         loss_dict['total'] = total_loss.item()
-        
+
         return total_loss, loss_dict
 
 
@@ -850,9 +968,24 @@ def train_lbeads_net(model: nn.Module,
         loss_history: List of total training losses
         loss_details: List of loss component dictionaries
     """
-    model = model.to(device)
+    # MPS (Apple Silicon) only supports float32, not float64
+    if device == 'mps':
+        model = model.float().to(device)
+        # Convert all training data to float32 for MPS
+        train_y = train_y.float()
+        train_x_true = train_x_true.float()
+        if train_f_true is not None:
+            train_f_true = train_f_true.float()
+        if test_y is not None:
+            test_y = test_y.float()
+        if test_x_true is not None:
+            test_x_true = test_x_true.float()
+        if test_f_true is not None:
+            test_f_true = test_f_true.float()
+    else:
+        model = model.to(device)
     model.train()
-    
+
     optimizer = optim.Adam(model.parameters(), lr=learning_rate)
     scheduler = optim.lr_scheduler.StepLR(optimizer, step_size=50, gamma=0.5)
     
@@ -864,9 +997,13 @@ def train_lbeads_net(model: nn.Module,
         'alpha_smooth': 0.2,
         'alpha_neg': 2.0,
         'alpha_baseline': 0.5,
-        'alpha_leakage': 0.5,
-        'alpha_ortho': 0.2,
-        'alpha_baseline_tv': 0.0,
+        'alpha_leakage': 0.3,
+        'alpha_ortho': 0.1,
+        'alpha_baseline_tv': 0.05,
+        'alpha_asym_baseline': 1.0,
+        'asym_alpha': 0.9,
+        'alpha_envelope': 0.5,
+        'alpha_freq': 0.05,
         'peak_mask_rel_threshold': 0.02,
         'peak_mask_abs_min': 1e-4,
         'use_huber': False,
@@ -928,6 +1065,7 @@ def train_lbeads_net(model: nn.Module,
         stage_epochs = int(stage.get('epochs', 0))
         stage_loss_cfg = dict(loss_config)
         stage_loss_cfg.update(stage.get('loss_config', {}))
+        intermediate_supervision = stage.get('intermediate_supervision', False)
         criterion = SparsityLoss(**stage_loss_cfg)
 
         if verbose:
@@ -966,28 +1104,73 @@ def train_lbeads_net(model: nn.Module,
                 y_batch = train_y[batch_indices].to(device)
                 x_true_batch = train_x_true[batch_indices].to(device)
 
+                # Convert to float32 for MPS (Apple Silicon) which doesn't support float64
+                if device == 'mps':
+                    y_batch = y_batch.float()
+                    x_true_batch = x_true_batch.float()
+
                 # Get baseline ground truth if available
                 f_true_batch = None
                 if has_baseline_supervision:
                     f_true_batch = train_f_true[batch_indices].to(device)
+                    if device == 'mps':
+                        f_true_batch = f_true_batch.float()
 
                 optimizer.zero_grad()
 
                 # Forward pass: model predicts peaks (x) and baseline (f) from observed y
-                x_pred, f_pred = model(y_batch)
+                if intermediate_supervision:
+                    x_pred, f_pred, intermediates = model(y_batch, return_intermediate=True)
+                    # intermediates contains x at each stage; compute f for each intermediate x
+                    f_intermediates = []
+                    for x_inter in intermediates:
+                        f_inter = apply_lowpass_filter(
+                            y_batch - x_inter,
+                            model.a_coeff,
+                            model.b_coeff,
+                            iterations=model.lowpass_iterations,
+                            solve_cg_iters=int(model.lowpass_cg_iters) if model.training else 128,
+                        )
+                        f_intermediates.append(f_inter)
+                else:
+                    x_pred, f_pred = model(y_batch)
+                    f_intermediates = None
 
                 f_pred_highpass = None
                 if criterion.alpha_leakage > 0:
                     f_pred_highpass = compute_loss_highpass(f_pred)
 
                 # Loss with sparsity penalties AND baseline supervision
-                loss, loss_dict = criterion(
-                    x_pred,
-                    x_true_batch,
-                    f_pred,
-                    f_true_batch,
-                    f_pred_highpass=f_pred_highpass,
-                )
+                if intermediate_supervision and f_intermediates is not None:
+                    # Compute loss at each stage with linearly increasing weights
+                    total_loss = 0.0
+                    loss_dict = {}
+                    n_stages = len(f_intermediates)
+                    for stage_idx, (x_inter, f_inter) in enumerate(zip(intermediates, f_intermediates)):
+                        # Linearly increasing weight: 0.1 at first stage, 1.0 at last
+                        stage_weight = 0.1 + 0.9 * (stage_idx / max(1, n_stages - 1))
+                        stage_loss, stage_loss_dict = criterion(
+                            x_inter,
+                            x_true_batch,
+                            f_inter,
+                            f_true_batch,
+                            f_pred_highpass=None,  # don't compute highpass for each stage
+                            y=y_batch,
+                        )
+                        total_loss = total_loss + stage_weight * stage_loss
+                        # Accumulate loss components with stage weight
+                        for k, v in stage_loss_dict.items():
+                            loss_dict[f'{k}_stage{stage_idx}'] = loss_dict.get(f'{k}_stage{stage_idx}', 0.0) + v * stage_weight
+                    loss = total_loss
+                else:
+                    loss, loss_dict = criterion(
+                        x_pred,
+                        x_true_batch,
+                        f_pred,
+                        f_true_batch,
+                        f_pred_highpass=f_pred_highpass,
+                        y=y_batch,
+                    )
 
                 # Track per-epoch peak scale diagnostic.
                 epoch_abs_x_pred_sum += torch.sum(torch.abs(x_pred)).item()
@@ -1028,9 +1211,16 @@ def train_lbeads_net(model: nn.Module,
                         y_test_batch = test_y[test_slice].to(device)
                         x_test_batch = test_x_true[test_slice].to(device)
 
+                        # Convert to float32 for MPS
+                        if device == 'mps':
+                            y_test_batch = y_test_batch.float()
+                            x_test_batch = x_test_batch.float()
+
                         f_test_batch = None
                         if test_f_true is not None:
                             f_test_batch = test_f_true[test_slice].to(device)
+                            if device == 'mps':
+                                f_test_batch = f_test_batch.float()
 
                         x_test_pred, f_test_pred = model(y_test_batch)
                         f_test_pred_highpass = None
@@ -1261,9 +1451,17 @@ def evaluate_model(model: nn.Module,
         metrics: Dictionary of evaluation metrics
     """
     model.eval()
-    model = model.to(device)
-    
+    if device == 'mps':
+        model = model.float().to(device)
+    else:
+        model = model.to(device)
+
     with torch.no_grad():
+        # Convert to float32 for MPS BEFORE moving to device
+        if device == 'mps':
+            test_y = test_y.float()
+            test_x_true = test_x_true.float()
+
         test_y = test_y.to(device)
         test_x_true = test_x_true.to(device)
         
@@ -1402,7 +1600,7 @@ def main():
     
     # Create model.
     # Use enough unrolled iterations to separate peaks/baseline under supervision.
-    model_num_layers = 5
+    model_num_layers = 8
     model_shared_params = False
     model_solve_cg_iters = 5
     model_lowpass_cg_iters = 24
@@ -1462,9 +1660,13 @@ def main():
         'alpha_smooth': 0.2,
         'alpha_neg': 2.0,
         'alpha_baseline': 0.5,
-        'alpha_leakage': 0.5,
-        'alpha_ortho': 0.5,
-        'alpha_baseline_tv': 0.1,
+        'alpha_leakage': 0.3,
+        'alpha_ortho': 0.1,
+        'alpha_baseline_tv': 0.05,
+        'alpha_asym_baseline': 1.0,
+        'asym_alpha': 0.9,
+        'alpha_envelope': 0.5,
+        'alpha_freq': 0.05,
         'peak_mask_rel_threshold': 0.02,
         'peak_mask_abs_min': 1e-4,
         'use_huber': False,
@@ -1475,6 +1677,7 @@ def main():
         {
             'name': 'A_peak_recon',
             'epochs': 5,
+            'intermediate_supervision': False,
             'loss_config': {
                 'alpha_mse': 1.0,
                 'alpha_l1': 0.0,
@@ -1485,12 +1688,40 @@ def main():
                 'alpha_ortho': 0.0,
                 'alpha_smooth': 0.0,
                 'alpha_baseline_tv': 0.0,
+                'alpha_asym_baseline': 0.0,
+                'alpha_envelope': 0.0,
+                'alpha_freq': 0.0,
             }
         },
         {
-            'name': 'B_masked_baseline_leakage',
-            'epochs': 20,
-            'loss_config': dict(loss_config)
+            'name': 'B_baseline_leakage',
+            'epochs': 5,
+            'intermediate_supervision': False,
+            'loss_config': {
+                'alpha_mse': 1.0,
+                'alpha_l1': 0.01,
+                'alpha_tv': 0.01,
+                'alpha_smooth': 0.2,
+                'alpha_neg': 2.0,
+                'alpha_baseline': 0.5,
+                'alpha_leakage': 0.3,
+                'alpha_ortho': 0.1,
+                'alpha_baseline_tv': 0.05,
+                'alpha_asym_baseline': 1.0,
+                'asym_alpha': 0.9,
+                'alpha_envelope': 0.0,  # Skip envelope in stage B
+                'alpha_freq': 0.0,      # Skip freq in stage B
+            }
+        },
+        {
+            'name': 'C_fine_tune',
+            'epochs': 5,
+            'intermediate_supervision': False,
+            'loss_config': {
+                **loss_config,
+                'alpha_freq': 0.0,  # Skip expensive FFT-based loss in final stage
+                'alpha_envelope': 0.0,  # Skip envelope in final stage for speed
+            }
         }
     ]
     
@@ -1502,7 +1733,13 @@ def main():
     print("\n" + "=" * 60)
     print("Training with Sparsity-Based Loss...")
     print("=" * 60)
-    device = 'cuda' if torch.cuda.is_available() else 'cpu'
+    # Detect best available device: CUDA > MPS (Apple Silicon) > CPU
+    if torch.cuda.is_available():
+        device = 'cuda'
+    elif torch.backends.mps.is_available():
+        device = 'mps'
+    else:
+        device = 'cpu'
     print(f"Using device: {device}")
     
     start_time = time.time()
@@ -1516,8 +1753,8 @@ def main():
         test_f_true=test_f_true,
         num_epochs=50,           # Used only when stage_configs is None
         learning_rate=1e-3,
-        batch_size=4,            # Slightly larger batch for normalized data
-        device=device,
+        batch_size=24,           # Larger batch leverages M4 Pro GPU (10-12 cores)
+        device="cpu",
         verbose=True,
         loss_config=loss_config,
         stage_configs=stage_configs

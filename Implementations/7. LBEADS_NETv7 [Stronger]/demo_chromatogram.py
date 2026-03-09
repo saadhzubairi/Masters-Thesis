@@ -192,7 +192,7 @@ def main():
     apply_endpoint_parabola_preprocessing = True
 
     # --- Load data (same as BEADS paper / Replicate/main.py) ---
-    data_dir = os.path.normpath(os.path.join(script_dir, '..', '..', '0. BEADS', 'data'))
+    data_dir = os.path.normpath(os.path.join(script_dir, '..', '0. BEADS', 'data'))
     noise = sio.loadmat(os.path.join(data_dir, 'noise.mat'))['noise'].flatten()
     X = sio.loadmat(os.path.join(data_dir, 'chromatograms.mat'))['X']
 

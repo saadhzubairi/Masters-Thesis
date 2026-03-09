@@ -662,7 +662,7 @@ class LBEADS_NET(nn.Module):
                 intermediates.append(x.clone())
 
         x = self.output_gain * x
-        
+
         # Compute baseline in operator form (no dense NxN low-pass matrix).
         residual = y - x
         f = apply_lowpass_filter(
