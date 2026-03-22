@@ -7,10 +7,12 @@ from typing import Optional
 class ExperimentStore:
     def __init__(self, base_dir: str):
         self.base_dir = base_dir
+        self._counter = 0
         os.makedirs(base_dir, exist_ok=True)
 
     def create_run(self, name: str, config: dict) -> str:
-        run_id = str(int(time.time() * 1000))
+        self._counter += 1
+        run_id = f"{int(time.time() * 1000)}_{self._counter}"
         run_dir = os.path.join(self.base_dir, run_id)
         os.makedirs(run_dir, exist_ok=True)
         config_with_meta = {**config, "name": name, "run_id": run_id}
