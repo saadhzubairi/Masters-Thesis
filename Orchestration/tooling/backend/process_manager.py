@@ -6,9 +6,10 @@ from typing import Optional
 
 
 class ProcessManager:
-    def __init__(self, max_concurrent: int = 4):
+    def __init__(self, max_concurrent: int = 4, on_event=None):
         self.max_concurrent = max_concurrent
         self._processes: dict[str, dict] = {}
+        self._on_event = on_event  # callback(run_id, event_dict)
 
     async def start(self, run_id: str, cmd: list[str], cwd: str = None) -> int:
         running = sum(1 for p in self._processes.values() if p["status"] == "running")
@@ -49,11 +50,15 @@ class ProcessManager:
                 try:
                     parsed = json.loads(line)
                     entry["output_lines"].append(parsed)
+                    if self._on_event:
+                        self._on_event(run_id, parsed)
                 except json.JSONDecodeError:
                     entry["output_lines"].append({"type": "log", "message": line})
             proc.wait()
             if entry["status"] == "running":
                 entry["status"] = "complete" if proc.returncode == 0 else "failed"
+                if self._on_event:
+                    self._on_event(run_id, {"type": "_process_ended", "status": entry["status"]})
         except Exception:
             entry["status"] = "failed"
 

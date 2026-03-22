@@ -24,7 +24,28 @@ app.add_middleware(
 
 EXPERIMENTS_DIR = os.path.join(os.path.dirname(__file__), "experiments")
 store = ExperimentStore(EXPERIMENTS_DIR)
-manager = ProcessManager(max_concurrent=4)
+
+
+def _on_process_event(run_id: str, event: dict):
+    """Called from ProcessManager background thread whenever a JSON line is read."""
+    event_type = event.get("type")
+    if event_type == "epoch":
+        store.append_epoch(run_id, event)
+    elif event_type == "training_done":
+        store.set_summary(run_id, event.get("final_metrics", {}))
+    elif event_type == "complete":
+        store.update_status(run_id, "complete")
+    elif event_type == "error" and event.get("fatal"):
+        store.update_status(run_id, "failed")
+    elif event_type == "_process_ended":
+        # Process exited — ensure status is synced
+        status = event.get("status", "failed")
+        current = store.get_run(run_id)
+        if current and current["status"] == "running":
+            store.update_status(run_id, status)
+
+
+manager = ProcessManager(max_concurrent=4, on_event=_on_process_event)
 
 
 class RunConfig(BaseModel):
@@ -57,11 +78,22 @@ async def create_run(config: RunConfig):
 @app.get("/runs")
 async def list_runs():
     runs = store.list_runs()
-    # Enrich with live status from process manager
     for run in runs:
         live_status = manager.get_status(run["id"])
         if live_status:
             run["status"] = live_status
+        # Include live epoch count from process manager output
+        live_lines = manager.get_output_lines(run["id"])
+        live_epochs = [l for l in live_lines if l.get("type") == "epoch"]
+        if live_epochs:
+            run["epoch_count"] = len(live_epochs)
+            last = live_epochs[-1]
+            if last.get("train_loss") is not None:
+                run["summary"] = {
+                    **run.get("summary", {}),
+                    "train_loss": last["train_loss"],
+                    "test_loss": last.get("test_loss"),
+                }
     return runs
 
 
@@ -87,15 +119,6 @@ async def stream_run(run_id: str):
             lines = manager.get_output_lines(run_id, since=last_index)
             for line in lines:
                 yield {"data": json.dumps(line)}
-                # Also persist epoch data to store
-                if line.get("type") == "epoch":
-                    store.append_epoch(run_id, line)
-                elif line.get("type") == "training_done":
-                    store.set_summary(run_id, line.get("final_metrics", {}))
-                elif line.get("type") == "complete":
-                    store.update_status(run_id, "complete")
-                elif line.get("type") == "error" and line.get("fatal"):
-                    store.update_status(run_id, "failed")
             last_index += len(lines)
 
             status = manager.get_status(run_id)
