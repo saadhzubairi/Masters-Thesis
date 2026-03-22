@@ -821,7 +821,8 @@ def train_lbeads_net(model: nn.Module,
                      device: str = 'cpu',
                      verbose: bool = True,
                      loss_config: Optional[Dict] = None,
-                     stage_configs: Optional[List[Dict]] = None) -> Tuple[List[float], List[Dict]]:
+                     stage_configs: Optional[List[Dict]] = None,
+                     epoch_callback=None) -> Tuple[List[float], List[Dict]]:
     """
     Train LBEADS-NET model on synthetic data with sparsity-based loss.
     
@@ -1056,6 +1057,9 @@ def train_lbeads_net(model: nn.Module,
                 avg_loss_dict['test_total'] = avg_test_loss
             avg_loss_dict['stage'] = stage_name
             loss_details.append(avg_loss_dict)
+
+            if epoch_callback:
+                epoch_callback(global_epoch, stage_name, avg_loss, avg_loss_dict)
 
             if verbose:
                 print(f"  Mean |x_pred|: {mean_abs_x_pred:.6f}, Mean |x_true|: {mean_abs_x_true:.6f}")
@@ -1604,46 +1608,44 @@ def run_training(config: dict, output_dir: str, callback=None):
     if not stage_configs:
         stage_configs = [{'name': 'default', 'epochs': 25, 'loss_config': loss_config}]
 
-    # 5. Run training with callback integration
-    global_epoch = [0]
+    # 5. Run training with real-time epoch callback
     start_time = _time.time()
-    current_stage_name = [stage_configs[0]['name'] if stage_configs else '']
 
     all_loss_history = []
     all_loss_details = []
 
-    for stage in stage_configs:
-        current_stage_name[0] = stage['name']
-        loss_history, loss_details = train_lbeads_net(
-            model=model,
-            train_y=train_y, train_x_true=train_x, train_f_true=train_f,
-            test_y=test_y, test_x_true=test_x, test_f_true=test_f,
-            num_epochs=stage['epochs'],
-            learning_rate=tc.get('learning_rate', 1e-3),
-            batch_size=tc.get('batch_size', 4),
-            device=device,
-            verbose=True,
-            loss_config=stage['loss_config'],
-        )
+    def _on_epoch(global_ep, stage_name, avg_loss, avg_loss_dict):
+        """Called by train_lbeads_net at the end of each epoch."""
+        all_loss_history.append(avg_loss)
+        all_loss_details.append(avg_loss_dict)
+        if callback:
+            epoch_event = {
+                "type": "epoch",
+                "epoch": global_ep,
+                "stage": stage_name,
+                "train_loss": avg_loss,
+                "test_loss": avg_loss_dict.get("test_total"),
+                "components": {k: v for k, v in avg_loss_dict.items()
+                               if k not in ("test_total", "stage", "total")},
+                "learned_params": model.get_learned_params() if hasattr(model, 'get_learned_params') else {},
+                "elapsed_s": _time.time() - start_time,
+            }
+            callback(epoch_event)
 
-        for i, (loss_val, details) in enumerate(zip(loss_history, loss_details)):
-            global_epoch[0] += 1
-            all_loss_history.append(loss_val)
-            all_loss_details.append(details)
-
-            if callback:
-                epoch_event = {
-                    "type": "epoch",
-                    "epoch": global_epoch[0],
-                    "stage": current_stage_name[0],
-                    "train_loss": loss_val,
-                    "test_loss": details.get("test_total"),
-                    "components": {k: v for k, v in details.items()
-                                   if k not in ("test_total", "stage", "total")},
-                    "learned_params": model.get_learned_params() if hasattr(model, 'get_learned_params') else {},
-                    "elapsed_s": _time.time() - start_time,
-                }
-                callback(epoch_event)
+    # Single call — stages are handled inside train_lbeads_net
+    train_lbeads_net(
+        model=model,
+        train_y=train_y, train_x_true=train_x, train_f_true=train_f,
+        test_y=test_y, test_x_true=test_x, test_f_true=test_f,
+        num_epochs=sum(s['epochs'] for s in stage_configs),
+        learning_rate=tc.get('learning_rate', 1e-3),
+        batch_size=tc.get('batch_size', 4),
+        device=device,
+        verbose=True,
+        loss_config=loss_config,
+        stage_configs=stage_configs,
+        epoch_callback=_on_epoch,
+    )
 
     # 6. Compute final metrics
     model.eval()
