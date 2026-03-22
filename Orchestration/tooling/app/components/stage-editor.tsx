@@ -48,34 +48,33 @@ export function StageEditor({ stages, onChange }: StageEditorProps) {
       {stages.map((stage, i) => (
         <Collapsible key={i} defaultOpen={i === stages.length - 1}>
           <div className="border p-3">
-            <CollapsibleTrigger className="flex items-center justify-between w-full">
-              <div className="flex items-center gap-2">
+            <div className="flex items-center justify-between w-full">
+              <CollapsibleTrigger className="flex items-center gap-2">
                 <span className="bg-foreground text-background px-2 py-0.5 text-xs font-bold">
                   {String.fromCharCode(65 + i)}
                 </span>
+                <span className="text-xs text-muted-foreground">toggle</span>
+              </CollapsibleTrigger>
+              <div className="flex items-center gap-2">
                 <Input
                   value={stage.name}
                   onChange={(e) => updateStage(i, { name: e.target.value })}
                   className="h-7 text-xs w-40"
-                  onClick={(e) => e.stopPropagation()}
                 />
-              </div>
-              <div className="flex items-center gap-2">
                 <Label className="text-xs text-muted-foreground">Epochs:</Label>
                 <Input
                   type="number"
                   value={stage.epochs}
                   onChange={(e) => updateStage(i, { epochs: parseInt(e.target.value) || 1 })}
                   className="h-7 text-xs w-16"
-                  onClick={(e) => e.stopPropagation()}
                 />
                 {stages.length > 1 && (
-                  <Button variant="ghost" size="sm" className="h-7 text-xs text-destructive" onClick={(e) => { e.stopPropagation(); removeStage(i) }}>
+                  <Button variant="ghost" size="sm" className="h-7 text-xs text-destructive" onClick={() => removeStage(i)}>
                     Remove
                   </Button>
                 )}
               </div>
-            </CollapsibleTrigger>
+            </div>
             <CollapsibleContent className="mt-3 space-y-2">
               {ALPHA_KEYS.map((key) => {
                 const active = key in stage.loss_config
