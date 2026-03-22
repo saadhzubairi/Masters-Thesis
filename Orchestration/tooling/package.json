@@ -4,6 +4,7 @@
   "private": true,
   "scripts": {
     "dev": "next dev",
+    "dev:backend": "cd backend && source venv/bin/activate && uvicorn server:app --port 8000 --reload",
     "build": "next build",
     "start": "next start",
     "lint": "eslint"
