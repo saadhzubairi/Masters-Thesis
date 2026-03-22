@@ -1649,7 +1649,9 @@ def run_training(config: dict, output_dir: str, callback=None):
     model.eval()
     with torch.no_grad():
         test_y_dev = test_y.to(device)
-        x_pred, f_pred, _ = model(test_y_dev)
+        result_tuple = model(test_y_dev)
+        x_pred = result_tuple[0]
+        f_pred = result_tuple[1]
         x_pred_np = x_pred.cpu().numpy()
         x_true_np = test_x.numpy()
 
