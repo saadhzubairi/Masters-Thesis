@@ -1,0 +1,108 @@
+<h2>ML Experiment Hub — Dashboard Layout</h2>
+<p class="subtitle">Which overall layout structure works best for your workflow?</p>
+
+<div class="cards">
+  <div class="card" data-choice="sidebar" onclick="toggleSelect(this)">
+    <div class="card-image">
+      <div style="display:flex;height:300px;font-family:monospace;font-size:11px;background:#1a1a2e;border-radius:8px;overflow:hidden;">
+        <!-- Sidebar -->
+        <div style="width:200px;background:#16213e;padding:12px;border-right:1px solid #333;color:#8892b0;">
+          <div style="color:#64ffda;font-weight:bold;margin-bottom:16px;">⚗️ LBEADS Hub</div>
+          <div style="padding:6px 8px;background:#1a1a2e;border-radius:4px;color:#ccd6f6;margin-bottom:4px;">📊 Dashboard</div>
+          <div style="padding:6px 8px;margin-bottom:4px;">🚀 New Run</div>
+          <div style="padding:6px 8px;margin-bottom:4px;">📁 Experiments</div>
+          <div style="padding:6px 8px;margin-bottom:4px;">⚙️ Presets</div>
+        </div>
+        <!-- Main -->
+        <div style="flex:1;padding:16px;color:#ccd6f6;">
+          <div style="font-size:14px;font-weight:bold;margin-bottom:12px;">Active Runs</div>
+          <!-- Run card -->
+          <div style="background:#16213e;border-radius:6px;padding:10px;margin-bottom:8px;border-left:3px solid #64ffda;">
+            <div style="display:flex;justify-content:space-between;margin-bottom:6px;">
+              <span style="color:#64ffda;">Run #42 — v6 baseline</span>
+              <span style="color:#ffd93d;font-size:10px;">● RUNNING</span>
+            </div>
+            <div style="background:#0a0a1a;border-radius:4px;height:8px;overflow:hidden;">
+              <div style="background:linear-gradient(90deg,#64ffda,#00b4d8);width:65%;height:100%;border-radius:4px;"></div>
+            </div>
+            <div style="font-size:10px;color:#8892b0;margin-top:4px;">Epoch 16/25 · Train: 0.0023 · Test: 0.0031</div>
+          </div>
+          <div style="background:#16213e;border-radius:6px;padding:10px;margin-bottom:8px;border-left:3px solid #8892b0;">
+            <div style="display:flex;justify-content:space-between;margin-bottom:6px;">
+              <span>Run #41 — high ortho</span>
+              <span style="color:#64ffda;font-size:10px;">✓ DONE</span>
+            </div>
+            <div style="font-size:10px;color:#8892b0;">25/25 epochs · Test MSE: 0.0028 · MAE: 0.041</div>
+          </div>
+          <div style="background:#16213e;border-radius:6px;padding:10px;border-left:3px solid #ff6b6b;">
+            <div style="display:flex;justify-content:space-between;margin-bottom:6px;">
+              <span>Run #40 — low smooth</span>
+              <span style="color:#ff6b6b;font-size:10px;">✗ FAILED</span>
+            </div>
+            <div style="font-size:10px;color:#8892b0;">Epoch 8/25 · NaN loss detected</div>
+          </div>
+        </div>
+      </div>
+    </div>
+    <div class="card-body">
+      <h3>A. Sidebar Navigation</h3>
+      <p>Fixed sidebar with nav, main content area shows active/past runs. Familiar IDE-like layout. Good for quick switching between views.</p>
+    </div>
+  </div>
+
+  <div class="card" data-choice="tabs" onclick="toggleSelect(this)">
+    <div class="card-image">
+      <div style="height:300px;font-family:monospace;font-size:11px;background:#1a1a2e;border-radius:8px;overflow:hidden;">
+        <!-- Top bar -->
+        <div style="background:#16213e;padding:8px 16px;display:flex;align-items:center;gap:12px;border-bottom:1px solid #333;">
+          <span style="color:#64ffda;font-weight:bold;">⚗️ LBEADS Hub</span>
+          <div style="flex:1;display:flex;gap:2px;">
+            <div style="padding:6px 14px;background:#1a1a2e;border-radius:6px 6px 0 0;color:#ccd6f6;border-bottom:2px solid #64ffda;">Dashboard</div>
+            <div style="padding:6px 14px;color:#8892b0;">New Run</div>
+            <div style="padding:6px 14px;color:#8892b0;">Experiments</div>
+          </div>
+          <div style="color:#8892b0;font-size:10px;">3 active</div>
+        </div>
+        <!-- Content -->
+        <div style="padding:16px;color:#ccd6f6;">
+          <div style="display:grid;grid-template-columns:1fr 1fr;gap:10px;">
+            <div style="background:#16213e;border-radius:6px;padding:10px;">
+              <div style="display:flex;justify-content:space-between;margin-bottom:8px;">
+                <span style="color:#64ffda;font-size:12px;">Run #42</span>
+                <span style="color:#ffd93d;font-size:10px;">● RUNNING</span>
+              </div>
+              <div style="background:#0a0a1a;border-radius:4px;height:6px;overflow:hidden;margin-bottom:6px;">
+                <div style="background:#64ffda;width:65%;height:100%;"></div>
+              </div>
+              <div style="font-size:10px;color:#8892b0;">16/25 · Loss: 0.0023</div>
+              <div style="margin-top:8px;background:#0a0a1a;border-radius:4px;height:60px;display:flex;align-items:end;padding:4px;gap:1px;">
+                <div style="background:#64ffda;width:8%;height:90%;opacity:0.6;"></div>
+                <div style="background:#64ffda;width:8%;height:75%;opacity:0.6;"></div>
+                <div style="background:#64ffda;width:8%;height:60%;opacity:0.7;"></div>
+                <div style="background:#64ffda;width:8%;height:45%;opacity:0.7;"></div>
+                <div style="background:#64ffda;width:8%;height:35%;opacity:0.8;"></div>
+                <div style="background:#64ffda;width:8%;height:28%;opacity:0.8;"></div>
+                <div style="background:#64ffda;width:8%;height:22%;opacity:0.9;"></div>
+                <div style="background:#64ffda;width:8%;height:18%;opacity:0.9;"></div>
+              </div>
+            </div>
+            <div style="background:#16213e;border-radius:6px;padding:10px;">
+              <div style="display:flex;justify-content:space-between;margin-bottom:8px;">
+                <span style="font-size:12px;">Run #41</span>
+                <span style="color:#64ffda;font-size:10px;">✓ DONE</span>
+              </div>
+              <div style="font-size:10px;color:#8892b0;margin-bottom:6px;">25/25 · MSE: 0.0028</div>
+              <div style="margin-top:8px;background:#0a0a1a;border-radius:4px;height:60px;display:flex;align-items:center;justify-content:center;color:#8892b0;font-size:10px;">
+                📊 Click to view results
+              </div>
+            </div>
+          </div>
+        </div>
+      </div>
+    </div>
+    <div class="card-body">
+      <h3>B. Tab Navigation + Grid Cards</h3>
+      <p>Top tabs for navigation, runs shown as cards in a grid with inline mini-charts. More visual density, better for comparing multiple runs at a glance.</p>
+    </div>
+  </div>
+</div>

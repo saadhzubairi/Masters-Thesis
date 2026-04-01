@@ -77,7 +77,8 @@ def main():
         try:
             from demo import run_demo
             demo_dir = os.path.join(args.output_dir, "demo")
-            outputs = run_demo(checkpoint_path, demo_dir, N=config["model"].get("N", 4096))
+            outputs = run_demo(checkpoint_path, demo_dir, N=config["model"].get("N", 4096),
+                               data_config=config.get("data"))
             emit({"type": "demo_done", "demo": "demo.py", "outputs": outputs})
         except Exception as e:
             emit({"type": "demo_error", "demo": "demo.py", "error": str(e)})
@@ -87,7 +88,8 @@ def main():
         try:
             from demo_chromatogram import run_chromatogram_demo
             chrom_dir = os.path.join(args.output_dir, "demo_chrom")
-            outputs = run_chromatogram_demo(checkpoint_path, chrom_dir, N=config["model"].get("N", 4096))
+            outputs = run_chromatogram_demo(checkpoint_path, chrom_dir, N=config["model"].get("N", 4096),
+                                           data_config=config.get("data"))
             emit({"type": "demo_done", "demo": "demo_chromatogram.py", "outputs": outputs})
         except Exception as e:
             emit({"type": "demo_error", "demo": "demo_chromatogram.py", "error": str(e)})

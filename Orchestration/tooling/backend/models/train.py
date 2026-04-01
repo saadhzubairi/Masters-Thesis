@@ -26,6 +26,7 @@ from dataclasses import dataclass
 
 from lbeads_net import (
     LBEADS_NET,
+    LBEADS_NET_Fast,
     apply_highpass_filter,
     apply_highpass_filter_np,
     apply_lowpass_filter_np,
@@ -822,7 +823,8 @@ def train_lbeads_net(model: nn.Module,
                      verbose: bool = True,
                      loss_config: Optional[Dict] = None,
                      stage_configs: Optional[List[Dict]] = None,
-                     epoch_callback=None) -> Tuple[List[float], List[Dict]]:
+                     epoch_callback=None,
+                     batch_callback=None) -> Tuple[List[float], List[Dict]]:
     """
     Train LBEADS-NET model on synthetic data with sparsity-based loss.
     
@@ -960,8 +962,10 @@ def train_lbeads_net(model: nn.Module,
             # Shuffle data
             perm = torch.randperm(num_samples)
 
+            total_batches_in_epoch = (num_samples + batch_size - 1) // batch_size
             for i in range(0, num_samples, batch_size):
                 batch_indices = perm[i:min(i + batch_size, num_samples)]
+                batch_num = i // batch_size + 1
 
                 y_batch = train_y[batch_indices].to(device)
                 x_true_batch = train_x_true[batch_indices].to(device)
@@ -997,8 +1001,7 @@ def train_lbeads_net(model: nn.Module,
                 # Backward pass
                 loss.backward()
 
-                # Gentle clipping prevents rare spikes without freezing updates.
-                torch.nn.utils.clip_grad_norm_(model.parameters(), max_norm=5.0)
+                grad_norm = torch.nn.utils.clip_grad_norm_(model.parameters(), max_norm=5.0)
 
                 optimizer.step()
 
@@ -1007,6 +1010,19 @@ def train_lbeads_net(model: nn.Module,
                 for k, v in loss_dict.items():
                     epoch_loss_dict[k] = epoch_loss_dict.get(k, 0.0) + v
                 num_batches += 1
+
+                # Sub-epoch batch progress (## prefix = detail lines for display only)
+                if verbose:
+                    parts = [f"## batch {batch_num}/{total_batches_in_epoch}"]
+                    parts.append(f"loss={loss.item():.5f}")
+                    parts.append(f"grad_norm={grad_norm:.4f}")
+                    top_keys = [k for k in ("mse", "baseline", "leakage", "l1") if k in loss_dict]
+                    for k in top_keys[:3]:
+                        parts.append(f"{k}={loss_dict[k]:.5f}")
+                    print(" | ".join(parts), flush=True)
+
+                if batch_callback:
+                    batch_callback(batch_num, total_batches_in_epoch, loss.item(), grad_norm.item() if hasattr(grad_norm, 'item') else float(grad_norm))
 
             scheduler.step()
 
@@ -1555,11 +1571,41 @@ def run_training(config: dict, output_dir: str, callback=None):
     device = 'cuda' if torch.cuda.is_available() else 'cpu'
 
     # 1. Generate synthetic data
+    dc = config.get("data") or {}
+    bl = dc.get("baseline", {})
+    peak_layers = dc.get("peak_layers", [{}])  # default: 1 layer with defaults
+    noise_cfg = dc.get("noise", {})
+
     gen = SyntheticDataGenerator(N=N, seed=tc.get("seed", 42))
-    signals = gen.generate_dataset(
-        n_samples=tc.get("num_samples", 500),
-        noise_level_range=(tc.get("noise_level", 0.01), tc.get("noise_level", 0.01))
-    )
+
+    signals = []
+    noise_level = tc.get("noise_level", 0.01)
+    for _ in range(tc.get("num_samples", 500)):
+        f_true, _ = gen.generate_baseline(
+            smooth_sigma=bl.get("smooth_sigma", 100.0),
+            sine_amp=bl.get("sine_amp", 0.1),
+            sine_freq_range=(bl.get("sine_freq_min", 0.5), bl.get("sine_freq_max", 2.0)),
+            baseline_amp_range=(bl.get("baseline_amp_min", 0.08), bl.get("baseline_amp_max", 0.35)),
+        )
+        x_true = np.zeros(N, dtype=np.float64)
+        for layer in peak_layers:
+            gen.peak_shape_mode = layer.get("peak_shape_mode", "mixed")
+            peaks, _ = gen.generate_peaks(
+                num_peaks_range=(layer.get("num_peaks_min", 2), layer.get("num_peaks_max", 6)),
+                amplitude_range=(layer.get("amplitude_min", 0.2), layer.get("amplitude_max", 1.0)),
+                rise_width_range=(layer.get("rise_width_min", 10), layer.get("rise_width_max", 80)),
+                decay_width_range=(layer.get("decay_width_min", 20), layer.get("decay_width_max", 200)),
+                plateau_width_range=(layer.get("plateau_width_min", 0), layer.get("plateau_width_max", 10)),
+            )
+            x_true += peaks
+        noise, _ = gen.generate_noise(noise_level=noise_cfg.get("noise_level", noise_level))
+
+        y = x_true + f_true + noise
+        scale = max(float(np.max(np.abs(y))), 1e-8)
+        signals.append(SyntheticSignal(
+            y=(y / scale), x_true=(x_true / scale),
+            f_true=(f_true / scale), noise=(noise / scale), metadata={}
+        ))
 
     n_train = int(len(signals) * tc.get("train_ratio", 0.8))
     train_signals = signals[:n_train]
@@ -1574,16 +1620,40 @@ def run_training(config: dict, output_dir: str, callback=None):
     test_f = torch.stack([torch.tensor(s.f_true, dtype=torch.float32) for s in test_signals])
 
     # 2. Build model
-    model = LBEADS_NET(
-        N=N,
-        d=mc.get("d", 1),
-        fc=mc.get("fc", 0.006),
-        num_layers=mc.get("num_layers", 5),
-        shared_params=mc.get("shared_params", False),
-        lowpass_iterations=1,
-        solve_cg_iters=mc.get("solve_cg_iters", 5),
-        lowpass_cg_iters=mc.get("lowpass_cg_iters", 24),
-    ).to(device)
+    model_type = config.get("model_type", "lbeads")
+    if model_type == "lbeads_fast":
+        mf = config.get("model_fast", mc)  # prefer model_fast section if present
+        N = mf.get("N", N)  # allow fast config to override N
+        model = LBEADS_NET_Fast(
+            N=N,
+            d=mf.get("d", 1),
+            fc=mf.get("fc", 0.006),
+            num_layers=mf.get("num_layers", 10),
+            init_lam0=mf.get("init_lam0", 0.4),
+            init_lam1=mf.get("init_lam1", 4.0),
+            init_lam2=mf.get("init_lam2", 3.2),
+            init_r=mf.get("init_r", 6.0),
+            init_step_size=mf.get("init_step_size", 0.1),
+            lowpass_iterations=mf.get("lowpass_iterations", 3),
+            lowpass_cg_iters=mf.get("lowpass_cg_iters", 12),
+        ).to(device)
+    else:
+        model = LBEADS_NET(
+            N=N,
+            d=mc.get("d", 1),
+            fc=mc.get("fc", 0.006),
+            num_layers=mc.get("num_layers", 5),
+            shared_params=mc.get("shared_params", False),
+            lowpass_iterations=1,
+            solve_cg_iters=mc.get("solve_cg_iters", 5),
+            lowpass_cg_iters=mc.get("lowpass_cg_iters", 24),
+            init_lam0=mc.get("init_lam0", 0.002),
+            init_lam1=mc.get("init_lam1", 0.3),
+            init_lam2=mc.get("init_lam2", 0.3),
+            init_r=mc.get("init_r", 6.0),
+            init_step=mc.get("init_step", 1.0),
+            init_output_gain=mc.get("init_output_gain", 1.0),
+        ).to(device)
 
     # 3. Build loss_config (global defaults + user overrides)
     loss_config = {
@@ -1632,6 +1702,17 @@ def run_training(config: dict, output_dir: str, callback=None):
             }
             callback(epoch_event)
 
+    def _on_batch(batch_num, total_batches, batch_loss, grad_norm):
+        """Called by train_lbeads_net after each batch."""
+        if callback:
+            callback({
+                "type": "batch_progress",
+                "batch": batch_num,
+                "total_batches": total_batches,
+                "batch_loss": batch_loss,
+                "grad_norm": grad_norm,
+            })
+
     # Single call — stages are handled inside train_lbeads_net
     train_lbeads_net(
         model=model,
@@ -1645,6 +1726,7 @@ def run_training(config: dict, output_dir: str, callback=None):
         loss_config=loss_config,
         stage_configs=stage_configs,
         epoch_callback=_on_epoch,
+        batch_callback=_on_batch,
     )
 
     # 6. Compute final metrics
@@ -1676,8 +1758,9 @@ def run_training(config: dict, output_dir: str, callback=None):
     checkpoint_path = os.path.join(output_dir, "checkpoint.pth")
     final_params = model.get_learned_params() if hasattr(model, 'get_learned_params') else {}
     torch.save({
+        'model_type': model_type,
         'model_state_dict': model.state_dict(),
-        'model_config': mc,
+        'model_config': config.get("model_fast", mc) if model_type == "lbeads_fast" else mc,
         'loss_config': loss_config,
         'stage_configs': stage_configs,
         'final_params': final_params,

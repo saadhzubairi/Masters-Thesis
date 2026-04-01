@@ -1,0 +1,8 @@
+{
+  "permissions": {
+    "allow": [
+      "Bash(npx tsc:*)",
+      "Bash(npx shadcn@latest add \"https://www.shadcn.io/r/amethyst-haze.json?token=0c891ad8640df52b6223ae824af70a73939099dd1b3d59400e84234d0f3fe862\")"
+    ]
+  }
+}

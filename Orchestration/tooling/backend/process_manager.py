@@ -33,8 +33,11 @@ class ProcessManager:
             "pid": proc.pid,
             "status": "running",
             "output_lines": [],
+            "stderr_lines": [],
         }
-        asyncio.get_event_loop().run_in_executor(None, self._read_output, run_id)
+        loop = asyncio.get_event_loop()
+        loop.run_in_executor(None, self._read_output, run_id)
+        loop.run_in_executor(None, self._read_stderr, run_id)
         return proc.pid
 
     def _read_output(self, run_id: str):
@@ -43,7 +46,7 @@ class ProcessManager:
             return
         proc = entry["process"]
         try:
-            for line in proc.stdout:
+            for line in iter(proc.stdout.readline, ''):
                 line = line.strip()
                 if not line:
                     continue
@@ -61,6 +64,19 @@ class ProcessManager:
                     self._on_event(run_id, {"type": "_process_ended", "status": entry["status"]})
         except Exception:
             entry["status"] = "failed"
+
+    def _read_stderr(self, run_id: str):
+        entry = self._processes.get(run_id)
+        if not entry:
+            return
+        proc = entry["process"]
+        try:
+            for line in iter(proc.stderr.readline, ''):
+                line = line.strip()
+                if line:
+                    entry["stderr_lines"].append(line)
+        except Exception:
+            pass
 
     def get_status(self, run_id: str) -> Optional[str]:
         entry = self._processes.get(run_id)
@@ -85,6 +101,12 @@ class ProcessManager:
         if not entry:
             return []
         return entry["output_lines"][since:]
+
+    def get_stderr(self, run_id: str) -> list[str]:
+        entry = self._processes.get(run_id)
+        if not entry:
+            return []
+        return entry.get("stderr_lines", [])
 
     def get_active_count(self) -> int:
         return sum(1 for p in self._processes.values() if p["status"] == "running")

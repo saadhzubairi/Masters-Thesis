@@ -1,0 +1,24 @@
+artifact_path: /Users/saadhzubairi/Work/Masters-Thesis/Implementations/7. LBEADS_NETv7
+  [Stronger]/mlruns/1/models/m-87ea59fc5b4a43ed8cd64fd82cb5f5e3/artifacts
+flavors:
+  python_function:
+    config:
+      device: null
+    data: data
+    env:
+      conda: conda.yaml
+      virtualenv: python_env.yaml
+    loader_module: mlflow.pytorch
+    pickle_module_name: mlflow.pytorch.pickle_module
+    python_version: 3.14.3
+  pytorch:
+    code: null
+    model_data: data
+    pytorch_version: 2.10.0
+mlflow_version: 3.10.1
+model_id: m-87ea59fc5b4a43ed8cd64fd82cb5f5e3
+model_size_bytes: 450903
+model_uuid: m-87ea59fc5b4a43ed8cd64fd82cb5f5e3
+prompts: null
+run_id: 81d1034ce5da44afa786c34cc49fa29b
+utc_time_created: '2026-03-14 22:10:04.032058'

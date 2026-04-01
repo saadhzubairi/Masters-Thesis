@@ -1,0 +1,159 @@
+<h2>Run Detail — Live Monitoring & Results</h2>
+<p class="subtitle">What you see when you click into a running or completed experiment</p>
+
+<div class="mockup">
+  <div class="mockup-header">Run #42 — v6 baseline · <span style="color:#ffd93d;">● RUNNING</span></div>
+  <div class="mockup-body" style="padding:20px;font-family:monospace;font-size:11px;">
+
+    <!-- Top bar: summary -->
+    <div style="display:flex;gap:16px;margin-bottom:16px;align-items:center;">
+      <div style="background:#16213e;padding:8px 14px;border-radius:6px;">
+        <div style="color:#8892b0;font-size:9px;">PROGRESS</div>
+        <div style="color:#64ffda;font-size:16px;font-weight:bold;">16 / 25</div>
+      </div>
+      <div style="background:#16213e;padding:8px 14px;border-radius:6px;">
+        <div style="color:#8892b0;font-size:9px;">TRAIN LOSS</div>
+        <div style="color:#ccd6f6;font-size:16px;font-weight:bold;">0.00234</div>
+      </div>
+      <div style="background:#16213e;padding:8px 14px;border-radius:6px;">
+        <div style="color:#8892b0;font-size:9px;">TEST LOSS</div>
+        <div style="color:#ccd6f6;font-size:16px;font-weight:bold;">0.00312</div>
+      </div>
+      <div style="background:#16213e;padding:8px 14px;border-radius:6px;">
+        <div style="color:#8892b0;font-size:9px;">STAGE</div>
+        <div style="color:#ffd93d;font-size:16px;font-weight:bold;">B</div>
+      </div>
+      <div style="background:#16213e;padding:8px 14px;border-radius:6px;">
+        <div style="color:#8892b0;font-size:9px;">ELAPSED</div>
+        <div style="color:#ccd6f6;font-size:16px;font-weight:bold;">4m 32s</div>
+      </div>
+      <div style="flex:1;"></div>
+      <div style="background:#ff6b6b;padding:8px 14px;border-radius:6px;color:#fff;font-weight:bold;cursor:pointer;">⏹ Stop</div>
+    </div>
+
+    <!-- Progress bar -->
+    <div style="background:#0a0a1a;border-radius:6px;height:12px;overflow:hidden;margin-bottom:20px;position:relative;">
+      <div style="background:linear-gradient(90deg,#64ffda 0%,#64ffda 20%,#ffd93d 20%,#00b4d8 64%);width:64%;height:100%;border-radius:6px;transition:width 0.3s;"></div>
+      <div style="position:absolute;left:20%;top:0;height:100%;border-left:2px dashed #8892b0;"></div>
+      <div style="position:absolute;left:18%;top:-16px;color:#8892b0;font-size:9px;">Stage A→B</div>
+    </div>
+
+    <!-- Live loss chart placeholder -->
+    <div style="background:#16213e;border-radius:8px;padding:16px;margin-bottom:16px;">
+      <div style="color:#64ffda;font-weight:bold;margin-bottom:10px;">📈 Loss Curves (Live)</div>
+      <div style="background:#0a0a1a;border-radius:6px;height:120px;display:flex;align-items:end;padding:8px 12px;gap:2px;position:relative;">
+        <!-- Y axis labels -->
+        <div style="position:absolute;left:4px;top:8px;color:#8892b0;font-size:8px;">0.05</div>
+        <div style="position:absolute;left:4px;bottom:8px;color:#8892b0;font-size:8px;">0.00</div>
+        <!-- Train loss bars (green) -->
+        <div style="display:flex;align-items:end;gap:2px;flex:1;height:100%;padding-left:24px;">
+          <div style="background:#64ffda;width:6%;height:95%;opacity:0.7;border-radius:2px 2px 0 0;"></div>
+          <div style="background:#64ffda;width:6%;height:80%;opacity:0.7;border-radius:2px 2px 0 0;"></div>
+          <div style="background:#64ffda;width:6%;height:55%;opacity:0.7;border-radius:2px 2px 0 0;"></div>
+          <div style="background:#64ffda;width:6%;height:38%;opacity:0.8;border-radius:2px 2px 0 0;"></div>
+          <div style="background:#64ffda;width:6%;height:65%;opacity:0.8;border-radius:2px 2px 0 0;"></div>
+          <div style="background:#64ffda;width:6%;height:48%;opacity:0.8;border-radius:2px 2px 0 0;"></div>
+          <div style="background:#64ffda;width:6%;height:35%;opacity:0.8;border-radius:2px 2px 0 0;"></div>
+          <div style="background:#64ffda;width:6%;height:28%;opacity:0.9;border-radius:2px 2px 0 0;"></div>
+          <div style="background:#64ffda;width:6%;height:22%;opacity:0.9;border-radius:2px 2px 0 0;"></div>
+          <div style="background:#64ffda;width:6%;height:18%;opacity:0.9;border-radius:2px 2px 0 0;"></div>
+          <div style="background:#64ffda;width:6%;height:15%;opacity:0.9;border-radius:2px 2px 0 0;"></div>
+          <div style="background:#64ffda;width:6%;height:13%;opacity:0.9;border-radius:2px 2px 0 0;"></div>
+          <div style="background:#64ffda;width:6%;height:11%;opacity:1;border-radius:2px 2px 0 0;"></div>
+          <div style="background:#64ffda;width:6%;height:9%;opacity:1;border-radius:2px 2px 0 0;"></div>
+          <div style="background:#64ffda;width:6%;height:8%;opacity:1;border-radius:2px 2px 0 0;"></div>
+          <div style="background:#64ffda;width:6%;height:7%;opacity:1;border-radius:2px 2px 0 0;"></div>
+        </div>
+      </div>
+      <div style="display:flex;gap:16px;margin-top:6px;">
+        <span style="color:#64ffda;font-size:10px;">━ Train Loss</span>
+        <span style="color:#ff6b6b;font-size:10px;">━ Test Loss</span>
+        <span style="color:#8892b0;font-size:10px;">┊ Stage boundary</span>
+      </div>
+    </div>
+
+    <!-- Epoch table -->
+    <div style="background:#16213e;border-radius:8px;padding:16px;margin-bottom:16px;">
+      <div style="color:#64ffda;font-weight:bold;margin-bottom:10px;">📋 Epoch Breakdown</div>
+
+      <!-- Header -->
+      <div style="display:grid;grid-template-columns:50px 50px 80px 80px 80px 80px 80px 80px;gap:4px;padding:6px 0;border-bottom:1px solid #333;color:#8892b0;font-size:9px;">
+        <div>Epoch</div><div>Stage</div><div>Train Loss</div><div>Test Loss</div><div>recon</div><div>baseline</div><div>leakage</div><div>ortho</div>
+      </div>
+
+      <!-- Epoch 16 (latest, highlighted) -->
+      <div style="display:grid;grid-template-columns:50px 50px 80px 80px 80px 80px 80px 80px;gap:4px;padding:6px 0;border-bottom:1px solid #1a1a2e;color:#ccd6f6;font-size:10px;background:#0d3320;border-radius:4px;padding-left:4px;">
+        <div style="color:#64ffda;font-weight:bold;">16</div><div style="color:#ffd93d;">B</div><div>0.00234</div><div>0.00312</div><div>0.00180</div><div>0.00032</div><div>0.00015</div><div>0.00007</div>
+      </div>
+
+      <!-- Epoch 15 -->
+      <div style="display:grid;grid-template-columns:50px 50px 80px 80px 80px 80px 80px 80px;gap:4px;padding:6px 0;border-bottom:1px solid #1a1a2e;color:#ccd6f6;font-size:10px;">
+        <div>15</div><div style="color:#ffd93d;">B</div><div>0.00251</div><div>0.00328</div><div>0.00195</div><div>0.00034</div><div>0.00016</div><div>0.00006</div>
+      </div>
+
+      <!-- Epoch 14 -->
+      <div style="display:grid;grid-template-columns:50px 50px 80px 80px 80px 80px 80px 80px;gap:4px;padding:6px 0;border-bottom:1px solid #1a1a2e;color:#ccd6f6;font-size:10px;">
+        <div>14</div><div style="color:#ffd93d;">B</div><div>0.00273</div><div>0.00345</div><div>0.00210</div><div>0.00038</div><div>0.00018</div><div>0.00007</div>
+      </div>
+
+      <!-- ... -->
+      <div style="padding:6px 0;color:#8892b0;font-size:10px;text-align:center;">· · · scroll for earlier epochs · · ·</div>
+
+      <!-- Epoch 5 (stage boundary) -->
+      <div style="display:grid;grid-template-columns:50px 50px 80px 80px 80px 80px 80px 80px;gap:4px;padding:6px 0;border-bottom:1px solid #1a1a2e;color:#ccd6f6;font-size:10px;border-left:3px solid #ffd93d;padding-left:4px;">
+        <div>5</div><div style="color:#64ffda;">A</div><div>0.01820</div><div>0.02100</div><div>0.01820</div><div style="color:#8892b0;">—</div><div style="color:#8892b0;">—</div><div style="color:#8892b0;">—</div>
+      </div>
+
+      <!-- Expanded row concept -->
+      <div style="margin-top:8px;background:#0a0a1a;border-radius:6px;padding:12px;">
+        <div style="color:#8892b0;font-size:9px;margin-bottom:6px;">▼ EXPANDED: Epoch 16 — Full Details</div>
+        <div style="display:grid;grid-template-columns:1fr 1fr 1fr;gap:8px;">
+          <div><span style="color:#8892b0;">recon_mse:</span> <span style="color:#ccd6f6;">0.00180</span></div>
+          <div><span style="color:#8892b0;">l1_sparsity:</span> <span style="color:#ccd6f6;">0.00012</span></div>
+          <div><span style="color:#8892b0;">total_variation:</span> <span style="color:#ccd6f6;">0.00008</span></div>
+          <div><span style="color:#8892b0;">baseline_smooth:</span> <span style="color:#ccd6f6;">0.00032</span></div>
+          <div><span style="color:#8892b0;">baseline_recon:</span> <span style="color:#ccd6f6;">0.00032</span></div>
+          <div><span style="color:#8892b0;">baseline_leakage:</span> <span style="color:#ccd6f6;">0.00015</span></div>
+          <div><span style="color:#8892b0;">peak_base_ortho:</span> <span style="color:#ccd6f6;">0.00007</span></div>
+          <div><span style="color:#8892b0;">non_negativity:</span> <span style="color:#ccd6f6;">0.00003</span></div>
+          <div><span style="color:#8892b0;">baseline_tv:</span> <span style="color:#ccd6f6;">0.00000</span></div>
+        </div>
+        <div style="margin-top:8px;border-top:1px solid #333;padding-top:8px;">
+          <div style="color:#bb86fc;font-size:9px;margin-bottom:4px;">Learned Parameters</div>
+          <div style="display:grid;grid-template-columns:1fr 1fr 1fr;gap:8px;">
+            <div><span style="color:#8892b0;">lam0:</span> <span style="color:#bb86fc;">0.0024</span></div>
+            <div><span style="color:#8892b0;">lam1:</span> <span style="color:#bb86fc;">0.312</span></div>
+            <div><span style="color:#8892b0;">lam2:</span> <span style="color:#bb86fc;">0.298</span></div>
+            <div><span style="color:#8892b0;">r:</span> <span style="color:#bb86fc;">6.12</span></div>
+            <div><span style="color:#8892b0;">step:</span> <span style="color:#bb86fc;">0.845</span></div>
+            <div><span style="color:#8892b0;">output_gain:</span> <span style="color:#bb86fc;">1.023</span></div>
+          </div>
+        </div>
+      </div>
+    </div>
+
+    <!-- Results section (shown when done) -->
+    <div style="background:#16213e;border-radius:8px;padding:16px;">
+      <div style="color:#64ffda;font-weight:bold;margin-bottom:10px;">🖼️ Results (after completion)</div>
+      <div style="display:grid;grid-template-columns:1fr 1fr 1fr;gap:10px;">
+        <div style="background:#0a0a1a;border-radius:6px;padding:12px;text-align:center;">
+          <div style="background:#1a1a2e;height:80px;border-radius:4px;display:flex;align-items:center;justify-content:center;color:#8892b0;margin-bottom:6px;">📊</div>
+          <div style="color:#ccd6f6;font-size:10px;">Training Plot</div>
+          <div style="color:#8892b0;font-size:9px;">6-panel results</div>
+        </div>
+        <div style="background:#0a0a1a;border-radius:6px;padding:12px;text-align:center;">
+          <div style="background:#1a1a2e;height:80px;border-radius:4px;display:flex;align-items:center;justify-content:center;color:#8892b0;margin-bottom:6px;">🧪</div>
+          <div style="color:#ccd6f6;font-size:10px;">demo.py Results</div>
+          <div style="color:#8892b0;font-size:9px;">raw / hybrid / hybrid-snr</div>
+        </div>
+        <div style="background:#0a0a1a;border-radius:6px;padding:12px;text-align:center;">
+          <div style="background:#1a1a2e;height:80px;border-radius:4px;display:flex;align-items:center;justify-content:center;color:#8892b0;margin-bottom:6px;">📈</div>
+          <div style="color:#ccd6f6;font-size:10px;">Chromatogram Demo</div>
+          <div style="color:#8892b0;font-size:9px;">BEADS vs LBEADS-NET</div>
+        </div>
+      </div>
+      <div style="color:#8892b0;font-size:10px;margin-top:8px;">Click any to expand full-size. All images stored in experiment directory.</div>
+    </div>
+
+  </div>
+</div>

@@ -232,6 +232,12 @@ def _highpass_once_torch(signal: torch.Tensor, a_coeff: torch.Tensor, b_coeff: t
     return _banded_apply(z, b_coeff)
 
 
+def _apply_HT_torch(signal: torch.Tensor, a_coeff: torch.Tensor, b_coeff: torch.Tensor, solve_cg_iters: int) -> torch.Tensor:
+    """Apply H^T = A^{-T} B^T to signal. For symmetric filters, A^{-T}=A^{-1} and B^T flips coeffs."""
+    Bt_v = _banded_apply_T(signal, b_coeff)
+    return _solve_A_system(Bt_v, a_coeff, solve_cg_iters=solve_cg_iters, x0=Bt_v)
+
+
 def build_difference_matrices(N):
     """
     Build first and second order difference matrices.
@@ -819,25 +825,20 @@ class LBEADS_NET_Fast(nn.Module):
         """Soft thresholding (proximal operator for L1)."""
         return torch.sign(x) * torch.clamp(torch.abs(x) - lam, min=0)
     
-    def asymmetric_soft_threshold(self, x, lam, r):
+    def asymmetric_soft_threshold(self, x, lam, r, beta=10.0):
         """
-        Asymmetric soft thresholding for BEADS.
-        Penalizes negative values r times more than positive.
+        Smooth asymmetric soft thresholding for BEADS.
+        Uses softplus instead of hard clamp to maintain gradient flow
+        through the dead zone, preventing permanent small-peak loss.
         """
-        # For positive: threshold at lam
-        # For negative: threshold at lam * r
         pos_thresh = lam
         neg_thresh = lam * r
-        
-        result = torch.zeros_like(x)
-        pos_mask = x > pos_thresh
-        neg_mask = x < -neg_thresh
-        
-        result[pos_mask] = x[pos_mask] - pos_thresh
-        result[neg_mask] = x[neg_mask] + neg_thresh
-        # Values between thresholds stay at 0 (sparse!)
-        
-        return result
+
+        # softplus(x - thresh) ≈ max(x - thresh, 0) but with non-zero gradient below threshold
+        pos = torch.nn.functional.softplus(x - pos_thresh, beta=beta)
+        neg = -torch.nn.functional.softplus(-x - neg_thresh, beta=beta)
+
+        return pos + neg
     
     def forward(self, y, return_intermediate=False):
         """
@@ -874,11 +875,11 @@ class LBEADS_NET_Fast(nn.Module):
         intermediates = [x.clone()] if return_intermediate else None
         
         for k in range(self.num_layers):
-            lam0 = torch.exp(self.log_lam0[k])
-            lam1 = torch.exp(self.log_lam1[k])
-            lam2 = torch.exp(self.log_lam2[k])
-            r = torch.exp(self.log_r[k])
-            step_size = torch.exp(self.log_step_size[k])
+            lam0 = torch.clamp(torch.exp(self.log_lam0[k]), min=1e-3, max=2.0)
+            lam1 = torch.clamp(torch.exp(self.log_lam1[k]), min=1e-4, max=1.0)
+            lam2 = torch.clamp(torch.exp(self.log_lam2[k]), min=1e-4, max=1.0)
+            r = torch.clamp(torch.exp(self.log_r[k]), min=2.0, max=12.0)
+            step_size = torch.clamp(torch.exp(self.log_step_size[k]), min=0.01, max=0.5)
             
             # ===== DATA FIDELITY GRADIENT =====
             # We model y = x + f + noise where:
@@ -890,14 +891,15 @@ class LBEADS_NET_Fast(nn.Module):
             # Residual: what's left after removing current peak estimate
             residual = y - x
             
-            # Use the high-pass residual for data fidelity so baseline (low-freq)
-            # is not pulled into x during optimization updates.
-            data_grad = apply_highpass_filter(
+            # Correct gradient of (1/2)||H(y-x)||^2 w.r.t. x is -H^T H(y-x).
+            # First apply H to get high-pass residual, then H^T for proper gradient.
+            h_residual = apply_highpass_filter(
                 residual,
                 self.a_coeff,
                 self.b_coeff,
                 solve_cg_iters=effective_lowpass_cg_iters,
             )
+            data_grad = _apply_HT_torch(h_residual, self.a_coeff, self.b_coeff, solve_cg_iters=effective_lowpass_cg_iters)
             
             # ===== SMOOTHNESS PENALTY GRADIENTS =====
             # These penalize non-smooth variations in x (but peaks ARE non-smooth!)
@@ -951,11 +953,11 @@ class LBEADS_NET_Fast(nn.Module):
         """Return dictionary of current learned parameters."""
         params = {}
         for i in range(self.num_layers):
-            params[f"layer_{i}_lam0"] = torch.exp(self.log_lam0[i]).item()
-            params[f"layer_{i}_lam1"] = torch.exp(self.log_lam1[i]).item()
-            params[f"layer_{i}_lam2"] = torch.exp(self.log_lam2[i]).item()
-            params[f"layer_{i}_r"] = torch.exp(self.log_r[i]).item()
-            params[f"layer_{i}_step_size"] = torch.exp(self.log_step_size[i]).item()
+            params[f"layer_{i}_lam0"] = torch.clamp(torch.exp(self.log_lam0[i]), min=1e-3, max=2.0).item()
+            params[f"layer_{i}_lam1"] = torch.clamp(torch.exp(self.log_lam1[i]), min=1e-4, max=1.0).item()
+            params[f"layer_{i}_lam2"] = torch.clamp(torch.exp(self.log_lam2[i]), min=1e-4, max=1.0).item()
+            params[f"layer_{i}_r"] = torch.clamp(torch.exp(self.log_r[i]), min=2.0, max=12.0).item()
+            params[f"layer_{i}_step_size"] = torch.clamp(torch.exp(self.log_step_size[i]), min=0.01, max=0.5).item()
         return params
 
     def load_state_dict(self, state_dict, strict: bool = True):

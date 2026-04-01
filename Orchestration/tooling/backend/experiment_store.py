@@ -1,5 +1,6 @@
 import json
 import os
+import shutil
 import time
 from typing import Optional
 
@@ -26,7 +27,7 @@ class ExperimentStore:
             json.dump(status, f, indent=2)
         return run_id
 
-    def list_runs(self) -> list:
+    def list_runs(self, include_deleted: bool = False) -> list:
         if not os.path.exists(self.base_dir):
             return []
         runs = []
@@ -43,6 +44,11 @@ class ExperimentStore:
                 config = json.load(f)
             with open(status_path) as f:
                 status_data = json.load(f)
+            status = status_data.get("status", "pending")
+            if include_deleted and status != "deleted":
+                continue
+            if not include_deleted and status == "deleted":
+                continue
             summary = {}
             epochs = []
             if os.path.exists(metrics_path):
@@ -50,12 +56,17 @@ class ExperimentStore:
                     metrics = json.load(f)
                     summary = metrics.get("summary", {})
                     epochs = metrics.get("epochs", [])
+            total_epochs = sum(
+                s.get("epochs", 0) for s in config.get("stages", [])
+            )
             runs.append({
                 "id": entry,
                 "name": config.get("name", ""),
-                "status": status_data.get("status", "pending"),
+                "model_type": config.get("model_type", "lbeads"),
+                "status": status,
                 "created_at": status_data.get("created_at", 0),
                 "epoch_count": len(epochs),
+                "total_epochs": total_epochs,
                 "summary": summary,
             })
         runs.sort(key=lambda r: r["created_at"], reverse=True)
@@ -114,3 +125,48 @@ class ExperimentStore:
         metrics["summary"] = summary
         with open(metrics_path, "w") as f:
             json.dump(metrics, f, indent=2)
+
+    def append_error(self, run_id: str, error: dict):
+        metrics_path = os.path.join(self.base_dir, run_id, "metrics.json")
+        with open(metrics_path) as f:
+            metrics = json.load(f)
+        if "errors" not in metrics:
+            metrics["errors"] = []
+        metrics["errors"].append(error)
+        with open(metrics_path, "w") as f:
+            json.dump(metrics, f, indent=2)
+
+    def soft_delete_run(self, run_id: str):
+        status_path = os.path.join(self.base_dir, run_id, "status.json")
+        if not os.path.exists(status_path):
+            return False
+        with open(status_path) as f:
+            data = json.load(f)
+        data["previous_status"] = data.get("status", "pending")
+        data["status"] = "deleted"
+        data["deleted_at"] = time.time()
+        with open(status_path, "w") as f:
+            json.dump(data, f, indent=2)
+        return True
+
+    def restore_run(self, run_id: str):
+        status_path = os.path.join(self.base_dir, run_id, "status.json")
+        if not os.path.exists(status_path):
+            return False
+        with open(status_path) as f:
+            data = json.load(f)
+        if data.get("status") != "deleted":
+            return False
+        data["status"] = data.pop("previous_status", "failed")
+        data.pop("deleted_at", None)
+        data["updated_at"] = time.time()
+        with open(status_path, "w") as f:
+            json.dump(data, f, indent=2)
+        return True
+
+    def permanently_delete_run(self, run_id: str):
+        run_dir = os.path.join(self.base_dir, run_id)
+        if not os.path.isdir(run_dir):
+            return False
+        shutil.rmtree(run_dir)
+        return True

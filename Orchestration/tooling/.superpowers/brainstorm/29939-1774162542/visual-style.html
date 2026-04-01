@@ -1,0 +1,111 @@
+<h2>Visual Direction — Light Mode + Sharp Corners + shadcn</h2>
+<p class="subtitle">Confirming the look and feel</p>
+
+<div class="mockup">
+  <div class="mockup-header">Dashboard Preview — Light Mode</div>
+  <div class="mockup-body" style="padding:0;font-family:-apple-system,BlinkMacSystemFont,'Segoe UI',sans-serif;font-size:12px;background:#ffffff;">
+
+    <!-- Sidebar -->
+    <div style="display:flex;height:420px;">
+      <div style="width:220px;background:#fafafa;border-right:1px solid #e5e5e5;padding:16px;">
+        <div style="font-weight:700;font-size:14px;color:#09090b;margin-bottom:20px;">LBEADS Hub</div>
+        <div style="padding:8px 10px;background:#f4f4f5;border:1px solid #e5e5e5;color:#09090b;font-weight:500;margin-bottom:2px;">Dashboard</div>
+        <div style="padding:8px 10px;color:#71717a;margin-bottom:2px;">New Run</div>
+        <div style="padding:8px 10px;color:#71717a;margin-bottom:2px;">Experiments</div>
+      </div>
+
+      <!-- Main content -->
+      <div style="flex:1;padding:24px;overflow-y:auto;">
+        <div style="display:flex;justify-content:space-between;align-items:center;margin-bottom:20px;">
+          <div>
+            <div style="font-size:18px;font-weight:700;color:#09090b;">Active Runs</div>
+            <div style="color:#71717a;font-size:12px;">3 experiments running</div>
+          </div>
+          <div style="background:#18181b;color:#fafafa;padding:8px 16px;font-weight:500;font-size:12px;cursor:pointer;">+ New Run</div>
+        </div>
+
+        <!-- Run card - running -->
+        <div style="border:1px solid #e5e5e5;padding:16px;margin-bottom:8px;">
+          <div style="display:flex;justify-content:space-between;align-items:center;margin-bottom:10px;">
+            <div>
+              <span style="font-weight:600;color:#09090b;">Run #42</span>
+              <span style="color:#71717a;margin-left:8px;">v6 baseline</span>
+            </div>
+            <div style="display:flex;align-items:center;gap:8px;">
+              <span style="background:#fef3c7;color:#92400e;padding:2px 8px;font-size:10px;font-weight:600;">RUNNING</span>
+              <span style="color:#71717a;font-size:11px;">4m 32s</span>
+            </div>
+          </div>
+          <!-- Progress bar -->
+          <div style="background:#f4f4f5;height:6px;overflow:hidden;margin-bottom:8px;">
+            <div style="background:#18181b;width:64%;height:100%;"></div>
+          </div>
+          <div style="display:flex;gap:24px;font-size:11px;">
+            <span><span style="color:#71717a;">Epoch</span> <span style="color:#09090b;font-weight:500;">16/25</span></span>
+            <span><span style="color:#71717a;">Train</span> <span style="color:#09090b;font-weight:500;">0.00234</span></span>
+            <span><span style="color:#71717a;">Test</span> <span style="color:#09090b;font-weight:500;">0.00312</span></span>
+            <span><span style="color:#71717a;">Stage</span> <span style="color:#09090b;font-weight:500;">B</span></span>
+          </div>
+        </div>
+
+        <!-- Run card - done -->
+        <div style="border:1px solid #e5e5e5;padding:16px;margin-bottom:8px;">
+          <div style="display:flex;justify-content:space-between;align-items:center;margin-bottom:8px;">
+            <div>
+              <span style="font-weight:600;color:#09090b;">Run #41</span>
+              <span style="color:#71717a;margin-left:8px;">high ortho</span>
+            </div>
+            <span style="background:#dcfce7;color:#166534;padding:2px 8px;font-size:10px;font-weight:600;">COMPLETE</span>
+          </div>
+          <div style="display:flex;gap:24px;font-size:11px;">
+            <span><span style="color:#71717a;">Epochs</span> <span style="color:#09090b;font-weight:500;">25/25</span></span>
+            <span><span style="color:#71717a;">Test MSE</span> <span style="color:#09090b;font-weight:500;">0.00280</span></span>
+            <span><span style="color:#71717a;">MAE</span> <span style="color:#09090b;font-weight:500;">0.041</span></span>
+            <span><span style="color:#71717a;">Correlation</span> <span style="color:#09090b;font-weight:500;">0.987</span></span>
+          </div>
+        </div>
+
+        <!-- Run card - failed -->
+        <div style="border:1px solid #e5e5e5;padding:16px;margin-bottom:8px;">
+          <div style="display:flex;justify-content:space-between;align-items:center;margin-bottom:8px;">
+            <div>
+              <span style="font-weight:600;color:#09090b;">Run #40</span>
+              <span style="color:#71717a;margin-left:8px;">low smooth</span>
+            </div>
+            <span style="background:#fee2e2;color:#991b1b;padding:2px 8px;font-size:10px;font-weight:600;">FAILED</span>
+          </div>
+          <div style="font-size:11px;color:#71717a;">Epoch 8/25 — NaN loss detected</div>
+        </div>
+
+        <!-- Alpha config preview -->
+        <div style="border:1px solid #e5e5e5;padding:16px;margin-top:20px;">
+          <div style="font-weight:600;color:#09090b;margin-bottom:12px;">Loss Weights — Run #42</div>
+          <div style="display:grid;grid-template-columns:1fr 1fr;gap:6px;font-size:11px;">
+            <div style="display:flex;align-items:center;gap:8px;">
+              <span style="color:#71717a;width:100px;">alpha_mse</span>
+              <div style="flex:1;background:#f4f4f5;height:4px;"><div style="background:#18181b;width:100%;height:100%;"></div></div>
+              <span style="color:#09090b;width:32px;text-align:right;font-weight:500;">1.0</span>
+            </div>
+            <div style="display:flex;align-items:center;gap:8px;">
+              <span style="color:#71717a;width:100px;">alpha_baseline</span>
+              <div style="flex:1;background:#f4f4f5;height:4px;"><div style="background:#18181b;width:50%;height:100%;"></div></div>
+              <span style="color:#09090b;width:32px;text-align:right;font-weight:500;">0.5</span>
+            </div>
+            <div style="display:flex;align-items:center;gap:8px;">
+              <span style="color:#71717a;width:100px;">alpha_neg</span>
+              <div style="flex:1;background:#f4f4f5;height:4px;"><div style="background:#18181b;width:100%;height:100%;"></div></div>
+              <span style="color:#09090b;width:32px;text-align:right;font-weight:500;">2.0</span>
+            </div>
+            <div style="display:flex;align-items:center;gap:8px;">
+              <span style="color:#71717a;width:100px;">alpha_leakage</span>
+              <div style="flex:1;background:#f4f4f5;height:4px;"><div style="background:#18181b;width:50%;height:100%;"></div></div>
+              <span style="color:#09090b;width:32px;text-align:right;font-weight:500;">0.5</span>
+            </div>
+          </div>
+        </div>
+
+      </div>
+    </div>
+
+  </div>
+</div>

@@ -1,0 +1,96 @@
+<h2>System Architecture</h2>
+<p class="subtitle">FastAPI backend + Next.js frontend + filesystem storage</p>
+
+<div class="mockup">
+  <div class="mockup-header">Architecture Overview</div>
+  <div class="mockup-body" style="padding:24px;font-family:monospace;font-size:11px;">
+
+    <!-- Browser Layer -->
+    <div style="background:#1a1a2e;border:2px solid #64ffda;border-radius:8px;padding:16px;margin-bottom:12px;">
+      <div style="color:#64ffda;font-weight:bold;margin-bottom:10px;">🌐 BROWSER — Next.js Frontend (localhost:3000)</div>
+      <div style="display:flex;gap:8px;flex-wrap:wrap;">
+        <div style="background:#16213e;padding:8px 12px;border-radius:4px;color:#ccd6f6;">Dashboard<br><span style="color:#8892b0;font-size:10px;">Active runs, history</span></div>
+        <div style="background:#16213e;padding:8px 12px;border-radius:4px;color:#ccd6f6;">New Run<br><span style="color:#8892b0;font-size:10px;">Config form, clone</span></div>
+        <div style="background:#16213e;padding:8px 12px;border-radius:4px;color:#ccd6f6;">Run Detail<br><span style="color:#8892b0;font-size:10px;">Epochs, metrics, plots</span></div>
+        <div style="background:#16213e;padding:8px 12px;border-radius:4px;color:#ccd6f6;">Comparison<br><span style="color:#8892b0;font-size:10px;">Side-by-side runs</span></div>
+      </div>
+    </div>
+
+    <!-- Arrow -->
+    <div style="text-align:center;color:#8892b0;margin:4px 0;">
+      ▼ HTTP + SSE (EventSource) ▼
+    </div>
+
+    <!-- API Layer -->
+    <div style="background:#1a1a2e;border:2px solid #ffd93d;border-radius:8px;padding:16px;margin-bottom:12px;">
+      <div style="color:#ffd93d;font-weight:bold;margin-bottom:10px;">⚡ FastAPI Backend (localhost:8000)</div>
+      <div style="display:flex;gap:8px;flex-wrap:wrap;margin-bottom:10px;">
+        <div style="background:#16213e;padding:8px 12px;border-radius:4px;color:#ccd6f6;">POST /runs<br><span style="color:#8892b0;font-size:10px;">Start training</span></div>
+        <div style="background:#16213e;padding:8px 12px;border-radius:4px;color:#ccd6f6;">GET /runs<br><span style="color:#8892b0;font-size:10px;">List experiments</span></div>
+        <div style="background:#16213e;padding:8px 12px;border-radius:4px;color:#ccd6f6;">GET /runs/{id}/stream<br><span style="color:#8892b0;font-size:10px;">SSE progress</span></div>
+        <div style="background:#16213e;padding:8px 12px;border-radius:4px;color:#ccd6f6;">GET /runs/{id}<br><span style="color:#8892b0;font-size:10px;">Full results</span></div>
+        <div style="background:#16213e;padding:8px 12px;border-radius:4px;color:#ccd6f6;">POST /runs/{id}/stop<br><span style="color:#8892b0;font-size:10px;">Kill process</span></div>
+      </div>
+      <div style="display:flex;gap:8px;">
+        <div style="background:#2d1b4e;padding:8px 12px;border-radius:4px;color:#bb86fc;">ProcessManager<br><span style="color:#8892b0;font-size:10px;">Spawn, track, kill</span></div>
+        <div style="background:#2d1b4e;padding:8px 12px;border-radius:4px;color:#bb86fc;">ExperimentStore<br><span style="color:#8892b0;font-size:10px;">Read/write JSON</span></div>
+      </div>
+    </div>
+
+    <!-- Arrow -->
+    <div style="text-align:center;color:#8892b0;margin:4px 0;">
+      ▼ subprocess.Popen (stdout JSON lines) ▼
+    </div>
+
+    <!-- Training Layer -->
+    <div style="display:flex;gap:12px;margin-bottom:12px;">
+      <div style="flex:1;background:#1a1a2e;border:2px solid #ff6b6b;border-radius:8px;padding:16px;">
+        <div style="color:#ff6b6b;font-weight:bold;margin-bottom:10px;">🧠 Training Runner (train_runner.py)</div>
+        <div style="color:#ccd6f6;font-size:10px;line-height:1.6;">
+          • Accepts JSON config via --config arg<br>
+          • Imports train.py functions directly<br>
+          • Prints JSON lines to stdout:<br>
+          <span style="color:#64ffda;margin-left:12px;">{"type":"epoch", "epoch":5, "train_loss":0.002, ...}</span><br>
+          <span style="color:#64ffda;margin-left:12px;">{"type":"done", "checkpoint":"run_42.pth"}</span><br>
+          • Auto-runs demo.py + demo_chromatogram.py on completion
+        </div>
+      </div>
+      <div style="flex:1;background:#1a1a2e;border:2px solid #ff6b6b;border-radius:8px;padding:16px;">
+        <div style="color:#ff6b6b;font-weight:bold;margin-bottom:10px;">🧠 Training Runner (another job)</div>
+        <div style="color:#ccd6f6;font-size:10px;line-height:1.6;">
+          • Parallel process<br>
+          • Independent stdout stream<br>
+          • Own experiment directory<br>
+          • Own SSE connection
+        </div>
+      </div>
+    </div>
+
+    <!-- Arrow -->
+    <div style="text-align:center;color:#8892b0;margin:4px 0;">
+      ▼ writes to ▼
+    </div>
+
+    <!-- Storage Layer -->
+    <div style="background:#1a1a2e;border:2px solid #8892b0;border-radius:8px;padding:16px;">
+      <div style="color:#8892b0;font-weight:bold;margin-bottom:10px;">📁 Filesystem Storage (experiments/)</div>
+      <div style="color:#ccd6f6;font-size:10px;line-height:1.8;font-family:monospace;">
+        experiments/<br>
+        ├── run_1719000000/<br>
+        │   ├── config.json&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;<span style="color:#8892b0;"># Full training config (alphas, stages, model params)</span><br>
+        │   ├── metrics.json&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;<span style="color:#8892b0;"># Per-epoch losses + final metrics</span><br>
+        │   ├── checkpoint.pth&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;<span style="color:#8892b0;"># Trained model weights</span><br>
+        │   ├── training_plot.png&nbsp;&nbsp;&nbsp;<span style="color:#8892b0;"># 6-panel training results</span><br>
+        │   ├── demo/<br>
+        │   │   ├── raw/&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;<span style="color:#8892b0;"># demo.py raw variant plots</span><br>
+        │   │   ├── hybrid/&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;<span style="color:#8892b0;"># demo.py hybrid plots</span><br>
+        │   │   └── hybrid-snr/&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;<span style="color:#8892b0;"># demo.py hybrid-snr plots</span><br>
+        │   └── demo_chrom/<br>
+        │       └── comparison.png&nbsp;&nbsp;<span style="color:#8892b0;"># BEADS vs LBEADS-NET</span><br>
+        └── run_1719000100/<br>
+            └── ...
+      </div>
+    </div>
+
+  </div>
+</div>

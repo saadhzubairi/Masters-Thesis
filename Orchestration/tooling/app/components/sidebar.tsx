@@ -8,6 +8,8 @@ const navItems = [
   { href: "/", label: "Dashboard", icon: "LayoutDashboard" },
   { href: "/runs/new", label: "New Run", icon: "Play" },
   { href: "/experiments", label: "Experiments", icon: "History" },
+  { href: "/data-generator", label: "Data Generator", icon: "Waveform" },
+  { href: "/runs/deleted", label: "Recycle Bin", icon: "Trash2" },
 ]
 
 export function Sidebar() {

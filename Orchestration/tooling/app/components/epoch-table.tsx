@@ -13,7 +13,31 @@ const COMPONENT_KEYS = [
   "baseline_recon", "baseline_leakage", "peak_baseline_ortho", "non_negativity", "baseline_tv",
 ]
 
-const PARAM_KEYS = ["lam0", "lam1", "lam2", "r", "step", "output_gain"]
+const PARAM_NAMES = ["lam0", "lam1", "lam2", "r", "step", "step_size"]
+
+/** Group flat learned_params into rows per layer + globals. */
+function groupParamsByLayer(params: Record<string, number> | undefined) {
+  if (!params) return { layers: [], globals: {} as Record<string, number> }
+  const layers: { index: number; values: Record<string, number> }[] = []
+  const globals: Record<string, number> = {}
+  const layerMap = new Map<number, Record<string, number>>()
+
+  for (const [key, val] of Object.entries(params)) {
+    const m = key.match(/^layer_(\d+)_(.+)$/)
+    if (m) {
+      const idx = parseInt(m[1])
+      if (!layerMap.has(idx)) layerMap.set(idx, {})
+      layerMap.get(idx)![m[2]] = val
+    } else {
+      globals[key] = val
+    }
+  }
+
+  for (const [idx, values] of [...layerMap.entries()].sort((a, b) => a[0] - b[0])) {
+    layers.push({ index: idx, values })
+  }
+  return { layers, globals }
+}
 
 export function EpochTable({ epochs }: EpochTableProps) {
   const [expanded, setExpanded] = useState<number | null>(null)
@@ -62,17 +86,54 @@ export function EpochTable({ epochs }: EpochTableProps) {
                         </div>
                       ))}
                     </div>
-                    {ep.learned_params && (
-                      <div className="grid grid-cols-3 gap-2 text-xs border-t pt-3">
-                        <div className="font-semibold col-span-3 text-muted-foreground">Learned Parameters</div>
-                        {PARAM_KEYS.map((k) => (
-                          <div key={k}>
-                            <span className="text-muted-foreground">{k}:</span>{" "}
-                            <span className="font-mono">{ep.learned_params?.[k]?.toFixed(4) ?? "—"}</span>
-                          </div>
-                        ))}
-                      </div>
-                    )}
+                    {ep.learned_params && Object.keys(ep.learned_params).length > 0 && (() => {
+                      const { layers, globals } = groupParamsByLayer(ep.learned_params)
+                      // Collect all param names across layers for consistent columns
+                      const colNames = PARAM_NAMES.filter(n =>
+                        layers.some(l => n in l.values)
+                      )
+                      return (
+                        <div className="border-t pt-3 text-xs">
+                          <div className="font-semibold text-muted-foreground mb-2">Learned Parameters</div>
+                          {Object.keys(globals).length > 0 && (
+                            <div className="flex gap-4 mb-2">
+                              {Object.entries(globals).map(([k, v]) => (
+                                <span key={k}>
+                                  <span className="text-muted-foreground">{k}:</span>{" "}
+                                  <span className="font-mono font-medium">{v.toFixed(4)}</span>
+                                </span>
+                              ))}
+                            </div>
+                          )}
+                          {layers.length > 0 && (
+                            <div className="overflow-x-auto">
+                              <table className="w-full text-xs">
+                                <thead>
+                                  <tr className="border-b">
+                                    <th className="text-left py-1 pr-3 text-muted-foreground font-medium">Layer</th>
+                                    {colNames.map(n => (
+                                      <th key={n} className="text-right py-1 px-2 text-muted-foreground font-medium">{n}</th>
+                                    ))}
+                                  </tr>
+                                </thead>
+                                <tbody>
+                                  {layers.map(l => (
+                                    <tr key={l.index} className="border-b border-zinc-100">
+                                      <td className="py-1 pr-3 font-medium">{l.index}</td>
+                                      {colNames.map(n => (
+                                        <td key={n} className="text-right py-1 px-2 font-mono">
+                                          {l.values[n]?.toFixed(4) ?? "—"}
+                                        </td>
+                                      ))}
+                                    </tr>
+                                  ))}
+                                </tbody>
+                              </table>
+                            </div>
+                          )}
+                        </div>
+                      )
+                    })()}
                   </TableCell>
                 </TableRow>
               )}

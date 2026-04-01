@@ -1,6 +1,7 @@
 import type { Metadata } from "next"
 import { Geist, Geist_Mono } from "next/font/google"
 import { Sidebar } from "./components/sidebar"
+import { Toaster } from "sonner"
 import "./globals.css"
 
 const geistSans = Geist({ variable: "--font-geist-sans", subsets: ["latin"] })
@@ -17,6 +18,7 @@ export default function RootLayout({ children }: { children: React.ReactNode }) 
       <body className="h-screen flex" suppressHydrationWarning>
         <Sidebar />
         <main className="flex-1 overflow-y-auto">{children}</main>
+        <Toaster position="bottom-right" richColors closeButton toastOptions={{ className: "!rounded-none !font-mono !text-xs" }} />
       </body>
     </html>
   )

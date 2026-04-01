@@ -24,6 +24,8 @@ import random
 from typing import Tuple, List, Optional, Dict
 from dataclasses import dataclass
 from scipy.signal import find_peaks
+import mlflow
+import mlflow.pytorch
 
 from lbeads_net import (
     LBEADS_NET,
@@ -1248,6 +1250,19 @@ def train_lbeads_net(model: nn.Module,
             avg_loss_dict['stage'] = stage_name
             loss_details.append(avg_loss_dict)
 
+            # Log per-epoch metrics to MLflow
+            if mlflow.active_run():
+                mlflow.log_metric("train_loss", avg_loss, step=global_epoch)
+                if avg_test_loss is not None:
+                    mlflow.log_metric("test_loss", avg_test_loss, step=global_epoch)
+                mlflow.log_metric("lr", scheduler.get_last_lr()[0], step=global_epoch)
+                for comp_key in ['reconstruction', 'baseline_recon', 'l1_sparsity',
+                                 'total_variation', 'baseline_leakage', 'peak_baseline_ortho',
+                                 'non_negativity', 'baseline_tv', 'smoothness',
+                                 'asym_baseline', 'envelope', 'freq_separation']:
+                    if comp_key in avg_loss_dict:
+                        mlflow.log_metric(comp_key, avg_loss_dict[comp_key], step=global_epoch)
+
             if verbose:
                 print(f"  Mean |x_pred|: {mean_abs_x_pred:.6f}, Mean |x_true|: {mean_abs_x_true:.6f}")
                 with torch.no_grad():
@@ -1591,7 +1606,11 @@ def main():
     (train_y, train_x_true, train_f_true), (test_y, test_x_true, test_f_true) = create_train_test_split(
         dataset, train_ratio=train_ratio, seed=seed
     )
-    
+
+    # Cast to float32 — MPS does not support float64
+    train_y, train_x_true, train_f_true = train_y.float(), train_x_true.float(), train_f_true.float()
+    test_y, test_x_true, test_f_true = test_y.float(), test_x_true.float(), test_f_true.float()
+
     print(f"  Training samples: {train_y.shape[0]}")
     print(f"  Test samples: {test_y.shape[0]}")
     print(f"  Signal length: {train_y.shape[1]}")
@@ -1676,7 +1695,7 @@ def main():
     stage_configs = [
         {
             'name': 'A_peak_recon',
-            'epochs': 5,
+            'epochs': 1,
             'intermediate_supervision': False,
             'loss_config': {
                 'alpha_mse': 1.0,
@@ -1695,7 +1714,7 @@ def main():
         },
         {
             'name': 'B_baseline_leakage',
-            'epochs': 5,
+            'epochs': 1,
             'intermediate_supervision': False,
             'loss_config': {
                 'alpha_mse': 1.0,
@@ -1715,7 +1734,7 @@ def main():
         },
         {
             'name': 'C_fine_tune',
-            'epochs': 5,
+            'epochs': 1,
             'intermediate_supervision': False,
             'loss_config': {
                 **loss_config,
@@ -1741,218 +1760,270 @@ def main():
     else:
         device = 'cpu'
     print(f"Using device: {device}")
-    
-    start_time = time.time()
-    loss_history, loss_details = train_lbeads_net(
-        model,
-        train_y,
-        train_x_true,
-        train_f_true,  # Baseline ground truth for supervision
-        test_y=test_y,
-        test_x_true=test_x_true,
-        test_f_true=test_f_true,
-        num_epochs=50,           # Used only when stage_configs is None
-        learning_rate=1e-3,
-        batch_size=24,           # Larger batch leverages M4 Pro GPU (10-12 cores)
-        device="cpu",
-        verbose=True,
-        loss_config=loss_config,
-        stage_configs=stage_configs
-    )
-    elapsed_time = time.time() - start_time
-    print(f"\nTraining completed in {elapsed_time:.2f} seconds")
-    
-    # Evaluate on test set
-    print("\n" + "=" * 60)
-    print("Evaluating on Test Set...")
-    print("=" * 60)
-    def _fmt_metric(val: float, fmt: str = ".6f") -> str:
-        return format(val, fmt) if np.isfinite(val) else "nan"
 
-    test_metrics = evaluate_model(model, test_y, test_x_true, device)
-    print(f"  MSE: {test_metrics['mse']:.6f}")
-    print(f"  PSNR: {test_metrics['psnr']:.2f} dB")
-    print(f"  MAE: {test_metrics['mae']:.6f}")
-    print(f"  Correlation: {test_metrics['correlation']:.4f}")
-    print(f"  Peak Height MAE: {_fmt_metric(test_metrics['peak_height_mae'])}")
-    print(f"  Peak Height MAPE: {_fmt_metric(100.0 * test_metrics['peak_height_mape'], '.2f')}%")
-    print(f"  Peak Area RelErr (true support): {_fmt_metric(test_metrics['peak_area_rel_error_true_support'])}")
-    print(f"  Peak Area RelErr (thresholded): {_fmt_metric(test_metrics['peak_area_rel_error_thresholded'])}")
-    print(f"  Peak Localization MAE (idx): {_fmt_metric(test_metrics['peak_localization_mae'])}")
-    print(
-        f"  Peak Match Rate (@±{int(test_metrics['peak_match_tolerance'])}): "
-        f"{_fmt_metric(test_metrics['peak_match_rate'])}"
-    )
-    print(
-        f"  Peak Count (true/pred): "
-        f"{_fmt_metric(test_metrics['peak_true_count_mean'], '.2f')}/"
-        f"{_fmt_metric(test_metrics['peak_pred_count_mean'], '.2f')}"
-    )
-    
-    # Also evaluate on training set for comparison
-    train_metrics = evaluate_model(model, train_y, train_x_true, device)
-    print("\nTraining Set Metrics (for comparison):")
-    print(f"  MSE: {train_metrics['mse']:.6f}")
-    print(f"  PSNR: {train_metrics['psnr']:.2f} dB")
-    print(f"  MAE: {train_metrics['mae']:.6f}")
-    print(f"  Correlation: {train_metrics['correlation']:.4f}")
-    print(f"  Peak Height MAE: {_fmt_metric(train_metrics['peak_height_mae'])}")
-    print(f"  Peak Height MAPE: {_fmt_metric(100.0 * train_metrics['peak_height_mape'], '.2f')}%")
-    print(f"  Peak Area RelErr (true support): {_fmt_metric(train_metrics['peak_area_rel_error_true_support'])}")
-    print(f"  Peak Area RelErr (thresholded): {_fmt_metric(train_metrics['peak_area_rel_error_thresholded'])}")
-    print(f"  Peak Localization MAE (idx): {_fmt_metric(train_metrics['peak_localization_mae'])}")
-    print(
-        f"  Peak Match Rate (@±{int(train_metrics['peak_match_tolerance'])}): "
-        f"{_fmt_metric(train_metrics['peak_match_rate'])}"
-    )
-    print(
-        f"  Peak Count (true/pred): "
-        f"{_fmt_metric(train_metrics['peak_true_count_mean'], '.2f')}/"
-        f"{_fmt_metric(train_metrics['peak_pred_count_mean'], '.2f')}"
-    )
-    
-    # Print final parameters
-    print("\nFinal learned parameters:")
-    final_params = model.get_learned_params()
-    for k, v in list(final_params.items())[:8]:
-        print(f"  {k}: {v:.4f}")
-    
-    # Plot results
-    fig_results = plt.figure(figsize=(16, 12))
-    
-    # Loss history
-    plt.subplot(2, 3, 1)
-    plt.plot(loss_history)
-    plt.xlabel('Epoch')
-    plt.ylabel('Total Loss')
-    plt.title('Training Loss')
-    plt.grid(True)
-    
-    # Loss components over time
-    plt.subplot(2, 3, 2)
-    epochs = range(1, len(loss_details) + 1)
-    plt.plot(epochs, [d.get('reconstruction', 0) for d in loss_details], label='Peak Recon')
-    plt.plot(epochs, [d.get('baseline_recon', 0) for d in loss_details], label='Baseline Recon')
-    plt.plot(epochs, [d.get('l1_sparsity', 0) for d in loss_details], label='L1 Sparsity')
-    plt.plot(epochs, [d.get('total_variation', 0) for d in loss_details], label='Total Variation')
-    plt.plot(epochs, [d.get('peak_baseline_ortho', 0) for d in loss_details], label='Ortho')
-    plt.plot(epochs, [d.get('baseline_tv', 0) for d in loss_details], label='Baseline TV')
-    plt.xlabel('Epoch')
-    plt.ylabel('Loss Component')
-    plt.title('Loss Components')
-    plt.legend(fontsize=8)
-    plt.grid(True)
-    
-    # Test example 1
-    plt.subplot(2, 3, 3)
-    model.eval()
-    with torch.no_grad():
-        test_idx = 0
-        y = test_y[test_idx:test_idx+1].to(device)
-        x_pred, f_pred = model(y)
-        
-        y_np = y[0].cpu().numpy()
-        x_np = x_pred[0].cpu().numpy()
-        f_np = f_pred[0].cpu().numpy()
-        x_true_np = test_x_true[test_idx].numpy()
-        f_true_np = test_f_true[test_idx].numpy()
-    
-    plt.plot(y_np, 'gray', alpha=0.5, linewidth=0.5, label='Observed')
-    plt.plot(x_np, 'b', linewidth=1, label='Predicted Peaks')
-    plt.plot(x_true_np, 'g--', linewidth=1, label='Ground Truth Peaks')
-    plt.plot(f_np, 'r', linewidth=1, alpha=0.7, label='Predicted Baseline')
-    plt.plot(f_true_np, 'm--', linewidth=1, alpha=0.7, label='True Baseline')
-    plt.legend(fontsize=7)
-    plt.title('Test Sample 1: Peak Recovery')
-    plt.xlim([0, N])
-    
-    # Test example 2
-    plt.subplot(2, 3, 4)
-    with torch.no_grad():
-        test_idx = min(5, test_y.shape[0] - 1)
-        y = test_y[test_idx:test_idx+1].to(device)
-        x_pred, f_pred = model(y)
-        
-        y_np = y[0].cpu().numpy()
-        x_np = x_pred[0].cpu().numpy()
-        f_np = f_pred[0].cpu().numpy()
-        x_true_np = test_x_true[test_idx].numpy()
-        f_true_np = test_f_true[test_idx].numpy()
-    
-    plt.plot(y_np, 'gray', alpha=0.5, linewidth=0.5, label='Observed')
-    plt.plot(x_np, 'b', linewidth=1, label='Predicted Peaks')
-    plt.plot(x_true_np, 'g--', linewidth=1, label='Ground Truth Peaks')
-    plt.plot(f_np, 'r', linewidth=1, alpha=0.7, label='Predicted Baseline')
-    plt.plot(f_true_np, 'm--', linewidth=1, alpha=0.7, label='True Baseline')
-    plt.legend(fontsize=7)
-    plt.title('Test Sample 2: Peak Recovery')
-    plt.xlim([0, N])
-    
-    # Error distribution
-    plt.subplot(2, 3, 5)
-    with torch.no_grad():
-        all_pred, _ = model(test_y.to(device))
-        errors = (all_pred.cpu() - test_x_true).numpy().flatten()
-    plt.hist(errors, bins=50, density=True, alpha=0.7)
-    plt.xlabel('Prediction Error')
-    plt.ylabel('Density')
-    plt.title(f'Test Error Distribution (MSE={test_metrics["mse"]:.4f})')
-    plt.grid(True)
-    
-    # Sparsity visualization
-    plt.subplot(2, 3, 6)
-    with torch.no_grad():
-        # Show sparsity pattern for one sample
-        x_pred_flat = all_pred[0].cpu().numpy()
-        x_true_flat = test_x_true[0].numpy()
-    plt.plot(np.abs(x_true_flat), 'g-', alpha=0.7, label='|Ground Truth|')
-    plt.plot(np.abs(x_pred_flat), 'b-', alpha=0.7, label='|Predicted|')
-    plt.axhline(y=0.5, color='r', linestyle='--', alpha=0.5, label='Sparsity threshold')
-    plt.xlabel('Sample Index')
-    plt.ylabel('Absolute Value')
-    plt.title('Sparsity Pattern')
-    plt.legend(fontsize=8)
-    plt.xlim([0, N])
-    
-    plt.suptitle('LBEADS-NET Training Results (Baseline Supervision)', fontsize=14)
-    plt.tight_layout()
-    training_plot_path = os.path.join(output_dir, 'training_results.png')
-    plt.savefig(training_plot_path, dpi=150)
-    print(f"\nSaved results to {training_plot_path}")
-    
-    # Save model
-    model_path = os.path.join(script_dir, f'lbeads_net_baseline_fix_{int(time.time())}.pth')
-    torch.save({
-        'model_state_dict': model.state_dict(),
-        'model_config': {
-            'N': N,
-            'd': 1,
-            'fc': model_fc,
-            'num_layers': model_num_layers,
-            'lowpass_iterations': 1,
-            'shared_params': bool(getattr(model, 'shared_params', model_shared_params)),
-            'solve_cg_iters': int(getattr(model, 'solve_cg_iters', model_solve_cg_iters)),
-            'lowpass_cg_iters': int(getattr(model, 'lowpass_cg_iters', model_lowpass_cg_iters)),
-            'learn_step': bool(model_learn_step),
-            'learn_output_gain': bool(model_learn_output_gain),
-            'model_variant': 'lbeads_net',
-            'model_class': model.__class__.__name__,
-        },
-        'loss_config': loss_config,
-        'stage_configs': stage_configs,
-        'final_params': final_params,
-        'loss_history': loss_history,
-        'loss_details': loss_details,
-        'train_metrics': train_metrics,
-        'test_metrics': test_metrics,
-        'data_config': {
-            'n_samples': n_samples,
-            'train_ratio': train_ratio,
-            'seed': seed
-        }
-    }, model_path)
-    print(f"Saved model to {model_path}")
-    
+    # ── MLflow experiment tracking ──
+    mlflow.set_experiment("LBEADS-NET")
+
+    with mlflow.start_run(run_name=f"v7_layers{model_num_layers}_{int(time.time())}"):
+        # Log hyperparameters
+        mlflow.log_params({
+            "N": N,
+            "n_samples": n_samples,
+            "train_ratio": train_ratio,
+            "seed": seed,
+            "peak_shape_mode": synthetic_peak_mode,
+            "noise_range_lo": synthetic_noise_range[0],
+            "noise_range_hi": synthetic_noise_range[1],
+            "num_layers": model_num_layers,
+            "shared_params": model_shared_params,
+            "solve_cg_iters": model_solve_cg_iters,
+            "lowpass_cg_iters": model_lowpass_cg_iters,
+            "learn_step": model_learn_step,
+            "learn_output_gain": model_learn_output_gain,
+            "learning_rate": 1e-3,
+            "batch_size": 24,
+            "device": device,
+            "fc": model_fc,
+            "num_trainable_params": num_trainable,
+        })
+        # Log all loss weights
+        for k, v in loss_config.items():
+            mlflow.log_param(f"loss_{k}", v)
+        # Log stage config summary
+        for i, stage in enumerate(stage_configs):
+            mlflow.log_param(f"stage_{i}_name", stage.get('name', f'stage_{i}'))
+            mlflow.log_param(f"stage_{i}_epochs", stage.get('epochs', 0))
+
+        start_time = time.time()
+        loss_history, loss_details = train_lbeads_net(
+            model,
+            train_y,
+            train_x_true,
+            train_f_true,  # Baseline ground truth for supervision
+            test_y=test_y,
+            test_x_true=test_x_true,
+            test_f_true=test_f_true,
+            num_epochs=50,           # Used only when stage_configs is None
+            learning_rate=1e-3,
+            batch_size=24,           # Larger batch leverages M4 Pro GPU (10-12 cores)
+            device="cpu",
+            verbose=True,
+            loss_config=loss_config,
+            stage_configs=stage_configs
+        )
+        elapsed_time = time.time() - start_time
+        print(f"\nTraining completed in {elapsed_time:.2f} seconds")
+        mlflow.log_metric("training_time_seconds", elapsed_time)
+
+        # Evaluate on test set
+        print("\n" + "=" * 60)
+        print("Evaluating on Test Set...")
+        print("=" * 60)
+        def _fmt_metric(val: float, fmt: str = ".6f") -> str:
+            return format(val, fmt) if np.isfinite(val) else "nan"
+
+        test_metrics = evaluate_model(model, test_y, test_x_true, device)
+        print(f"  MSE: {test_metrics['mse']:.6f}")
+        print(f"  PSNR: {test_metrics['psnr']:.2f} dB")
+        print(f"  MAE: {test_metrics['mae']:.6f}")
+        print(f"  Correlation: {test_metrics['correlation']:.4f}")
+        print(f"  Peak Height MAE: {_fmt_metric(test_metrics['peak_height_mae'])}")
+        print(f"  Peak Height MAPE: {_fmt_metric(100.0 * test_metrics['peak_height_mape'], '.2f')}%")
+        print(f"  Peak Area RelErr (true support): {_fmt_metric(test_metrics['peak_area_rel_error_true_support'])}")
+        print(f"  Peak Area RelErr (thresholded): {_fmt_metric(test_metrics['peak_area_rel_error_thresholded'])}")
+        print(f"  Peak Localization MAE (idx): {_fmt_metric(test_metrics['peak_localization_mae'])}")
+        print(
+            f"  Peak Match Rate (@±{int(test_metrics['peak_match_tolerance'])}): "
+            f"{_fmt_metric(test_metrics['peak_match_rate'])}"
+        )
+        print(
+            f"  Peak Count (true/pred): "
+            f"{_fmt_metric(test_metrics['peak_true_count_mean'], '.2f')}/"
+            f"{_fmt_metric(test_metrics['peak_pred_count_mean'], '.2f')}"
+        )
+
+        # Also evaluate on training set for comparison
+        train_metrics = evaluate_model(model, train_y, train_x_true, device)
+        print("\nTraining Set Metrics (for comparison):")
+        print(f"  MSE: {train_metrics['mse']:.6f}")
+        print(f"  PSNR: {train_metrics['psnr']:.2f} dB")
+        print(f"  MAE: {train_metrics['mae']:.6f}")
+        print(f"  Correlation: {train_metrics['correlation']:.4f}")
+        print(f"  Peak Height MAE: {_fmt_metric(train_metrics['peak_height_mae'])}")
+        print(f"  Peak Height MAPE: {_fmt_metric(100.0 * train_metrics['peak_height_mape'], '.2f')}%")
+        print(f"  Peak Area RelErr (true support): {_fmt_metric(train_metrics['peak_area_rel_error_true_support'])}")
+        print(f"  Peak Area RelErr (thresholded): {_fmt_metric(train_metrics['peak_area_rel_error_thresholded'])}")
+        print(f"  Peak Localization MAE (idx): {_fmt_metric(train_metrics['peak_localization_mae'])}")
+        print(
+            f"  Peak Match Rate (@±{int(train_metrics['peak_match_tolerance'])}): "
+            f"{_fmt_metric(train_metrics['peak_match_rate'])}"
+        )
+        print(
+            f"  Peak Count (true/pred): "
+            f"{_fmt_metric(train_metrics['peak_true_count_mean'], '.2f')}/"
+            f"{_fmt_metric(train_metrics['peak_pred_count_mean'], '.2f')}"
+        )
+
+        # Log final metrics to MLflow
+        for prefix, metrics in [("test", test_metrics), ("train", train_metrics)]:
+            for key, val in metrics.items():
+                if isinstance(val, (int, float)) and np.isfinite(val):
+                    mlflow.log_metric(f"{prefix}_{key}", val)
+
+        # Print final parameters
+        print("\nFinal learned parameters:")
+        final_params = model.get_learned_params()
+        for k, v in list(final_params.items())[:8]:
+            print(f"  {k}: {v:.4f}")
+
+        # Log learned params to MLflow
+        for k, v in final_params.items():
+            mlflow.log_metric(f"learned_{k}", v)
+
+        # Plot results
+        fig_results = plt.figure(figsize=(16, 12))
+
+        # Loss history
+        plt.subplot(2, 3, 1)
+        plt.plot(loss_history)
+        plt.xlabel('Epoch')
+        plt.ylabel('Total Loss')
+        plt.title('Training Loss')
+        plt.grid(True)
+
+        # Loss components over time
+        plt.subplot(2, 3, 2)
+        epochs = range(1, len(loss_details) + 1)
+        plt.plot(epochs, [d.get('reconstruction', 0) for d in loss_details], label='Peak Recon')
+        plt.plot(epochs, [d.get('baseline_recon', 0) for d in loss_details], label='Baseline Recon')
+        plt.plot(epochs, [d.get('l1_sparsity', 0) for d in loss_details], label='L1 Sparsity')
+        plt.plot(epochs, [d.get('total_variation', 0) for d in loss_details], label='Total Variation')
+        plt.plot(epochs, [d.get('peak_baseline_ortho', 0) for d in loss_details], label='Ortho')
+        plt.plot(epochs, [d.get('baseline_tv', 0) for d in loss_details], label='Baseline TV')
+        plt.xlabel('Epoch')
+        plt.ylabel('Loss Component')
+        plt.title('Loss Components')
+        plt.legend(fontsize=8)
+        plt.grid(True)
+
+        # Test example 1
+        plt.subplot(2, 3, 3)
+        model.eval()
+        with torch.no_grad():
+            test_idx = 0
+            y = test_y[test_idx:test_idx+1].to(device)
+            x_pred, f_pred = model(y)
+
+            y_np = y[0].cpu().numpy()
+            x_np = x_pred[0].cpu().numpy()
+            f_np = f_pred[0].cpu().numpy()
+            x_true_np = test_x_true[test_idx].numpy()
+            f_true_np = test_f_true[test_idx].numpy()
+
+        plt.plot(y_np, 'gray', alpha=0.5, linewidth=0.5, label='Observed')
+        plt.plot(x_np, 'b', linewidth=1, label='Predicted Peaks')
+        plt.plot(x_true_np, 'g--', linewidth=1, label='Ground Truth Peaks')
+        plt.plot(f_np, 'r', linewidth=1, alpha=0.7, label='Predicted Baseline')
+        plt.plot(f_true_np, 'm--', linewidth=1, alpha=0.7, label='True Baseline')
+        plt.legend(fontsize=7)
+        plt.title('Test Sample 1: Peak Recovery')
+        plt.xlim([0, N])
+
+        # Test example 2
+        plt.subplot(2, 3, 4)
+        with torch.no_grad():
+            test_idx = min(5, test_y.shape[0] - 1)
+            y = test_y[test_idx:test_idx+1].to(device)
+            x_pred, f_pred = model(y)
+
+            y_np = y[0].cpu().numpy()
+            x_np = x_pred[0].cpu().numpy()
+            f_np = f_pred[0].cpu().numpy()
+            x_true_np = test_x_true[test_idx].numpy()
+            f_true_np = test_f_true[test_idx].numpy()
+
+        plt.plot(y_np, 'gray', alpha=0.5, linewidth=0.5, label='Observed')
+        plt.plot(x_np, 'b', linewidth=1, label='Predicted Peaks')
+        plt.plot(x_true_np, 'g--', linewidth=1, label='Ground Truth Peaks')
+        plt.plot(f_np, 'r', linewidth=1, alpha=0.7, label='Predicted Baseline')
+        plt.plot(f_true_np, 'm--', linewidth=1, alpha=0.7, label='True Baseline')
+        plt.legend(fontsize=7)
+        plt.title('Test Sample 2: Peak Recovery')
+        plt.xlim([0, N])
+
+        # Error distribution
+        plt.subplot(2, 3, 5)
+        with torch.no_grad():
+            all_pred, _ = model(test_y.to(device))
+            errors = (all_pred.cpu() - test_x_true).numpy().flatten()
+        plt.hist(errors, bins=50, density=True, alpha=0.7)
+        plt.xlabel('Prediction Error')
+        plt.ylabel('Density')
+        plt.title(f'Test Error Distribution (MSE={test_metrics["mse"]:.4f})')
+        plt.grid(True)
+
+        # Sparsity visualization
+        plt.subplot(2, 3, 6)
+        with torch.no_grad():
+            # Show sparsity pattern for one sample
+            x_pred_flat = all_pred[0].cpu().numpy()
+            x_true_flat = test_x_true[0].numpy()
+        plt.plot(np.abs(x_true_flat), 'g-', alpha=0.7, label='|Ground Truth|')
+        plt.plot(np.abs(x_pred_flat), 'b-', alpha=0.7, label='|Predicted|')
+        plt.axhline(y=0.5, color='r', linestyle='--', alpha=0.5, label='Sparsity threshold')
+        plt.xlabel('Sample Index')
+        plt.ylabel('Absolute Value')
+        plt.title('Sparsity Pattern')
+        plt.legend(fontsize=8)
+        plt.xlim([0, N])
+
+        plt.suptitle('LBEADS-NET Training Results (Baseline Supervision)', fontsize=14)
+        plt.tight_layout()
+        training_plot_path = os.path.join(output_dir, 'training_results.png')
+        plt.savefig(training_plot_path, dpi=150)
+        print(f"\nSaved results to {training_plot_path}")
+
+        # Save model
+        model_path = os.path.join(script_dir, f'lbeads_net_baseline_fix_{int(time.time())}.pth')
+        torch.save({
+            'model_state_dict': model.state_dict(),
+            'model_config': {
+                'N': N,
+                'd': 1,
+                'fc': model_fc,
+                'num_layers': model_num_layers,
+                'lowpass_iterations': 1,
+                'shared_params': bool(getattr(model, 'shared_params', model_shared_params)),
+                'solve_cg_iters': int(getattr(model, 'solve_cg_iters', model_solve_cg_iters)),
+                'lowpass_cg_iters': int(getattr(model, 'lowpass_cg_iters', model_lowpass_cg_iters)),
+                'learn_step': bool(model_learn_step),
+                'learn_output_gain': bool(model_learn_output_gain),
+                'model_variant': 'lbeads_net',
+                'model_class': model.__class__.__name__,
+            },
+            'loss_config': loss_config,
+            'stage_configs': stage_configs,
+            'final_params': final_params,
+            'loss_history': loss_history,
+            'loss_details': loss_details,
+            'train_metrics': train_metrics,
+            'test_metrics': test_metrics,
+            'data_config': {
+                'n_samples': n_samples,
+                'train_ratio': train_ratio,
+                'seed': seed
+            }
+        }, model_path)
+        print(f"Saved model to {model_path}")
+
+        # Log artifacts to MLflow
+        mlflow.log_artifact(training_plot_path)
+        mlflow.log_artifact(model_path)
+        mlflow.pytorch.log_model(model, "model")
+
+        print(f"\nMLflow run ID: {mlflow.active_run().info.run_id}")
+        print(f"View at: mlflow ui  (http://127.0.0.1:5000)")
+
     plt.show()
 
 

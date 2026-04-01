@@ -1,10 +1,10 @@
 "use client"
 
+import { useState } from "react"
 import { Button } from "@/components/ui/button"
 import { Input } from "@/components/ui/input"
 import { Label } from "@/components/ui/label"
 import { AlphaSlider } from "./alpha-slider"
-import { Collapsible, CollapsibleContent, CollapsibleTrigger } from "@/components/ui/collapsible"
 import type { StageConfig, LossConfig } from "@/lib/types"
 import { DEFAULT_LOSS_CONFIG } from "@/lib/types"
 
@@ -19,6 +19,8 @@ const ALPHA_KEYS = [
 ] as const
 
 export function StageEditor({ stages, onChange }: StageEditorProps) {
+  const [openIndex, setOpenIndex] = useState<number | null>(stages.length - 1)
+
   function updateStage(index: number, updates: Partial<StageConfig>) {
     const next = stages.map((s, i) => (i === index ? { ...s, ...updates } : s))
     onChange(next)
@@ -26,10 +28,12 @@ export function StageEditor({ stages, onChange }: StageEditorProps) {
 
   function removeStage(index: number) {
     onChange(stages.filter((_, i) => i !== index))
+    if (openIndex === index) setOpenIndex(null)
   }
 
   function addStage() {
     onChange([...stages, { name: `Stage ${String.fromCharCode(65 + stages.length)}`, epochs: 10, loss_config: {} }])
+    setOpenIndex(stages.length)
   }
 
   function toggleAlpha(stageIndex: number, key: string, enabled: boolean) {
@@ -45,65 +49,108 @@ export function StageEditor({ stages, onChange }: StageEditorProps) {
 
   return (
     <div className="space-y-3">
-      {stages.map((stage, i) => (
-        <Collapsible key={i} defaultOpen={i === stages.length - 1}>
-          <div className="border p-3">
-            <div className="flex items-center justify-between w-full">
-              <CollapsibleTrigger className="flex items-center gap-2">
+      {stages.map((stage, i) => {
+        const isOpen = openIndex === i
+        return (
+          <div key={i} className="border bg-zinc-50/50">
+            <Button
+              variant="ghost"
+              onClick={() => setOpenIndex(isOpen ? null : i)}
+              className="w-full flex items-center justify-between px-3 py-2.5 h-auto hover:bg-zinc-100"
+            >
+              <div className="flex items-center gap-2">
                 <span className="bg-foreground text-background px-2 py-0.5 text-xs font-bold">
                   {String.fromCharCode(65 + i)}
                 </span>
-                <span className="text-xs text-muted-foreground">toggle</span>
-              </CollapsibleTrigger>
-              <div className="flex items-center gap-2">
-                <Input
-                  value={stage.name}
-                  onChange={(e) => updateStage(i, { name: e.target.value })}
-                  className="h-7 text-xs w-40"
-                />
-                <Label className="text-xs text-muted-foreground">Epochs:</Label>
-                <Input
-                  type="number"
-                  value={stage.epochs}
-                  onChange={(e) => updateStage(i, { epochs: parseInt(e.target.value) || 1 })}
-                  className="h-7 text-xs w-16"
-                />
-                {stages.length > 1 && (
-                  <Button variant="ghost" size="sm" className="h-7 text-xs text-destructive" onClick={() => removeStage(i)}>
-                    Remove
-                  </Button>
-                )}
+                <span className="text-xs">{stage.name}</span>
+                <span className="text-xs text-muted-foreground">{stage.epochs} epochs</span>
               </div>
-            </div>
-            <CollapsibleContent className="mt-3 space-y-2">
-              {ALPHA_KEYS.map((key) => {
-                const active = key in stage.loss_config
-                const value = active ? (stage.loss_config[key] as number) : 0
-                return (
-                  <div key={key} className="flex items-center gap-2">
-                    <input
-                      type="checkbox"
-                      checked={active}
-                      onChange={(e) => toggleAlpha(i, key, e.target.checked)}
-                      className="accent-foreground"
+              <svg
+                xmlns="http://www.w3.org/2000/svg"
+                width="16"
+                height="16"
+                viewBox="0 0 24 24"
+                fill="none"
+                stroke="currentColor"
+                strokeWidth="2"
+                strokeLinecap="round"
+                strokeLinejoin="round"
+                className={`transition-transform duration-200 ${isOpen ? "rotate-180" : ""}`}
+              >
+                <path d="m6 9 6 6 6-6" />
+              </svg>
+            </Button>
+            {isOpen && (
+              <div className="px-3 pb-3 pt-2 border-t bg-white space-y-3">
+                <div className="flex items-center gap-3">
+                  <div className="flex-1">
+                    <Label className="text-xs">Stage Name</Label>
+                    <Input
+                      value={stage.name}
+                      onChange={(e) => updateStage(i, { name: e.target.value })}
+                      className="h-8 text-xs mt-1"
                     />
-                    <div className={active ? "flex-1" : "flex-1 opacity-40"}>
-                      <AlphaSlider
-                        name={key}
-                        value={value}
-                        onChange={(v) => {
-                          const nextConfig = { ...stage.loss_config, [key]: v }
-                          updateStage(i, { loss_config: nextConfig })
-                        }}
-                      />
-                    </div>
                   </div>
-                )
-              })}
-            </CollapsibleContent>
+                  <div className="w-24">
+                    <Label className="text-xs">Epochs</Label>
+                    <Input
+                      type="number"
+                      value={stage.epochs}
+                      onChange={(e) => updateStage(i, { epochs: parseInt(e.target.value) || 1 })}
+                      className="h-8 text-xs mt-1"
+                    />
+                  </div>
+                  {stages.length > 1 && (
+                    <Button
+                      variant="ghost"
+                      size="sm"
+                      className="h-8 text-xs text-destructive mt-5"
+                      onClick={() => removeStage(i)}
+                    >
+                      Remove
+                    </Button>
+                  )}
+                </div>
+                <div className="space-y-1">
+                  <Label className="text-xs text-muted-foreground">Loss Overrides</Label>
+                  {ALPHA_KEYS.map((key) => {
+                    const active = key in stage.loss_config
+                    const value = active ? (stage.loss_config[key] as number) : 0
+                    return (
+                      <div
+                        key={key}
+                        className="flex items-center gap-2 px-2 py-1.5 hover:bg-zinc-50 transition-colors"
+                      >
+                        <label className="cursor-pointer flex items-center" onClick={(e) => e.stopPropagation()}>
+                          <input
+                            type="checkbox"
+                            checked={active}
+                            onChange={(e) => toggleAlpha(i, key, e.target.checked)}
+                            className="accent-foreground cursor-pointer"
+                          />
+                        </label>
+                        <div
+                          className={active ? "flex-1" : "flex-1 opacity-40 cursor-pointer"}
+                          onClick={() => { if (!active) toggleAlpha(i, key, true) }}
+                        >
+                          <AlphaSlider
+                            name={key}
+                            value={value}
+                            onChange={(v) => {
+                              const nextConfig = { ...stage.loss_config, [key]: v }
+                              updateStage(i, { loss_config: nextConfig })
+                            }}
+                          />
+                        </div>
+                      </div>
+                    )
+                  })}
+                </div>
+              </div>
+            )}
           </div>
-        </Collapsible>
-      ))}
+        )
+      })}
       <Button variant="outline" size="sm" onClick={addStage} className="text-xs">
         + Add Stage
       </Button>

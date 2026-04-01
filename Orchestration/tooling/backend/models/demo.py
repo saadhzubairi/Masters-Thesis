@@ -24,7 +24,7 @@ import time
 import glob
 import scipy.io as sio
 
-from lbeads_net import LBEADS_NET, HybridConfig, hybrid_infer_1d
+from lbeads_net import LBEADS_NET, LBEADS_NET_Fast, HybridConfig, hybrid_infer_1d
 
 # Import synthetic data generator from train.py
 from train import SyntheticDataGenerator, SyntheticSignal
@@ -180,7 +180,8 @@ def _save_synthetic_variant_plots(results, output_dir, N, model_status, variant_
         ax.set_xlim([0, N])
         ax.set_title(
             f"S{idx + 1} | stage={result['selected_stage']}\n"
-            f"MSE={result['mse']:.4f}, Corr={result['correlation']:.3f}"
+            f"MSE={result.get('peak_mse', result.get('mse', 0)):.4f}, "
+            f"Corr={result.get('peak_corr', result.get('correlation', 0)):.3f}"
         )
         if idx == 0:
             ax.legend(fontsize=7, loc='upper right')
@@ -608,7 +609,190 @@ def demo_legacy_data(model=None, trained: bool = False):
 # Entry Point
 # =============================================================================
 
-def run_demo(checkpoint_path: str, output_dir: str, N: int = 4096):
+def _generate_signals_from_data_config(data_config, N, num_samples=6, seed=123):
+    """Generate synthetic test signals using the same data config as the data generator page."""
+    from synth_generator import SyntheticDataGenerator as StandaloneGen
+    gen = StandaloneGen(N=N, seed=seed)
+
+    bl = data_config.get("baseline", {})
+    peak_layers = data_config.get("peak_layers", [{}])
+    noise_cfg = data_config.get("noise", {})
+    noise_level = noise_cfg.get("noise_level", 0.01)
+
+    signals = []
+    for _ in range(num_samples):
+        f_true, _ = gen.generate_baseline(
+            smooth_sigma=bl.get("smooth_sigma", 100.0),
+            sine_amp=bl.get("sine_amp", 0.1),
+            sine_freq_range=(bl.get("sine_freq_min", 0.5), bl.get("sine_freq_max", 2.0)),
+            baseline_amp_range=(bl.get("baseline_amp_min", 0.08), bl.get("baseline_amp_max", 0.35)),
+        )
+        x_true = np.zeros(N, dtype=np.float64)
+        for layer in peak_layers:
+            gen.peak_shape_mode = layer.get("peak_shape_mode", "mixed")
+            peaks, _ = gen.generate_peaks(
+                num_peaks_range=(layer.get("num_peaks_min", 2), layer.get("num_peaks_max", 6)),
+                amplitude_range=(layer.get("amplitude_min", 0.2), layer.get("amplitude_max", 1.0)),
+                rise_width_range=(layer.get("rise_width_min", 10), layer.get("rise_width_max", 80)),
+                decay_width_range=(layer.get("decay_width_min", 20), layer.get("decay_width_max", 200)),
+                plateau_width_range=(layer.get("plateau_width_min", 0), layer.get("plateau_width_max", 10)),
+            )
+            x_true += peaks
+        noise, _ = gen.generate_noise(noise_level=noise_level)
+
+        y = x_true + f_true + noise
+        scale = max(float(np.max(np.abs(y))), 1e-8)
+        # Scale to chromatogram-like amplitudes
+        target_amp = float(gen.rng.uniform(300.0, 1800.0))
+        signals.append(SyntheticSignal(
+            y=(y / scale) * target_amp,
+            x_true=(x_true / scale) * target_amp,
+            f_true=(f_true / scale) * target_amp,
+            noise=(noise / scale) * target_amp,
+            metadata={"target_amplitude_scale": target_amp},
+        ))
+    return signals
+
+
+def _save_before_after_plots(results, output_dir, N, variant_label):
+    """Save before/after comparison plots: one image per signal showing observed vs inference."""
+    n = len(results)
+    # 4 images: before_after grid, peaks comparison, baselines comparison, metrics summary
+    output_files = []
+
+    # --- Image 1: Before / Predicted / Ground Truth (3 columns x N rows) ---
+    fig, axes = plt.subplots(n, 3, figsize=(20, 3.2 * n))
+    if n == 1:
+        axes = axes.reshape(1, -1)
+    for i, r in enumerate(results):
+        sig = r['signal']
+        # Col 1: Before (observed)
+        ax_obs = axes[i, 0]
+        ax_obs.plot(sig.y, 'k', linewidth=0.5, alpha=0.7)
+        ax_obs.set_xlim([0, N])
+        ax_obs.set_ylabel(f'S{i+1}', fontsize=9, fontweight='bold')
+        if i == 0:
+            ax_obs.set_title('Observed Signal', fontsize=11)
+        ax_obs.grid(True, alpha=0.2)
+
+        # Col 2: Predicted (peaks + baseline)
+        ax_pred = axes[i, 1]
+        ax_pred.plot(r['x_pred'], 'b', linewidth=0.8, label='Pred Peaks')
+        ax_pred.plot(r['f_pred'], 'r', linewidth=0.7, alpha=0.8, label='Pred Baseline')
+        ax_pred.set_xlim([0, N])
+        if i == 0:
+            ax_pred.set_title('Predicted Decomposition', fontsize=11)
+            ax_pred.legend(fontsize=6, loc='upper right')
+        ax_pred.grid(True, alpha=0.2)
+        ax_pred.text(0.98, 0.02,
+                     f"MSE={r['peak_mse']:.4f}  Corr={r['peak_corr']:.3f}  stage={r['selected_stage']}",
+                     transform=ax_pred.transAxes, fontsize=7, ha='right', va='bottom',
+                     bbox=dict(boxstyle='round,pad=0.2', facecolor='white', alpha=0.8))
+
+        # Col 3: Ground truth (peaks + baseline)
+        ax_gt = axes[i, 2]
+        ax_gt.plot(sig.x_true, 'g', linewidth=0.8, label='True Peaks')
+        ax_gt.plot(sig.f_true, 'm', linewidth=0.7, alpha=0.8, label='True Baseline')
+        ax_gt.set_xlim([0, N])
+        if i == 0:
+            ax_gt.set_title('Ground Truth', fontsize=11)
+            ax_gt.legend(fontsize=6, loc='upper right')
+        ax_gt.grid(True, alpha=0.2)
+
+    fig.suptitle(f'{variant_label} — Observed / Predicted / Ground Truth', fontsize=13, fontweight='bold')
+    fig.tight_layout()
+    fname = 'before_after.png'
+    fig.savefig(os.path.join(output_dir, fname), dpi=150)
+    plt.close(fig)
+    output_files.append(fname)
+
+    # --- Image 2: Peak candidates comparison ---
+    fig, axes = plt.subplots(n, 1, figsize=(12, 3.0 * n))
+    if n == 1:
+        axes = [axes]
+    for i, r in enumerate(results):
+        ax = axes[i]
+        ax.plot(r['signal'].x_true, 'k', linewidth=0.9, label='Ground Truth')
+        ax.plot(r['x_lbeads'], 'b', linewidth=0.7, alpha=0.8, label='x_lbeads')
+        ax.plot(r['x_post'], 'c', linewidth=0.7, alpha=0.8, label='x_post')
+        ax.plot(r['x_refine'], 'r', linewidth=0.7, alpha=0.8, label='x_refine')
+        ax.set_xlim([0, N])
+        ax.set_ylabel(f'S{i+1}', fontsize=9, fontweight='bold')
+        if i == 0:
+            ax.legend(fontsize=7, loc='upper right', ncol=4)
+        ax.grid(True, alpha=0.2)
+    fig.suptitle(f'{variant_label} — Peak Candidates', fontsize=13, fontweight='bold')
+    fig.tight_layout()
+    fname = 'peak_candidates.png'
+    fig.savefig(os.path.join(output_dir, fname), dpi=150)
+    plt.close(fig)
+    output_files.append(fname)
+
+    # --- Image 3: Baseline candidates comparison ---
+    fig, axes = plt.subplots(n, 1, figsize=(12, 3.0 * n))
+    if n == 1:
+        axes = [axes]
+    for i, r in enumerate(results):
+        ax = axes[i]
+        ax.plot(r['signal'].f_true, 'k', linewidth=0.9, label='Ground Truth')
+        ax.plot(r['f_lbeads'], 'b', linewidth=0.7, alpha=0.8, label='f_lbeads')
+        ax.plot(r['f_post'], 'c', linewidth=0.7, alpha=0.8, label='f_post')
+        ax.plot(r['f_refine'], 'r', linewidth=0.7, alpha=0.8, label='f_refine')
+        ax.set_xlim([0, N])
+        ax.set_ylabel(f'S{i+1}', fontsize=9, fontweight='bold')
+        if i == 0:
+            ax.legend(fontsize=7, loc='upper right', ncol=4)
+        ax.grid(True, alpha=0.2)
+    fig.suptitle(f'{variant_label} — Baseline Candidates', fontsize=13, fontweight='bold')
+    fig.tight_layout()
+    fname = 'baseline_candidates.png'
+    fig.savefig(os.path.join(output_dir, fname), dpi=150)
+    plt.close(fig)
+    output_files.append(fname)
+
+    # --- Image 4: Metrics summary table ---
+    fig, ax = plt.subplots(figsize=(10, 0.6 * n + 1.5))
+    ax.axis('off')
+    headers = ['Signal', 'Peak MSE', 'Peak Corr', 'Baseline MSE', 'Baseline Corr', 'MAE', 'Stage']
+    rows = []
+    for i, r in enumerate(results):
+        rows.append([
+            f'S{i+1}',
+            f"{r['peak_mse']:.6f}",
+            f"{r['peak_corr']:.4f}",
+            f"{r['baseline_mse']:.6f}",
+            f"{r['baseline_corr']:.4f}",
+            f"{r['mae']:.6f}",
+            r['selected_stage'],
+        ])
+    # Add mean row
+    avg_peak_mse = np.mean([r['peak_mse'] for r in results])
+    avg_peak_corr = np.mean([r['peak_corr'] for r in results])
+    avg_bl_mse = np.mean([r['baseline_mse'] for r in results])
+    avg_bl_corr = np.mean([r['baseline_corr'] for r in results])
+    avg_mae = np.mean([r['mae'] for r in results])
+    rows.append(['Mean', f'{avg_peak_mse:.6f}', f'{avg_peak_corr:.4f}',
+                 f'{avg_bl_mse:.6f}', f'{avg_bl_corr:.4f}', f'{avg_mae:.6f}', '—'])
+
+    table = ax.table(cellText=rows, colLabels=headers, loc='center', cellLoc='center')
+    table.auto_set_font_size(False)
+    table.set_fontsize(9)
+    table.scale(1, 1.4)
+    # Bold the header and mean row
+    for j in range(len(headers)):
+        table[0, j].set_text_props(fontweight='bold')
+        table[len(rows), j].set_text_props(fontweight='bold')
+    fig.suptitle(f'{variant_label} — Metrics', fontsize=13, fontweight='bold')
+    fig.tight_layout()
+    fname = 'metrics.png'
+    fig.savefig(os.path.join(output_dir, fname), dpi=150, bbox_inches='tight')
+    plt.close(fig)
+    output_files.append(fname)
+
+    return output_files
+
+
+def run_demo(checkpoint_path: str, output_dir: str, N: int = 4096, data_config: dict = None):
     """
     Run synthetic demo from a saved checkpoint and save plots to output_dir.
 
@@ -616,6 +800,8 @@ def run_demo(checkpoint_path: str, output_dir: str, N: int = 4096):
         checkpoint_path: Path to a .pth checkpoint file.
         output_dir: Directory where output plots are written.
         N: Signal length (must match training).
+        data_config: Data generation config (peak_layers, baseline, noise).
+                     If None, uses hardcoded defaults.
 
     Returns:
         List of output file paths (relative to output_dir).
@@ -628,46 +814,56 @@ def run_demo(checkpoint_path: str, output_dir: str, N: int = 4096):
     # Load model from checkpoint
     checkpoint = torch.load(checkpoint_path, map_location='cpu', weights_only=False)
     config = checkpoint.get('model_config', {})
+    model_type = checkpoint.get('model_type', 'lbeads')
 
     loaded_layers = int(config.get('num_layers', 10))
     infer_layers = min(loaded_layers, 10)
 
-    model = LBEADS_NET(
-        N=config.get('N', N),
-        d=config.get('d', 1),
-        fc=config.get('fc', 0.006),
-        num_layers=infer_layers,
-        shared_params=config.get('shared_params', False),
-        lowpass_iterations=config.get('lowpass_iterations', 1),
-        solve_cg_iters=config.get('solve_cg_iters', 18),
-        lowpass_cg_iters=config.get('lowpass_cg_iters', 12),
-    )
+    if model_type == 'lbeads_fast':
+        model = LBEADS_NET_Fast(
+            N=config.get('N', N),
+            d=config.get('d', 1),
+            fc=config.get('fc', 0.006),
+            num_layers=infer_layers,
+            lowpass_iterations=config.get('lowpass_iterations', 3),
+            lowpass_cg_iters=config.get('lowpass_cg_iters', 12),
+        )
+    else:
+        model = LBEADS_NET(
+            N=config.get('N', N),
+            d=config.get('d', 1),
+            fc=config.get('fc', 0.006),
+            num_layers=infer_layers,
+            shared_params=config.get('shared_params', False),
+            lowpass_iterations=config.get('lowpass_iterations', 1),
+            solve_cg_iters=config.get('solve_cg_iters', 18),
+            lowpass_cg_iters=config.get('lowpass_cg_iters', 12),
+        )
     model.load_state_dict(checkpoint['model_state_dict'], strict=False)
     model.eval()
 
-    # Generate synthetic test data
-    num_test_samples = 6
-    synthetic_noise_range = (0.01, 0.01)
-    synthetic_amplitude_range = (300.0, 1800.0)
+    # Generate synthetic test data using data config (same as training)
+    if data_config:
+        test_signals = _generate_signals_from_data_config(data_config, N, num_samples=6, seed=123)
+    else:
+        # Legacy fallback
+        generator = SyntheticDataGenerator(N=N, seed=123)
+        test_signals = []
+        for _ in range(6):
+            signal = generator.generate_signal(noise_level=0.01)
+            target_amp = float(generator.rng.uniform(300.0, 1800.0))
+            signal.y = signal.y * target_amp
+            signal.x_true = signal.x_true * target_amp
+            signal.f_true = signal.f_true * target_amp
+            signal.noise = signal.noise * target_amp
+            signal.metadata['target_amplitude_scale'] = target_amp
+            test_signals.append(signal)
 
-    generator = SyntheticDataGenerator(N=N, seed=123)
-    test_signals = []
-    for _ in range(num_test_samples):
-        noise_level = float(generator.rng.uniform(*synthetic_noise_range))
-        signal = generator.generate_signal(noise_level=noise_level)
-        target_amp = float(generator.rng.uniform(*synthetic_amplitude_range))
-        signal.y = signal.y * target_amp
-        signal.x_true = signal.x_true * target_amp
-        signal.f_true = signal.f_true * target_amp
-        signal.noise = signal.noise * target_amp
-        signal.metadata['target_amplitude_scale'] = target_amp
-        test_signals.append(signal)
-
-    # Variant specs (same as main())
+    # Variant specs
     variant_specs = [
         {
             "key": "raw",
-            "label": "Raw net only (x_lbeads/f_lbeads)",
+            "label": "Raw Net Output",
             "x_key": "x_lbeads",
             "f_key": "f_lbeads",
             "config": HybridConfig(
@@ -677,7 +873,7 @@ def run_demo(checkpoint_path: str, output_dir: str, N: int = 4096):
         },
         {
             "key": "hybrid",
-            "label": "Hybrid no-threshold (noise_k=0.0)",
+            "label": "Hybrid (No Threshold)",
             "x_key": "x_hybrid",
             "f_key": "f_hybrid",
             "config": HybridConfig(
@@ -687,7 +883,7 @@ def run_demo(checkpoint_path: str, output_dir: str, N: int = 4096):
         },
         {
             "key": "hybrid-snr",
-            "label": "Hybrid current settings (noise_k=2.5)",
+            "label": "Hybrid (SNR Threshold)",
             "x_key": "x_hybrid",
             "f_key": "f_hybrid",
             "config": HybridConfig(
@@ -709,8 +905,11 @@ def run_demo(checkpoint_path: str, output_dir: str, N: int = 4096):
 
             x_pred_np = np.asarray(hybrid_result[spec["x_key"]], dtype=np.float64)
             f_pred_np = np.asarray(hybrid_result[spec["f_key"]], dtype=np.float64)
-            mse = float(np.mean((x_pred_np - signal.x_true) ** 2))
-            corr = float(np.corrcoef(x_pred_np, signal.x_true)[0, 1])
+
+            peak_mse = float(np.mean((x_pred_np - signal.x_true) ** 2))
+            peak_corr = float(np.corrcoef(x_pred_np, signal.x_true)[0, 1]) if np.std(signal.x_true) > 1e-10 else 0.0
+            baseline_mse = float(np.mean((f_pred_np - signal.f_true) ** 2))
+            baseline_corr = float(np.corrcoef(f_pred_np, signal.f_true)[0, 1]) if np.std(signal.f_true) > 1e-10 else 0.0
 
             results.append({
                 'signal': signal,
@@ -722,23 +921,24 @@ def run_demo(checkpoint_path: str, output_dir: str, N: int = 4096):
                 'f_lbeads': np.asarray(hybrid_result['f_lbeads'], dtype=np.float64),
                 'f_post': np.asarray(hybrid_result['f_post'], dtype=np.float64),
                 'f_refine': np.asarray(hybrid_result['f_refine'], dtype=np.float64),
-                'mse': mse,
+                'peak_mse': peak_mse,
+                'peak_corr': peak_corr,
+                'baseline_mse': baseline_mse,
+                'baseline_corr': baseline_corr,
                 'mae': float(np.mean(np.abs(x_pred_np - signal.x_true))),
-                'correlation': corr,
-                'baseline_mse': float(np.mean((f_pred_np - signal.f_true) ** 2)),
-                'time': 0.0,
                 'selected_stage': hybrid_result['selected_stage'],
-                'noise_sigma_normalized': float(hybrid_result['noise_sigma_normalized']),
-                'quality_post': hybrid_result['quality'].get('post'),
-                'quality_short_refine': hybrid_result['quality'].get('short_refine'),
             })
 
+        variant_files = _save_before_after_plots(results, variant_output_dir, N, spec["label"])
+        plt.close('all')
+
+        # Also save the old-style plots for backward compat
         _save_synthetic_variant_plots(results, variant_output_dir, N, "Trained", spec["label"])
         plt.close('all')
 
-        # Collect output file paths relative to output_dir
-        for fname in ['synthetic_selected_output.png', 'synthetic_candidates_peaks.png',
-                       'synthetic_candidates_baselines.png']:
+        for fname in variant_files + ['synthetic_selected_output.png',
+                                       'synthetic_candidates_peaks.png',
+                                       'synthetic_candidates_baselines.png']:
             rel_path = os.path.join(spec["key"], fname)
             full_path = os.path.join(output_dir, rel_path)
             if os.path.isfile(full_path):
