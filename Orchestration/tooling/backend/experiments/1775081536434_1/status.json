@@ -1,5 +1,7 @@
 {
-  "status": "running",
+  "status": "deleted",
   "created_at": 1775081536.435665,
-  "updated_at": 1775081536.44015
+  "updated_at": 1775082937.189984,
+  "previous_status": "failed",
+  "deleted_at": 1775090901.923855
 }

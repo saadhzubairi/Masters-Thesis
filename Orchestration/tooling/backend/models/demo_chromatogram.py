@@ -386,6 +386,7 @@ def run_chromatogram_demo(checkpoint_path: str, output_dir: str, N: int = 4096,
         )
     model.load_state_dict(checkpoint['model_state_dict'], strict=False)
     model.eval()
+    print(f"Model training mode: {model.training}")
 
     hybrid_cfg = HybridConfig(
         noise_k=2.5, lowpass_iterations=3,

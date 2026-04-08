@@ -33,19 +33,6 @@
       "plateau_width_min": 0,
       "plateau_width_max": 10,
       "peak_shape_mode": "mixed"
-    },
-    {
-      "num_peaks_min": 2,
-      "num_peaks_max": 6,
-      "amplitude_min": 0.2,
-      "amplitude_max": 1,
-      "rise_width_min": 10,
-      "rise_width_max": 80,
-      "decay_width_min": 20,
-      "decay_width_max": 200,
-      "plateau_width_min": 0,
-      "plateau_width_max": 10,
-      "peak_shape_mode": "mixed"
     }
   ],
   "noise": {

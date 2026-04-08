@@ -825,21 +825,6 @@ class LBEADS_NET_Fast(nn.Module):
         """Soft thresholding (proximal operator for L1)."""
         return torch.sign(x) * torch.clamp(torch.abs(x) - lam, min=0)
     
-    def asymmetric_soft_threshold(self, x, lam, r, beta=10.0):
-        """
-        Smooth asymmetric soft thresholding for BEADS.
-        Uses softplus instead of hard clamp to maintain gradient flow
-        through the dead zone, preventing permanent small-peak loss.
-        """
-        pos_thresh = lam
-        neg_thresh = lam * r
-
-        # softplus(x - thresh) ≈ max(x - thresh, 0) but with non-zero gradient below threshold
-        pos = torch.nn.functional.softplus(x - pos_thresh, beta=beta)
-        neg = -torch.nn.functional.softplus(-x - neg_thresh, beta=beta)
-
-        return pos + neg
-    
     def forward(self, y, return_intermediate=False):
         """
         Forward pass using ISTA-style proximal gradient with asymmetric thresholding.
@@ -876,8 +861,8 @@ class LBEADS_NET_Fast(nn.Module):
         
         for k in range(self.num_layers):
             lam0 = torch.clamp(torch.exp(self.log_lam0[k]), min=1e-3, max=2.0)
-            lam1 = torch.clamp(torch.exp(self.log_lam1[k]), min=1e-4, max=1.0)
-            lam2 = torch.clamp(torch.exp(self.log_lam2[k]), min=1e-4, max=1.0)
+            lam1 = torch.clamp(torch.exp(self.log_lam1[k]), min=1e-4, max=10.0)
+            lam2 = torch.clamp(torch.exp(self.log_lam2[k]), min=1e-4, max=10.0)
             r = torch.clamp(torch.exp(self.log_r[k]), min=2.0, max=12.0)
             step_size = torch.clamp(torch.exp(self.log_step_size[k]), min=0.01, max=0.5)
             
@@ -924,7 +909,11 @@ class LBEADS_NET_Fast(nn.Module):
             # - Positive values (peaks) are thresholded lightly
             # - Negative values are thresholded more heavily (by factor r)
             # This encourages positive sparse peaks!
-            x = self.asymmetric_soft_threshold(x_update, lam0 * step_size, r)
+            pos_thresh = lam0 * step_size
+            neg_thresh = lam0 * step_size * r
+            x = torch.where(x_update > pos_thresh, x_update - pos_thresh,
+                torch.where(x_update < -neg_thresh, x_update + neg_thresh,
+                torch.zeros_like(x_update)))
             
             if return_intermediate:
                 intermediates.append(x.clone())
@@ -954,8 +943,8 @@ class LBEADS_NET_Fast(nn.Module):
         params = {}
         for i in range(self.num_layers):
             params[f"layer_{i}_lam0"] = torch.clamp(torch.exp(self.log_lam0[i]), min=1e-3, max=2.0).item()
-            params[f"layer_{i}_lam1"] = torch.clamp(torch.exp(self.log_lam1[i]), min=1e-4, max=1.0).item()
-            params[f"layer_{i}_lam2"] = torch.clamp(torch.exp(self.log_lam2[i]), min=1e-4, max=1.0).item()
+            params[f"layer_{i}_lam1"] = torch.clamp(torch.exp(self.log_lam1[i]), min=1e-4, max=10.0).item()
+            params[f"layer_{i}_lam2"] = torch.clamp(torch.exp(self.log_lam2[i]), min=1e-4, max=10.0).item()
             params[f"layer_{i}_r"] = torch.clamp(torch.exp(self.log_r[i]), min=2.0, max=12.0).item()
             params[f"layer_{i}_step_size"] = torch.clamp(torch.exp(self.log_step_size[i]), min=0.01, max=0.5).item()
         return params
