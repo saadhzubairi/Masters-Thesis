@@ -54,6 +54,9 @@
     citecolor=blue
 }
 
+% Tables:
+\usepackage{booktabs}
+
 %%
 %% Place here your \newcommand's and \renewcommand's. Some examples already included.
 %%
@@ -61,6 +64,14 @@
 \newcommand{\Mspace}        {{\mathbb M}}
 \newcommand{\Rspace}        {{\mathbb R}}
 \newcommand{\Cspace}        {{\mathbb C}}
+
+% Thesis-specific math commands:
+\newcommand{\yvec}{\mathbf{y}}
+\newcommand{\xvec}{\mathbf{x}}
+\newcommand{\fvec}{\mathbf{f}}
+\newcommand{\wvec}{\mathbf{w}}
+\DeclareMathOperator*{\argmin}{arg\,min}
+\newcommand{\norm}[1]{\left\lVert #1 \right\rVert}
 
 \newcommand{\Mo}        {{\hat M}}
 \newcommand{\Ms}        {{\tilde M}}

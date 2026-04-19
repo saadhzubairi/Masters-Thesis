@@ -1,0 +1,52 @@
+{
+  "id": "cui2025opairpls",
+  "title": "Beyond Traditional airPLS: Improved Baseline Removal in SERS with Parameter-Focused Optimization and Prediction",
+  "authors": ["Cui", "Chen", "Zhao"],
+  "year": 2025,
+  "venue": "Analytical Chemistry",
+  "citations": [
+    {
+      "claim": "Cui et al. developed OP-airPLS, an adaptive grid search algorithm that optimizes airPLS parameters lambda and tau simultaneously (with p fixed at 2), achieving an average percentage improvement of 96 +/- 2% over default-parameter airPLS across 12 spectral shapes.",
+      "use_in_sections": ["related_work"]
+    },
+    {
+      "claim": "Cui et al. developed ML-airPLS, a PCA-Random Forest model that predicts optimal airPLS parameters directly from input spectra in 0.038 seconds per spectrum, a roughly 2100x speedup over iterative grid search optimization.",
+      "use_in_sections": ["related_work", "introduction"]
+    },
+    {
+      "claim": "Cui et al. showed that the three airPLS parameters (lambda, tau, and p) interact in complex ways, and that default parameters produce nonsmooth baselines, large errors in broad peak regions, and difficulties with complex spectral shapes.",
+      "use_in_sections": ["introduction", "background"]
+    },
+    {
+      "claim": "Cui et al. found that optimal airPLS parameters for each spectral shape reside within a well-defined linear region in the log(tau)-log(lambda) parameter space, characterized by the equation log(tau*) = -0.865*log(lambda*) - 8.765.",
+      "use_in_sections": ["related_work"]
+    },
+    {
+      "claim": "The ML-airPLS model of Cui et al. achieved a percentage improvement of 90 +/- 10% after outlier removal, reducing MAE by one order of magnitude compared to default-parameter airPLS, but its performance on real experimental spectra was constrained by noise and spectral shape similarity to training data.",
+      "use_in_sections": ["related_work", "evaluation"]
+    },
+    {
+      "claim": "Cui et al. found that direct application of their ML-airPLS model to experimental spectra without denoising yielded consistently negative PI values, demonstrating that models trained on noise-free synthetic data may fail to generalize to noisy real-world spectra.",
+      "use_in_sections": ["related_work", "evaluation"]
+    },
+    {
+      "claim": "Cui et al. evaluated multiple ML architectures including Random Forest, XGBoost, LSTM, DNN, and CNN for predicting airPLS parameters, finding that PCA-RF with 100 trees outperformed all alternatives.",
+      "use_in_sections": ["related_work"]
+    },
+    {
+      "claim": "Cui et al. used a dataset of 6,000 simulated spectra representing 12 spectral shapes (three peak types: broad, convoluted, distinct; four baseline types: exponential, Gaussian, fifth-order polynomial, sigmoidal) to train and evaluate their parameter prediction model.",
+      "use_in_sections": ["related_work"]
+    },
+    {
+      "claim": "Cui et al. acknowledged that their ML-airPLS approach's applicability is bounded by the spectral conditions represented in the training set, and that expanding synthetic training data to encompass broader baseline and peak shape variations is needed for real-world deployment.",
+      "use_in_sections": ["related_work", "evaluation"]
+    }
+  ],
+  "do_not_claim": [
+    "That OP-airPLS or ML-airPLS uses algorithm unrolling or deep unfolding",
+    "That ML-airPLS is trained end-to-end through the airPLS algorithm",
+    "That ML-airPLS was applied to chromatographic data",
+    "That ML-airPLS replaces the airPLS algorithm -- it only predicts parameters for it",
+    "That ML-airPLS generalizes well to noisy real spectra -- the authors explicitly showed it fails without denoising"
+  ]
+}

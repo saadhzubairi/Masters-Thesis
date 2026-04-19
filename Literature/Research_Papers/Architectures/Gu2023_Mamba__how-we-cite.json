@@ -1,0 +1,51 @@
+{
+  "id": "gu2023mamba",
+  "title": "Mamba: Linear-Time Sequence Modeling with Selective State Spaces",
+  "authors": ["Gu", "Dao"],
+  "year": 2023,
+  "venue": "arXiv:2312.00752 (NeurIPS 2024 submission)",
+  "citations": [
+    {
+      "claim": "Gu and Dao proposed Mamba, a selective state space model that achieves linear-time sequence modeling by making SSM parameters input-dependent, allowing the model to selectively propagate or forget information along the sequence.",
+      "use_in_sections": ["related_work", "introduction"]
+    },
+    {
+      "claim": "Mamba identified that a key weakness of prior structured SSMs is their linear time invariance (LTI), which prevents content-based reasoning, and addressed this by making the B, C, and Delta parameters functions of the input.",
+      "use_in_sections": ["related_work", "background"]
+    },
+    {
+      "claim": "Mamba achieves 5x higher inference throughput than Transformers of similar size and scales linearly in sequence length, while matching or exceeding Transformer performance on language, audio, and genomics tasks.",
+      "use_in_sections": ["related_work"]
+    },
+    {
+      "claim": "Gu and Dao showed that structured state space models can be interpreted as combining recurrent neural networks and convolutional neural networks, computable as either a linear recurrence or a global convolution.",
+      "use_in_sections": ["background", "related_work"]
+    },
+    {
+      "claim": "The Mamba architecture simplifies prior SSM architectures by combining the SSM layer and MLP block into a single homogeneous block with gated linear projections and a selective SSM in the main branch.",
+      "use_in_sections": ["related_work"]
+    },
+    {
+      "claim": "Gu and Dao demonstrated that the discretization step in SSMs, which converts continuous parameters (Delta, A, B) to discrete parameters, has deep connections to RNN gating mechanisms, where Delta controls the balance between focusing on the current input and persisting the hidden state.",
+      "use_in_sections": ["background", "related_work"]
+    },
+    {
+      "claim": "Mamba uses a hardware-aware parallel scan algorithm that loads SSM parameters from GPU HBM to SRAM, performs discretization and recurrence in SRAM, and writes outputs back to HBM, achieving memory efficiency comparable to FlashAttention.",
+      "use_in_sections": ["related_work"]
+    },
+    {
+      "claim": "On audio waveform modeling, Mamba outperformed prior state-of-the-art models including SaShiMi, Hyena, and Transformers, with performance improving on longer contexts up to million-length sequences.",
+      "use_in_sections": ["related_work"]
+    },
+    {
+      "claim": "Gu and Dao framed the fundamental problem of sequence modeling as compressing context into a smaller state, noting that attention is effective but inefficient because it does not compress context, while recurrent models are efficient but limited by the quality of their state compression.",
+      "use_in_sections": ["introduction", "related_work"]
+    }
+  ],
+  "do_not_claim": [
+    "Mamba was applied to signal separation, baseline correction, or chromatographic data",
+    "Mamba uses algorithm unrolling or proximal gradient methods",
+    "Mamba uses attention mechanisms",
+    "Mamba was published in 2024 (the arXiv preprint appeared in December 2023)"
+  ]
+}

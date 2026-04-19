@@ -1,0 +1,47 @@
+{
+  "id": "you2021istanetpp",
+  "title": "ISTA-Net++: Flexible Deep Unfolding Network for Compressive Sensing",
+  "authors": ["You", "Xie", "Zhang"],
+  "year": 2021,
+  "venue": "ICME 2021",
+  "citations": [
+    {
+      "claim": "You et al. proposed ISTA-Net++, a flexible deep unfolding network that handles multiple compressive sensing ratios through a single trained model by incorporating a dynamic unfolding strategy.",
+      "use_in_sections": ["related_work"]
+    },
+    {
+      "claim": "ISTA-Net++ introduces a condition module that takes the CS ratio as input and transmits ratio-dependent step size and noise level parameters to each unfolded stage, enabling multi-ratio flexibility.",
+      "use_in_sections": ["related_work", "methodology"]
+    },
+    {
+      "claim": "ISTA-Net++ uses a dynamic proximal mapping module (DPMM) consisting of residual blocks with convolution layers, replacing the hand-crafted proximal operator with a learned nonlinear mapping.",
+      "use_in_sections": ["related_work"]
+    },
+    {
+      "claim": "ISTA-Net++ introduces a cross-block strategy that processes the whole image rather than individual blocks, alleviating blocking artifacts and improving reconstruction quality by up to 0.64 dB PSNR.",
+      "use_in_sections": ["related_work"]
+    },
+    {
+      "claim": "ISTA-Net++ achieves state-of-the-art compressive sensing reconstruction with a single model containing 0.76M parameters, compared to prior methods that required separate models per CS ratio totaling up to 46.5M parameters.",
+      "use_in_sections": ["related_work"]
+    },
+    {
+      "claim": "You et al. demonstrated that using a balanced training dataset with diverse scenes improves robustness of deep unfolding networks, addressing the scene imbalance problem in the commonly used Train91 dataset.",
+      "use_in_sections": ["related_work"]
+    },
+    {
+      "claim": "ISTA-Net++ unfolds ISTA into K=20 stages, each alternating between a dynamic gradient descent module and a dynamic proximal mapping module corresponding to the gradient and proximal steps of ISTA.",
+      "use_in_sections": ["related_work", "background"]
+    },
+    {
+      "claim": "The condition module in ISTA-Net++ uses three fully connected layers with ReLU and Softplus activations to predict per-stage step sizes and noise levels from the CS ratio input.",
+      "use_in_sections": ["related_work", "methodology"]
+    }
+  ],
+  "do_not_claim": [
+    "ISTA-Net++ provides theoretical convergence guarantees",
+    "ISTA-Net++ was the first to unfold ISTA for compressive sensing",
+    "ISTA-Net++ was applied to baseline correction or chromatography",
+    "ISTA-Net++ learns only scalar parameters per layer"
+  ]
+}

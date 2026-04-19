@@ -1,0 +1,47 @@
+{
+  "id": "yu2024msdcdeqnet",
+  "title": "MsDC-DEQ-Net: Deep Equilibrium Model (DEQ) with Multi-scale Dilated Convolution for Image Compressive Sensing (CS)",
+  "authors": ["Yu", "Dansereau"],
+  "year": 2024,
+  "venue": "IET Signal Processing",
+  "citations": [
+    {
+      "claim": "Yu and Dansereau mapped one step of the ISTA algorithm to a deep network block and used it as a deep equilibrium layer, combining algorithm unrolling insights with the DEQ framework for image compressive sensing.",
+      "use_in_sections": ["related_work", "background"]
+    },
+    {
+      "claim": "MsDC-DEQ-Net uses only one iteration block instead of multiple unrolled iterations, significantly reducing storage requirements compared to deep unrolling methods while achieving competitive reconstruction performance.",
+      "use_in_sections": ["related_work"]
+    },
+    {
+      "claim": "Unlike deep unrolling models that degrade when applied iteratively beyond their trained depth, the DEQ-based model can be iteratively applied with consistent improvement in reconstruction accuracy.",
+      "use_in_sections": ["related_work", "introduction"]
+    },
+    {
+      "claim": "Yu and Dansereau integrated aggregated residual transformations (ResNeXt) and squeeze-and-excitation (SE) mechanisms into an ISTA-based deep equilibrium layer to enhance learning ability and structural diversity.",
+      "use_in_sections": ["related_work"]
+    },
+    {
+      "claim": "Deep unrolling methods typically use 5 to 10 iteration blocks, and while more blocks often improve performance, training such models consumes substantial memory and can lead to out-of-memory issues.",
+      "use_in_sections": ["introduction", "related_work"]
+    },
+    {
+      "claim": "MsDC-DEQ-Net employs multi-scale dilated convolutions with dilation factors ranging from 1 to 7 to expand the receptive field without increasing the number of parameters.",
+      "use_in_sections": ["related_work"]
+    },
+    {
+      "claim": "The ISTA iteration naturally converges to an equilibrium point, aligning with the concept of a deep equilibrium model where the fixed point represents the optimal reconstruction.",
+      "use_in_sections": ["background", "methodology"]
+    },
+    {
+      "claim": "Anderson acceleration was used to find the fixed point of the DEQ model, with 50 iterations at test time to ensure convergence.",
+      "use_in_sections": ["related_work"]
+    }
+  ],
+  "do_not_claim": [
+    "MsDC-DEQ-Net was applied to baseline correction or chromatographic signals",
+    "MsDC-DEQ-Net learns per-signal parameters (it learns shared network parameters)",
+    "MsDC-DEQ-Net uses BEADS or any baseline estimation algorithm",
+    "MsDC-DEQ-Net is a pure deep unrolling method (it is a deep equilibrium model inspired by unrolling)"
+  ]
+}

@@ -1,9 +1,163 @@
+% ============================================================
+% Chapter 1: Introduction — Bibliography
+% ============================================================
 
-@inproceedings{pezent2017design,
-  title={Design and characterization of the OpenWrist: A robotic wrist exoskeleton for coordinated hand-wrist rehabilitation},
-  author={Pezent, Evan and Rose, Chad and Deshpande, Ashish and O'Malley, Marcia},
-  booktitle={IEEE International Conference on Rehabilitation Robotics (ICORR)},
-  year={2017},
-  pages={720--725},
-  doi={10.1109/ICORR.2017.8009333}
+% --- Analytical chemistry background ---
+
+@book{skoog2017fundamentals,
+  author    = {Skoog, Douglas A. and West, Donald M. and Holler, F. James and Crouch, Stanley R.},
+  title     = {Fundamentals of Analytical Chemistry},
+  edition   = {9th},
+  publisher = {Cengage Learning},
+  year      = {2014}
+}
+
+% --- Classical baseline correction methods ---
+
+@article{ning2014beads,
+  author  = {Ning, Xiaoran and Selesnick, Ivan W. and Duval, Laurent},
+  title   = {Chromatogram baseline estimation and denoising using sparsity ({BEADS})},
+  journal = {Chemometrics and Intelligent Laboratory Systems},
+  volume  = {139},
+  pages   = {156--167},
+  year    = {2014},
+  doi     = {10.1016/j.chemolab.2014.09.014}
+}
+
+@techreport{eilers2005baseline,
+  author      = {Eilers, Paul H. C. and Boelens, Hans F. M.},
+  title       = {Baseline Correction with Asymmetric Least Squares Smoothing},
+  institution = {Leiden University Medical Centre},
+  year        = {2005}
+}
+
+@article{baek2015arpls,
+  author  = {Baek, Sung-June and Park, Aaron and Ahn, Young-Jin and Choo, Jaebum},
+  title   = {Baseline correction using asymmetrically reweighted penalized least squares smoothing},
+  journal = {Analyst},
+  volume  = {140},
+  number  = {1},
+  pages   = {250--257},
+  year    = {2015},
+  doi     = {10.1039/C4AN01061B}
+}
+
+@article{zhang2010airpls,
+  author  = {Zhang, Zhi-Min and Chen, Shan and Liang, Yi-Zeng},
+  title   = {Baseline correction using adaptive iteratively reweighted penalized least squares},
+  journal = {Analyst},
+  volume  = {135},
+  number  = {5},
+  pages   = {1138--1146},
+  year    = {2010},
+  doi     = {10.1039/B922045C}
+}
+
+@article{morhac2008snip,
+  author  = {Morh\'{a}\v{c}, Miroslav and Matou\v{s}ek, Vladislav},
+  title   = {Peak Clipping Algorithms for Background Estimation in Spectroscopic Data},
+  journal = {Applied Spectroscopy},
+  volume  = {62},
+  number  = {1},
+  pages   = {91--106},
+  year    = {2008},
+  doi     = {10.1366/000370208783412762}
+}
+
+% --- Algorithm unrolling ---
+
+@inproceedings{gregor2010lista,
+  author    = {Gregor, Karol and LeCun, Yann},
+  title     = {Learning Fast Approximations of Sparse Coding},
+  booktitle = {Proceedings of the 27th International Conference on Machine Learning (ICML)},
+  pages     = {399--406},
+  year      = {2010}
+}
+
+@article{monga2021unrolling,
+  author  = {Monga, Vishal and Li, Yuelong and Eldar, Yonina C.},
+  title   = {Algorithm Unrolling: Interpretable, Efficient Deep Learning for Signal and Image Processing},
+  journal = {IEEE Signal Processing Magazine},
+  volume  = {38},
+  number  = {2},
+  pages   = {18--44},
+  year    = {2021},
+  doi     = {10.1109/MSP.2020.3016905}
+}
+
+@inproceedings{zhang2018istanet,
+  author    = {Zhang, Jian and Ghanem, Bernard},
+  title     = {{ISTA-Net}: Interpretable Optimization-Inspired Deep Network for Image Compressive Sensing},
+  booktitle = {Proceedings of the IEEE Conference on Computer Vision and Pattern Recognition (CVPR)},
+  pages     = {1828--1837},
+  year      = {2018}
+}
+
+@article{yang2018admm,
+  author  = {Yang, Yan and Sun, Jian and Li, Huibin and Xu, Zongben},
+  title   = {{ADMM-CSNet}: A Deep Learning Approach for Image Compressive Sensing},
+  journal = {IEEE Transactions on Pattern Analysis and Machine Intelligence},
+  volume  = {42},
+  number  = {3},
+  pages   = {521--538},
+  year    = {2020},
+  doi     = {10.1109/TPAMI.2018.2883941}
+}
+
+% --- Neural baseline correction ---
+
+@article{kensert2021deep,
+  author  = {Kensert, Alexander and Collaerts, Gabriel and Efthymiadis, Kyriakos and Bos, Tina S. and Bruun Andersen, Casper and Degerman, Marianne and Str\"{o}m, Patrik},
+  title   = {Deep convolutional autoencoder for the simultaneous removal of baseline noise and baseline drift in chromatographic data},
+  journal = {Journal of Chromatography A},
+  volume  = {1646},
+  pages   = {462093},
+  year    = {2021},
+  doi     = {10.1016/j.chroma.2021.462093}
+}
+
+@article{chen2022resnet,
+  author  = {Chen, Ting and Luo, Zhe and He, Jia-Nan and Xu, Jun-Gang},
+  title   = {Automatic baseline correction of Raman spectra using a deep residual network combined with {U-Net}},
+  journal = {Analyst},
+  volume  = {147},
+  number  = {18},
+  pages   = {4126--4134},
+  year    = {2022},
+  doi     = {10.1039/D2AN00868H}
+}
+
+@article{zhao20251dtrans,
+  author  = {Zhao, Jiangang and Lu, Yao and Guo, Siwei and He, Jiacheng and Liu, Yanqin and Song, Guohua},
+  title   = {1dTrans: An Efficient Baseline Correction Method for Raman Spectra Based on the {Transformer} Architecture},
+  journal = {Spectrochimica Acta Part A: Molecular and Biomolecular Spectroscopy},
+  year    = {2025},
+  doi     = {10.1016/j.saa.2024.125368}
+}
+
+@article{hu2024rspssl,
+  author  = {Hu, Yufei and Fan, Biyun and Liu, Yutao and He, Guojin and Yin, Ruqin and Li, Jinming and Du, Jianguo},
+  title   = {{RSPSSL}: A Raman spectral pre-processing method based on self-supervised learning},
+  journal = {Light: Science \& Applications},
+  volume  = {13},
+  pages   = {248},
+  year    = {2024},
+  doi     = {10.1038/s41377-024-01609-z}
+}
+
+% --- Unrolled networks for analytical chemistry ---
+
+@inproceedings{gharbi2024unrolled,
+  author    = {Gharbi, Hichem and Chouzenoux, Emilie and Pesquet, Jean-Christophe},
+  title     = {Unrolled Deep Networks for Sparse Signal Restoration in Analytical Chemistry},
+  booktitle = {IEEE International Workshop on Machine Learning for Signal Processing (MLSP)},
+  year      = {2024}
+}
+
+@article{diras2025,
+  author  = {Ding, Xin and Kang, Jiale and Li, Guangqin and Wu, Maogang and Zhou, Zhan},
+  title   = {Adaptive Physics-Aware {Raman} Baseline Correction with Machine Learning Predicted Parameters},
+  journal = {Analytical Chemistry},
+  year    = {2025},
+  doi     = {10.1021/acs.analchem.4c06296}
 }

@@ -1,0 +1,47 @@
+{
+  "id": "vandeoord2016wavenet",
+  "title": "WaveNet: A Generative Model for Raw Audio",
+  "authors": ["van den Oord", "Dieleman", "Zen", "Simonyan", "Vinyals", "Graves", "Kalchbrenner", "Senior", "Kavukcuoglu"],
+  "year": 2016,
+  "venue": "arXiv:1609.03499 (presented at SSW 2016)",
+  "citations": [
+    {
+      "claim": "Van den Oord et al. introduced WaveNet, a deep autoregressive neural network that generates raw audio waveforms using stacks of dilated causal convolutions, achieving state-of-the-art text-to-speech naturalness.",
+      "use_in_sections": ["related_work", "introduction"]
+    },
+    {
+      "claim": "WaveNet uses dilated causal convolutions with exponentially increasing dilation factors (1, 2, 4, ..., 512), enabling exponential receptive field growth with depth while preserving the input resolution and computational efficiency.",
+      "use_in_sections": ["related_work", "background"]
+    },
+    {
+      "claim": "Van den Oord et al. employed gated activation units of the form z = tanh(W_f * x) . sigma(W_g * x), which significantly outperformed rectified linear activations for modeling audio signals.",
+      "use_in_sections": ["related_work", "background"]
+    },
+    {
+      "claim": "WaveNet uses residual and skip connections throughout the network to speed up convergence and enable training of much deeper models.",
+      "use_in_sections": ["related_work"]
+    },
+    {
+      "claim": "WaveNet supports both global conditioning (e.g., speaker identity) and local conditioning (e.g., linguistic features) to guide audio generation, demonstrating that a single model can capture characteristics of over 100 speakers.",
+      "use_in_sections": ["related_work"]
+    },
+    {
+      "claim": "Van den Oord et al. showed that modeling audio sample distributions with a categorical softmax over mu-law quantized values works better than mixture density networks, because categorical distributions make no assumptions about distribution shape.",
+      "use_in_sections": ["related_work"]
+    },
+    {
+      "claim": "WaveNet reduced the gap in mean opinion score between the best synthetic speech and natural speech by more than 50% compared to prior parametric and concatenative systems.",
+      "use_in_sections": ["related_work"]
+    },
+    {
+      "claim": "The WaveNet architecture processes 1D sequences using stacks of dilated convolutions and has been widely adopted as a backbone for various audio and signal processing tasks beyond its original text-to-speech application.",
+      "use_in_sections": ["introduction", "related_work"]
+    }
+  ],
+  "do_not_claim": [
+    "WaveNet was designed for or applied to signal separation or baseline correction",
+    "WaveNet uses algorithm unrolling or learned iterative optimization",
+    "WaveNet is a non-autoregressive model",
+    "WaveNet was applied to chromatographic data"
+  ]
+}

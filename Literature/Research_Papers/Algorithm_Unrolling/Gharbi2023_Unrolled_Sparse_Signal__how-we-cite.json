@@ -1,0 +1,52 @@
+{
+  "id": "gharbi2023unrolled_sparse",
+  "title": "Unrolled deep networks for sparse signal restoration",
+  "authors": ["Gharbi", "Villa", "Chouzenoux", "Pesquet"],
+  "year": 2023,
+  "venue": "HAL Preprint (hal-03988686v2)",
+  "citations": [
+    {
+      "claim": "Gharbi et al. presented a comprehensive comparative study of three deep unrolled architectures -- unrolled primal-dual, unrolled ISTA, and unrolled half-quadratic -- for sparse signal reconstruction, applied to mass spectrometry data.",
+      "use_in_sections": ["related_work", "introduction"]
+    },
+    {
+      "claim": "Gharbi et al. demonstrated that all three unrolled architectures outperform their iterative optimization counterparts in average restoration quality (MSE) on mass spectrometry signal recovery tasks.",
+      "use_in_sections": ["related_work"]
+    },
+    {
+      "claim": "Gharbi et al. reported that the best-performing iterative method (HQ) did not necessarily yield the best unrolled architecture, confirming findings from image processing that the relationship between iterative and unrolled performance is not straightforward.",
+      "use_in_sections": ["related_work"]
+    },
+    {
+      "claim": "The unrolled primal-dual architecture of Gharbi et al. is, to the authors' knowledge, the first instance of unrolling an implicit regularization formulation based on an L1-constrained problem.",
+      "use_in_sections": ["related_work"]
+    },
+    {
+      "claim": "In the unrolled half-quadratic method of Gharbi et al., the Fair potential is used as a smooth approximation of the L1 norm, controlled by a smoothing hyperparameter delta that is learned per layer.",
+      "use_in_sections": ["related_work", "methodology"]
+    },
+    {
+      "claim": "Gharbi et al. found that unrolled ISTA achieved the lowest MSE and highest TSNR among the three unrolled methods on mass spectrometry data, while also being the fastest at inference (0.008 seconds).",
+      "use_in_sections": ["related_work", "evaluation"]
+    },
+    {
+      "claim": "Gharbi et al. observed that the unrolled half-quadratic method tends to underestimate peak intensities, as reflected in lower truncated signal-to-noise ratio scores despite competitive MSE.",
+      "use_in_sections": ["related_work", "evaluation"]
+    },
+    {
+      "claim": "Deep unrolling provides three key benefits over iterative optimization: interpretability that contrasts with black-box models, computation speed from deep learning frameworks, and efficiency through supervised task-oriented tuning of algorithm hyperparameters.",
+      "use_in_sections": ["introduction", "related_work", "background"]
+    },
+    {
+      "claim": "Gharbi et al. used 8 to 22 layers across their unrolled architectures, with the number of layers chosen to minimize validation loss while maintaining reasonable training time.",
+      "use_in_sections": ["related_work", "methodology"]
+    }
+  ],
+  "do_not_claim": [
+    "This paper addresses baseline correction or baseline estimation (it addresses sparse spike deconvolution only)",
+    "This paper unrolls the BEADS algorithm",
+    "This paper was published at a peer-reviewed conference (it is a preprint on HAL)",
+    "This paper uses asymmetric penalties for chromatogram peak positivity",
+    "This paper includes Laurent Duval as an author (the 2023 preprint lists only Gharbi, Villa, Chouzenoux, and Pesquet)"
+  ]
+}

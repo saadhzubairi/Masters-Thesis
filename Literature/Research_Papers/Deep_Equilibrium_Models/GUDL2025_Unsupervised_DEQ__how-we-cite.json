@@ -1,0 +1,47 @@
+{
+  "id": "tian2025gudl",
+  "title": "Unsupervised Deep Equilibrium Model Learning for Large-Scale Channel Estimation with Performance Guarantees",
+  "authors": ["Tian", "Lian"],
+  "year": 2025,
+  "venue": "arXiv preprint (presented in part at IEEE GLOBECOM 2024)",
+  "citations": [
+    {
+      "claim": "Tian and Lian proposed an unsupervised DEQ learning framework (GUDL) for large-scale channel estimation that does not require ground-truth labels, using Generalized Stein's Unbiased Risk Estimate (GSURE) as the loss function.",
+      "use_in_sections": ["related_work"]
+    },
+    {
+      "claim": "Deep unrolling suffers from numerical instability in training and high storage costs, making it difficult to increase the number of unrolled iterations sufficiently, which limits performance.",
+      "use_in_sections": ["introduction", "related_work"]
+    },
+    {
+      "claim": "DEQ directly learns the fixed point of a nonlinear mapping with constant memory, and backpropagation can be conducted at the fixed point through implicit differentiation, requiring only constant memory.",
+      "use_in_sections": ["background", "related_work"]
+    },
+    {
+      "claim": "Tian and Lian proved that DEQ with a contraction mapping inherently enforces a compressible (sparse) output structure, and that this property combined with GSURE-based PMSE minimization provides theoretical performance guarantees approaching oracle-level supervised accuracy.",
+      "use_in_sections": ["related_work"]
+    },
+    {
+      "claim": "The DEQ model structure was derived from a proximal gradient descent algorithm, where the proximal operator is replaced by a neural network to learn the optimal denoising function directly from data.",
+      "use_in_sections": ["background", "methodology", "related_work"]
+    },
+    {
+      "claim": "Convergence of DEQ is guaranteed by designing the mapping function as a contraction mapping with Lipschitz constant L in (0,1), ensuring linear convergence to a unique fixed point for any initialization.",
+      "use_in_sections": ["background", "related_work"]
+    },
+    {
+      "claim": "An inexact gradient estimate can be used for DEQ backpropagation, where the matrix inversion in the Jacobian vanishes, and this approximation is proven to be a descent direction of the loss under mild conditions.",
+      "use_in_sections": ["background"]
+    },
+    {
+      "claim": "Supervised channel learning methods based on deep unrolling and DEQ allow convergence analysis by establishing a correspondence with underlying iterative algorithms.",
+      "use_in_sections": ["related_work"]
+    }
+  ],
+  "do_not_claim": [
+    "GUDL was applied to baseline correction, chromatography, or spectroscopy",
+    "GUDL uses algorithm unrolling (it uses DEQ as an alternative to unrolling)",
+    "GUDL works with 1D signals like chromatograms (it addresses large-scale MIMO channel estimation)",
+    "GUDL demonstrates that unsupervised learning always matches supervised performance (it provides theoretical bounds on the gap)"
+  ]
+}

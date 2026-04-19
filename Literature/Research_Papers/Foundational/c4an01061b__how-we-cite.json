@@ -1,0 +1,42 @@
+{
+  "id": "baek2015arpls",
+  "title": "Baseline correction using asymmetrically reweighted penalized least squares smoothing",
+  "authors": ["Baek", "Park", "Ahn", "Choo"],
+  "year": 2015,
+  "venue": "Analyst",
+  "citations": [
+    {
+      "claim": "Baek et al. proposed the arPLS (asymmetrically reweighted penalized least squares) method, which uses a generalized logistic function to assign weights that give similar importance to signals slightly above and below the estimated baseline, thereby avoiding the baseline underestimation problem of earlier methods.",
+      "use_in_sections": ["related_work", "background"]
+    },
+    {
+      "claim": "Baek et al. showed that AsLS and airPLS methods systematically underestimate the baseline in non-peak regions because they assign zero or near-zero weight to all signals above the fitted baseline, causing downward bias and peak height overestimation.",
+      "use_in_sections": ["related_work", "introduction"]
+    },
+    {
+      "claim": "The arPLS weighting scheme uses the mean and standard deviation of negative residuals (signals below the current baseline estimate) to parameterize a generalized logistic function that smoothly transitions weights from one (baseline region) to zero (peak region).",
+      "use_in_sections": ["related_work", "background"]
+    },
+    {
+      "claim": "Baek et al. demonstrated that arPLS achieved approximately half the RMSE of AsLS and airPLS on simulated spectra with known ground-truth baselines, for both low-noise and high-noise conditions.",
+      "use_in_sections": ["related_work", "evaluation"]
+    },
+    {
+      "claim": "Baek et al. showed that arPLS is relatively robust to the choice of the smoothness parameter lambda, maintaining low RMSE over a range spanning more than two orders of magnitude.",
+      "use_in_sections": ["related_work"]
+    },
+    {
+      "claim": "The arPLS method, like AsLS and airPLS, still requires manual selection of the smoothness parameter lambda, which must be tuned per application.",
+      "use_in_sections": ["introduction", "related_work"]
+    },
+    {
+      "claim": "Baek et al. formulated baseline correction as the weighted penalized least squares problem z = (W + lambda*D'D)^{-1} Wy, iteratively updating the weight matrix W until convergence.",
+      "use_in_sections": ["background"]
+    }
+  ],
+  "do_not_claim": [
+    "Baek et al. proposed the penalized least squares framework for baseline correction (this was proposed by Eilers and Boelens in 2005)",
+    "arPLS eliminates all user-specified parameters (it still requires the smoothness parameter lambda)",
+    "arPLS was designed for chromatographic baseline correction specifically (it was developed for and tested on Raman spectra)"
+  ]
+}

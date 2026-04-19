@@ -1,0 +1,43 @@
+{
+  "id": "naish1988emg",
+  "title": "Exponentially Modified Gaussian Functions -- a Good Model for Chromatographic Peaks in Isocratic HPLC?",
+  "authors": ["Naish", "Hartwell"],
+  "year": 1988,
+  "venue": "Chromatographia",
+  "citations": [
+    {
+      "claim": "Naish and Hartwell validated the EMG function as a good model for isocratic HPLC peaks by least-squares fitting the full EMG expression to over 100 experimental peaks spanning asymmetry ratios (B/A) from 1.03 to 1.25.",
+      "use_in_sections": ["background", "methodology"]
+    },
+    {
+      "claim": "Least-squares fitting of EMG functions to experimental LC peaks showed close agreement across the full peak profile, whereas fitted Gaussian functions produced large errors particularly in the tail region, even for peaks with low skew.",
+      "use_in_sections": ["background"]
+    },
+    {
+      "claim": "The EMG model is not a perfect model for chromatographic peaks; small but significant mismatches were observed particularly at the top of early eluting peaks and near the start and tail of some peaks.",
+      "use_in_sections": ["background"]
+    },
+    {
+      "claim": "The exponential time constant tau in the EMG model was found to increase with retention time, suggesting that tau contains a residual component of column dispersion and is not purely attributable to extra-column effects.",
+      "use_in_sections": ["background"]
+    },
+    {
+      "claim": "The EMG fitting procedure achieved reproducibility with relative standard deviations below 0.4% for sigma and below 1.5% for tau across replicate chromatographic runs.",
+      "use_in_sections": ["background"]
+    },
+    {
+      "claim": "Naish and Hartwell demonstrated that the sigma and tau parameters of EMG-fitted peaks respond differently to changes in temperature, flow rate, and eluent composition, reflecting distinct underlying physical mechanisms for symmetric and asymmetric peak broadening.",
+      "use_in_sections": ["background"]
+    },
+    {
+      "claim": "The simplified EMG approximation methods of Barber and Carr, which estimate sigma and tau from peak half-width measurements, agreed well with full EMG fits for peaks with asymmetry ratios above 1.06 but diverged substantially for nearly symmetric peaks.",
+      "use_in_sections": ["background"]
+    }
+  ],
+  "do_not_claim": [
+    "Naish and Hartwell invented the EMG model",
+    "The paper addresses baseline correction or baseline estimation",
+    "The paper proposes any machine learning or automated method",
+    "The paper deals with gradient elution or non-isocratic chromatography"
+  ]
+}

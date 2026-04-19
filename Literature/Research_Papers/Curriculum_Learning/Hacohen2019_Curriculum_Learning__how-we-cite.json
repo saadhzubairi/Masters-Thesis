@@ -1,0 +1,46 @@
+{
+  "id": "hacohen2019curriculum",
+  "title": "On The Power of Curriculum Learning in Training Deep Networks",
+  "authors": ["Hacohen", "Weinshall"],
+  "year": 2019,
+  "venue": "ICML 2019",
+  "citations": [
+    {
+      "claim": "Hacohen and Weinshall decomposed curriculum learning into two components: a scoring function that ranks training examples by difficulty, and a pacing function that controls the rate at which harder examples are introduced during training.",
+      "use_in_sections": ["background", "methodology"]
+    },
+    {
+      "claim": "Hacohen and Weinshall demonstrated that curriculum learning, which presents easier examples before harder ones, accelerates convergence and improves final test accuracy across multiple CNN architectures and datasets including CIFAR-10, CIFAR-100, and ImageNet subsets.",
+      "use_in_sections": ["introduction", "related_work"]
+    },
+    {
+      "claim": "Hacohen and Weinshall showed that exponential pacing functions, which exponentially increase the proportion of training data available over time, are effective schedules for curriculum learning in deep networks.",
+      "use_in_sections": ["methodology", "background"]
+    },
+    {
+      "claim": "Hacohen and Weinshall provided theoretical analysis showing that curriculum learning modifies the optimization landscape to be steeper in the direction of the global optimum while preserving the location of that optimum under mild conditions.",
+      "use_in_sections": ["background", "methodology"]
+    },
+    {
+      "claim": "Hacohen and Weinshall demonstrated that a simple single-step pacing function, which trains initially on only the easiest fraction of examples before switching to the full dataset, achieves competitive performance with more complex exponential pacing schedules.",
+      "use_in_sections": ["methodology"]
+    },
+    {
+      "claim": "Hacohen and Weinshall showed that scoring functions based on transfer learning from a pretrained teacher network and self-taught bootstrapping both yield effective curricula, with the self-taught approach requiring no additional external resources.",
+      "use_in_sections": ["related_work", "background"]
+    },
+    {
+      "claim": "Hacohen and Weinshall observed that the beneficial effect of curriculum learning is more pronounced when the learning task is more difficult.",
+      "use_in_sections": ["methodology", "evaluation"]
+    },
+    {
+      "claim": "Hacohen and Weinshall distinguished curriculum learning, which scores examples by difficulty relative to a target hypothesis, from self-paced learning, which scores by difficulty relative to the current hypothesis, showing the former improves generalization while the latter can delay learning.",
+      "use_in_sections": ["background", "related_work"]
+    }
+  ],
+  "do_not_claim": [
+    "This paper does not propose or discuss algorithm unrolling or deep unfolding",
+    "This paper does not address spectral or signal processing tasks",
+    "This paper does not claim curriculum learning always outperforms standard training regardless of hyperparameter tuning"
+  ]
+}

@@ -1,0 +1,67 @@
+{
+  "id": "yang2016admmnet",
+  "title": "ADMM-Net: A Deep Learning Approach for Compressive Sensing MRI",
+  "authors": ["Yang", "Sun", "Li", "Xu"],
+  "year": 2016,
+  "venue": "NeurIPS 2016 (conference); extended journal version arXiv 2017",
+  "citations": [
+    {
+      "claim": "Yang et al. proposed ADMM-Net, a deep architecture derived from unrolling the Alternating Direction Method of Multipliers (ADMM) algorithm for compressive sensing MRI reconstruction.",
+      "use_in_sections": ["introduction", "background", "related_work"]
+    },
+    {
+      "claim": "ADMM-Net maps each iteration of the ADMM algorithm to a stage in a data flow graph, with three types of operations per stage: reconstruction, denoising (shrinkage), and multiplier update.",
+      "use_in_sections": ["background", "related_work"]
+    },
+    {
+      "claim": "In ADMM-Net, all parameters including image transforms, shrinkage functions, penalty parameters, and update rates are discriminatively trained end-to-end from data using L-BFGS optimization and back-propagation.",
+      "use_in_sections": ["background", "methodology", "related_work"]
+    },
+    {
+      "claim": "ADMM-Net replaces the hand-crafted shrinkage function (e.g., soft or hard thresholding) with a learnable piecewise linear function parameterized by a set of control points, enabling the network to learn more general nonlinear transforms from data.",
+      "use_in_sections": ["background", "methodology", "related_work"]
+    },
+    {
+      "claim": "Yang et al. proposed two variants: Basic-ADMM-Net, which introduces auxiliary variables in the transform domain, and Generic-ADMM-Net, which introduces the auxiliary variable in the image domain and uses gradient-descent sub-iterations within each stage.",
+      "use_in_sections": ["background", "related_work"]
+    },
+    {
+      "claim": "ADMM-Net does not constrain the convolution filters in the reconstruction layer and the convolution layer to be identical, thereby increasing the network capacity beyond the original ADMM algorithm.",
+      "use_in_sections": ["methodology", "related_work"]
+    },
+    {
+      "claim": "ADMM-Net parameters can be initialized from a model-based CS-MRI baseline (e.g., DCT basis with l1 regularization and soft thresholding), making the initialized network an exact realization of the ADMM optimization process.",
+      "use_in_sections": ["methodology", "related_work"]
+    },
+    {
+      "claim": "ADMM-Net achieved state-of-the-art MR image reconstruction accuracy while being approximately 10 to 13 times faster than competing iterative methods such as BM3D-MRI and PANO.",
+      "use_in_sections": ["related_work", "evaluation"]
+    },
+    {
+      "claim": "Yang et al. demonstrated that adding more stages (corresponding to more ADMM iterations) is more effective than adding more sub-iterations within each stage for improving reconstruction quality in ADMM-Net.",
+      "use_in_sections": ["methodology", "related_work"]
+    },
+    {
+      "claim": "ADMM-Net is an early and influential example of algorithm unrolling, where a classical iterative optimization algorithm is mapped to a deep network whose parameters are learned from data rather than hand-tuned.",
+      "use_in_sections": ["introduction", "background", "related_work"]
+    },
+    {
+      "claim": "The ADMM-Net framework naturally combines the merits of model-based approaches, which incorporate domain knowledge via the optimization structure, with deep learning approaches that learn parameters from data.",
+      "use_in_sections": ["introduction", "background", "methodology"]
+    },
+    {
+      "claim": "Yang et al. formulated the general CS-MRI reconstruction as minimizing a data fidelity term plus multiple regularization terms in transform domains, solved via ADMM by splitting into reconstruction, shrinkage, and multiplier update subproblems.",
+      "use_in_sections": ["background"]
+    },
+    {
+      "claim": "ADMM-Net demonstrated that a learned network trained from brain MR data generalized competitively to chest MR data, suggesting that learned local transforms and nonlinear functions transfer across imaging domains.",
+      "use_in_sections": ["evaluation", "related_work"]
+    }
+  ],
+  "do_not_claim": [
+    "ADMM-Net was applied to chromatogram baseline correction or 1-D signal processing",
+    "ADMM-Net uses ISTA or proximal gradient descent as its base algorithm",
+    "ADMM-Net was the first algorithm unrolling paper (LISTA by Gregor and LeCun 2010 preceded it)",
+    "ADMM-Net uses ReLU activations (it uses learned piecewise linear functions)"
+  ]
+}

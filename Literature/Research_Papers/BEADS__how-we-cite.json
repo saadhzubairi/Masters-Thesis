@@ -1,0 +1,72 @@
+{
+  "id": "ning2014beads",
+  "title": "Chromatogram baseline estimation and denoising using sparsity (BEADS)",
+  "authors": ["Ning", "Selesnick", "Duval"],
+  "year": 2014,
+  "venue": "Chemometrics and Intelligent Laboratory Systems",
+  "citations": [
+    {
+      "claim": "Ning et al. proposed BEADS, a convex optimization approach that jointly estimates the chromatogram baseline and denoises the signal by modeling peaks as sparse-derivative signals and the baseline as a low-pass signal.",
+      "use_in_sections": ["introduction", "background", "methodology"]
+    },
+    {
+      "claim": "BEADS decomposes the observed chromatogram as y = x + f + w, where x represents sparse-derivative peaks, f is a low-pass baseline, and w is additive white Gaussian noise.",
+      "use_in_sections": ["background", "methodology"]
+    },
+    {
+      "claim": "BEADS formulates baseline correction as a convex optimization problem whose unique solution is obtained via a majorization-minimization (MM) iterative algorithm guaranteed to converge regardless of initialization.",
+      "use_in_sections": ["background", "methodology"]
+    },
+    {
+      "claim": "The BEADS cost function penalizes the signal and its first M derivatives using compound sparse regularization terms weighted by parameters lambda_i for i = 0, ..., M.",
+      "use_in_sections": ["background", "methodology"]
+    },
+    {
+      "claim": "BEADS uses an asymmetric penalty function to enforce the positivity of chromatogram peaks, penalizing negative values of the signal more heavily than positive values via a parameter r.",
+      "use_in_sections": ["background", "methodology"]
+    },
+    {
+      "claim": "The BEADS high-pass filter H is constructed as H = B * A^{-1}, where A and B are banded convolution (Toeplitz) matrices parameterized by the filter order 2d and cutoff frequency f_c.",
+      "use_in_sections": ["background", "methodology"]
+    },
+    {
+      "claim": "BEADS leverages the banded structure of its matrices to achieve computational efficiency and low memory usage, enabling application to long data series with run-time under 1 second for signals of length 10,000.",
+      "use_in_sections": ["background"]
+    },
+    {
+      "claim": "BEADS uses smoothed differentiable penalty functions (phi_B or phi_C) to avoid divide-by-zero numerical errors that arise with the non-differentiable absolute value penalty.",
+      "use_in_sections": ["background", "methodology"]
+    },
+    {
+      "claim": "Ning et al. demonstrated that BEADS outperforms airPLS and backcor in baseline estimation accuracy on both simulated chromatograms with Gaussian and Poisson noise, achieving higher output SNR across all tested conditions.",
+      "use_in_sections": ["introduction", "evaluation", "related_work"]
+    },
+    {
+      "claim": "BEADS requires user-specified parameters including the asymmetry ratio r, the low-pass filter cutoff frequency f_c, and regularization weights lambda_i, which must be tuned per signal for optimal performance.",
+      "use_in_sections": ["introduction", "methodology", "evaluation"]
+    },
+    {
+      "claim": "BEADS models the baseline as a low-pass signal rather than a parametric function such as a polynomial, providing a more generic representation that avoids the limitations of polynomial fitting over long ranges.",
+      "use_in_sections": ["introduction", "background"]
+    },
+    {
+      "claim": "The BEADS algorithm typically converges in approximately 20 iterations, as indicated by the cost function history.",
+      "use_in_sections": ["background", "methodology"]
+    },
+    {
+      "claim": "BEADS can jointly perform baseline correction and noise reduction, since both baseline drift and noise are present in measured chromatographic data.",
+      "use_in_sections": ["introduction", "background"]
+    },
+    {
+      "claim": "Ning et al. noted that the regularization parameters lambda_i should be chosen inversely proportional to the L1 norm of the i-th derivative of the signal, and a proportionality constant alpha should be tuned according to the noise variance.",
+      "use_in_sections": ["methodology", "evaluation"]
+    }
+  ],
+  "do_not_claim": [
+    "BEADS uses deep learning or neural networks",
+    "BEADS learns its parameters from data",
+    "BEADS uses non-convex penalties (the paper explicitly states it uses convex penalties)",
+    "BEADS was designed for or tested on mass spectrometry data",
+    "BEADS automatically selects its hyperparameters without user intervention"
+  ]
+}

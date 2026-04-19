@@ -1,0 +1,47 @@
+{
+  "id": "hu2024rspssl",
+  "title": "RSPSSL: A novel high-fidelity Raman spectral preprocessing scheme to enhance biomedical applications and chemical resolution visualization",
+  "authors": ["Hu", "Chen", "Xue", "Liang", "Xiang", "Zhang", "Chi", "Liu", "Ye", "Cui", "Zhang", "Yu", "Dang", "Zhang", "Chen", "Tang", "Guo", "Ho", "Li", "Cong", "Shum"],
+  "year": 2024,
+  "venue": "Light: Science & Applications",
+  "citations": [
+    {
+      "claim": "Hu et al. proposed RSPSSL, a self-supervised learning scheme for Raman spectral preprocessing that performs both denoising and baseline correction without requiring experimentally obtained ideal reference spectra.",
+      "use_in_sections": ["related_work", "introduction"]
+    },
+    {
+      "claim": "Hu et al. noted that the performance of supervised deep learning approaches for spectral preprocessing is limited by the impossibility of experimentally obtaining ideal noise-free and baseline-free reference spectra, forcing reliance on mathematically simulated training data.",
+      "use_in_sections": ["introduction", "related_work"]
+    },
+    {
+      "claim": "Hu et al. used a GAN-based auxiliary task (RSGAN) to generate high-fidelity and diverse synthetic training spectra from a small set of real Raman spectra, addressing the domain gap between simulated and real data.",
+      "use_in_sections": ["related_work"]
+    },
+    {
+      "claim": "Hu et al. designed the RSBPCNN model with a dual-pipeline architecture: a Raman-Patches submodule for local feature extraction via sliding windows, and a Background-Estimation submodule for preliminary baseline fitting, merged through a U-shaped Downsampling-Upsampling block.",
+      "use_in_sections": ["related_work"]
+    },
+    {
+      "claim": "Hu et al. demonstrated that their RSPSSL scheme achieved an 88% reduction in RMSE and a 60% reduction in L-infinity norm compared to established preprocessing techniques on experimental Raman data.",
+      "use_in_sections": ["related_work", "evaluation"]
+    },
+    {
+      "claim": "Hu et al. identified that classical spectral preprocessing methods such as polynomial fitting, iterative morphological operations, and penalized least squares require manual parameter selection, making them unsuitable for high-throughput and cross-device applications.",
+      "use_in_sections": ["introduction", "related_work"]
+    },
+    {
+      "claim": "Hu et al. demonstrated that their trained RSPSSL model generalizes across different Raman spectroscopy devices, laboratories, excitation wavelengths, and sample types without requiring retraining.",
+      "use_in_sections": ["related_work", "introduction"]
+    },
+    {
+      "claim": "Hu et al. modeled Raman spectra as consisting of three components: Raman peaks (signal), slowly fluctuating background/baseline signals from fluorescence and residual Rayleigh scattering, and noise from cosmic rays, ambient light, and detector dark current.",
+      "use_in_sections": ["background"]
+    }
+  ],
+  "do_not_claim": [
+    "This paper does not use algorithm unrolling or deep unfolding",
+    "This paper does not address chromatogram baseline correction",
+    "This paper does not use penalized least squares methods like BEADS as part of its network architecture",
+    "This paper does not claim to handle all types of spectroscopy, only Raman spectroscopy"
+  ]
+}

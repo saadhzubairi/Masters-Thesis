@@ -1,0 +1,70 @@
+{
+  "id": "monga2021unrolling",
+  "title": "Algorithm Unrolling: Interpretable, Efficient Deep Learning for Signal and Image Processing",
+  "authors": ["Monga", "Li", "Eldar"],
+  "year": 2021,
+  "venue": "IEEE Signal Processing Magazine",
+  "citations": [
+    {
+      "claim": "Algorithm unrolling (or unfolding) provides a concrete and systematic connection between iterative algorithms used in signal processing and deep neural network architectures.",
+      "use_in_sections": ["introduction", "background"]
+    },
+    {
+      "claim": "Unrolling methods were first proposed by Gregor and LeCun to develop fast neural network approximations for sparse coding, mapping each iteration of ISTA to a network layer to create LISTA.",
+      "use_in_sections": ["introduction", "background"]
+    },
+    {
+      "claim": "In algorithm unrolling, each iteration of an iterative algorithm is represented as one layer of a deep network, and concatenating these layers forms a neural network where passing through the network is equivalent to executing the iterative algorithm a finite number of times.",
+      "use_in_sections": ["background", "methodology"]
+    },
+    {
+      "claim": "Algorithm parameters such as model parameters and regularization coefficients transfer to learnable network parameters and can be optimized through end-to-end training with back-propagation.",
+      "use_in_sections": ["background", "methodology"]
+    },
+    {
+      "claim": "Unrolled networks are highly parameter efficient compared to generic deep networks because they encode domain knowledge through unrolling, requiring less training data and generalizing better especially under limited training data regimes.",
+      "use_in_sections": ["introduction", "background", "related_work"]
+    },
+    {
+      "claim": "The trained unrolled network can be naturally interpreted as a parameter-optimized algorithm, effectively overcoming the lack of interpretability in most conventional neural networks.",
+      "use_in_sections": ["introduction", "background"]
+    },
+    {
+      "claim": "Unrolled networks naturally inherit prior structures and domain knowledge rather than learning them from intensive training data, and consequently tend to generalize better than generic networks.",
+      "use_in_sections": ["introduction", "background", "related_work"]
+    },
+    {
+      "claim": "Algorithm unrolling has been applied to diverse application domains including computational imaging, medical imaging, vision and recognition, and speech processing.",
+      "use_in_sections": ["introduction", "related_work"]
+    },
+    {
+      "claim": "Unrolled networks can achieve dramatic computational speedups over iterative counterparts: LISTA can be 20 times faster than ISTA, DUBLID 1000 times faster than TV-based deblurring, and CORONA over 50 times faster than Fast-ISTA.",
+      "use_in_sections": ["introduction", "related_work"]
+    },
+    {
+      "claim": "From a functional approximation perspective, unrolled networks occupy an intermediate position between generic neural networks and iterative algorithms, offering relatively low bias and variance simultaneously.",
+      "use_in_sections": ["background", "related_work"]
+    },
+    {
+      "claim": "Layer-specific (untied) parameters in unrolled networks allow a departure from the original iterative algorithm, enhancing representation capacity and boosting performance, though the networks may not completely inherit convergence guarantees of the original algorithm.",
+      "use_in_sections": ["methodology", "background"]
+    },
+    {
+      "claim": "Iterative algorithms with faster convergence rates and simpler iterative procedures are generally considered more suitable candidates for unrolling into deep networks.",
+      "use_in_sections": ["methodology"]
+    },
+    {
+      "claim": "Many iterative algorithms when unrolled may introduce highly non-linear or non-smooth operations such as hard-thresholding, so it is desirable to design algorithms whose iteration procedures are smooth or well-approximated by smooth operators.",
+      "use_in_sections": ["methodology"]
+    },
+    {
+      "claim": "An alternative approach to algorithm unrolling replaces one step of the iterative algorithm with an intact conventional neural network, as justified by the universal approximation theorem.",
+      "use_in_sections": ["related_work"]
+    }
+  ],
+  "do_not_claim": [
+    "This paper does not propose a new algorithm or network architecture; it is a survey and review article",
+    "This paper does not provide experimental results on chromatogram baseline correction or any chemical signal processing application",
+    "This paper does not specifically discuss the BEADS algorithm or baseline estimation problems"
+  ]
+}

@@ -1,0 +1,34 @@
+{
+  "id": "pompili2014onmf",
+  "title": "Two Algorithms for Orthogonal Nonnegative Matrix Factorization with Application to Clustering",
+  "authors": ["Pompili", "Gillis", "Absil", "Glineur"],
+  "year": 2014,
+  "venue": "arXiv:1201.0901v2 (extended version of ESANN 2013 proceedings)",
+  "citations": [
+    {
+      "claim": "Pompili et al. proved that orthogonal NMF is mathematically equivalent to a weighted variant of spherical k-means clustering.",
+      "use_in_sections": ["background", "related_work"]
+    },
+    {
+      "claim": "Pompili et al. proposed ONP-MF, an augmented Lagrangian method that strictly enforces orthogonality at each iteration while relaxing nonnegativity via a quadratic penalty, reversing the strategy of standard ONMF algorithms that enforce nonnegativity while pursuing orthogonality asymptotically.",
+      "use_in_sections": ["related_work"]
+    },
+    {
+      "claim": "Pompili et al. showed that the nonnegativity and orthogonality constraints together imply that each column of the factor V has at most one nonzero entry, giving ONMF an inherent hard-clustering interpretation.",
+      "use_in_sections": ["background"]
+    },
+    {
+      "claim": "Pompili et al. demonstrated that ONP-MF can be initialized with unaltered right singular vectors from SVD, which is impossible with other ONMF methods that require nonnegative initialization, and this deterministic initialization contributed to superior clustering performance.",
+      "use_in_sections": ["related_work"]
+    },
+    {
+      "claim": "Pompili et al. showed experimentally that ONP-MF outperformed other ONMF algorithms on hyperspectral unmixing tasks, being the only method to successfully recover all constituent materials in a synthetic Hubble telescope dataset.",
+      "use_in_sections": ["related_work"]
+    }
+  ],
+  "do_not_claim": [
+    "Pompili et al. applied ONMF to signal denoising, baseline correction, or chromatography",
+    "Pompili et al. proposed deep learning or neural network methods",
+    "Pompili et al. addressed the problem of algorithm unrolling or deep unfolding"
+  ]
+}

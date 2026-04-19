@@ -1,0 +1,42 @@
+{
+  "id": "eilers2003smoother",
+  "title": "A Perfect Smoother",
+  "authors": ["Eilers"],
+  "year": 2003,
+  "venue": "Analytical Chemistry",
+  "citations": [
+    {
+      "claim": "Eilers introduced the Whittaker smoother to the analytical chemistry community as a penalized least squares method that balances fidelity to data against roughness of the fitted curve, controlled by a single smoothing parameter lambda.",
+      "use_in_sections": ["background", "related_work"]
+    },
+    {
+      "claim": "The Whittaker smoother solves the linear system (I + lambda * D'D)z = y, where D is a difference matrix of order d and lambda controls the trade-off between data fidelity and smoothness.",
+      "use_in_sections": ["background", "methodology"]
+    },
+    {
+      "claim": "Eilers showed that incorporating a diagonal weight matrix W into the penalized least squares framework yields the system (W + lambda * D'D)z = Wy, enabling automatic handling of missing data and asymmetric fitting.",
+      "use_in_sections": ["background", "methodology"]
+    },
+    {
+      "claim": "The Whittaker smoother can be implemented efficiently using sparse matrices, smoothing a series of 100,000 observations in a few seconds with linear computational complexity in the number of data points.",
+      "use_in_sections": ["background"]
+    },
+    {
+      "claim": "The difference order d in the Whittaker smoother determines the limiting polynomial behavior under strong smoothing: d=1 yields a constant, d=2 a straight line, and d=3 a parabola.",
+      "use_in_sections": ["background"]
+    },
+    {
+      "claim": "The Whittaker smoother provides continuous control over smoothness with a single parameter lambda, unlike the Savitzky-Golay filter whose smoothness is controlled by a discrete window size.",
+      "use_in_sections": ["introduction", "related_work"]
+    },
+    {
+      "claim": "Eilers demonstrated that leave-one-out cross-validation can be performed efficiently for the Whittaker smoother using the hat matrix diagonal, enabling automatic selection of the smoothing parameter.",
+      "use_in_sections": ["background"]
+    }
+  ],
+  "do_not_claim": [
+    "Eilers proposed the Whittaker smoother for baseline correction (he proposed it for general smoothing, not baseline correction specifically)",
+    "Eilers introduced asymmetric weights for baseline estimation (the asymmetric least squares extension came in a later 2005 unpublished report by Eilers and Boelens)",
+    "The Whittaker smoother was invented by Eilers (it was originally proposed by Whittaker in 1923; Eilers modernized it)"
+  ]
+}

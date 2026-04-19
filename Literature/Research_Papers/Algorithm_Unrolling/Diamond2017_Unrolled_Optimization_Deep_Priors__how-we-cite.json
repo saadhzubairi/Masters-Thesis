@@ -1,0 +1,51 @@
+{
+  "id": "diamond2018odp",
+  "title": "Unrolled Optimization with Deep Priors",
+  "authors": ["Diamond", "Sitzmann", "Heide", "Wetzstein"],
+  "year": 2018,
+  "venue": "arXiv:1705.08041",
+  "citations": [
+    {
+      "claim": "Diamond et al. proposed unrolled optimization with deep priors (ODP), a general framework that integrates knowledge of the image formation model into deep networks by unrolling classical iterative optimization algorithms and replacing hand-crafted priors with learned CNN priors.",
+      "use_in_sections": ["background", "related_work"]
+    },
+    {
+      "claim": "Diamond et al. demonstrated that the ODP framework factors each unrolled iteration into a data step, which encodes prior knowledge of the forward model, and a CNN prior step, which learns statistical image priors end-to-end.",
+      "use_in_sections": ["background", "methodology"]
+    },
+    {
+      "claim": "Diamond et al. showed that the proximal gradient method is a good default choice for the optimization algorithm to unroll, requiring only that the proximal operator of the data-fidelity term and its Jacobian can be computed efficiently.",
+      "use_in_sections": ["background", "methodology"]
+    },
+    {
+      "claim": "Diamond et al. found that a single ODP model trained across multiple image formation operators outperformed specialized models trained per operator, demonstrating that unrolled optimization generalizes across forward models.",
+      "use_in_sections": ["introduction", "related_work"]
+    },
+    {
+      "claim": "Diamond et al. showed that incorporating the forward model in the data step is critical: for deblurring and compressed sensing MRI, ODP networks with data steps substantially outperformed pure residual networks without data steps, while for denoising (where the data step is trivial) the two performed equally.",
+      "use_in_sections": ["background", "related_work"]
+    },
+    {
+      "claim": "Diamond et al. found that all unrolled algorithms that approximately invert the image formation operator each iteration (proximal gradient, ADMM) performed comparably, and that Lagrange multipliers provided minimal benefit for the low number of iterations typical in unrolled architectures.",
+      "use_in_sections": ["background", "related_work"]
+    },
+    {
+      "claim": "Diamond et al. parameterized the proximal operator or gradient of the prior term directly using a CNN, defining the prior implicitly rather than explicitly specifying a regularization function.",
+      "use_in_sections": ["methodology", "background"]
+    },
+    {
+      "claim": "Diamond et al. proposed learning per-iteration algorithm hyperparameters such as step sizes, rather than fixing them across iterations, and initialized step sizes using an aggressively decreasing schedule inspired by half-quadratic splitting.",
+      "use_in_sections": ["methodology"]
+    },
+    {
+      "claim": "Diamond et al. achieved state-of-the-art results on Gaussian denoising, non-blind deblurring, and compressed sensing MRI, outperforming both classical optimization methods and prior deep learning approaches.",
+      "use_in_sections": ["related_work"]
+    }
+  ],
+  "do_not_claim": [
+    "Diamond et al. did not propose the concept of algorithm unrolling itself; they cite Gregor and LeCun (2010) and others as prior work on unrolling",
+    "Diamond et al. did not address blind inverse problems or nonlinear image formation models",
+    "Diamond et al. did not apply their framework to signal processing problems outside imaging (e.g., spectroscopy or chromatography)",
+    "Diamond et al. did not use ISTA as their primary unrolled algorithm; they used proximal gradient with CNN priors"
+  ]
+}

@@ -1,0 +1,34 @@
+{
+  "id": "ding2006orthonmf",
+  "title": "Orthogonal Nonnegative Matrix Tri-Factorizations for Clustering",
+  "authors": ["Ding", "Li", "Peng", "Park"],
+  "year": 2006,
+  "venue": "ACM SIGKDD International Conference on Knowledge Discovery and Data Mining (KDD)",
+  "citations": [
+    {
+      "claim": "Ding et al. showed that nonnegative matrix factorization with an orthogonality constraint on one factor (G^T G = I) is equivalent to K-means clustering.",
+      "use_in_sections": ["background", "related_work"]
+    },
+    {
+      "claim": "Ding et al. introduced orthogonal nonnegative matrix tri-factorization X = FSG^T with bi-orthogonality constraints (F^T F = I, G^T G = I), where the intermediate factor S absorbs scale differences and enables simultaneous row and column clustering.",
+      "use_in_sections": ["background", "related_work"]
+    },
+    {
+      "claim": "Orthogonality constraints in NMF provide uniqueness of the solution up to permutation, eliminating the rotational ambiguity present in unconstrained NMF.",
+      "use_in_sections": ["background"]
+    },
+    {
+      "claim": "Ding et al. proved that unconstrained 3-factor NMF (X = FSG^T) is equivalent to unconstrained 2-factor NMF, but constrained 3-factor NMF with orthogonality brings genuinely new properties such as rigorous clustering interpretation.",
+      "use_in_sections": ["background"]
+    },
+    {
+      "claim": "Ding et al. provided multiplicative update rules for orthogonal NMF and proved their convergence using auxiliary function methods and matrix inequalities.",
+      "use_in_sections": ["background"]
+    }
+  ],
+  "do_not_claim": [
+    "Ding et al. applied orthogonal NMF to signal processing or baseline correction",
+    "Ding et al. proposed algorithm unrolling or deep learning approaches",
+    "Ding et al. addressed sparse signal decomposition in the sense of y = x + f + n"
+  ]
+}

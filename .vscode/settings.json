@@ -1,5 +1,5 @@
 {
     "python.analysis.extraPaths": [
         "./Initial_implementations/BEADS/Symmetric/verify_"
-    ]
+    ],
 }

@@ -1,0 +1,31 @@
+{
+  "id": "tian2024wavenetrf",
+  "title": "A Novel Approach to WaveNet Architecture for RF Signal Separation with Learnable Dilation and Data Augmentation",
+  "authors": ["Tian", "Alhammadi", "Quran", "Ali"],
+  "year": 2024,
+  "venue": "arXiv:2402.09461 (ICASSP 2024)",
+  "citations": [
+    {
+      "claim": "Tian et al. adapted the WaveNet architecture for RF signal separation by introducing learnable dilation parameters within convolutional layers, allowing the model to adaptively modulate its receptive field for different signal types.",
+      "use_in_sections": ["related_work"]
+    },
+    {
+      "claim": "Tian et al. demonstrated that replacing fixed dilation rates with learnable dilation parameters in a WaveNet-based architecture improved signal separation performance by 58.82% in SINR at a BER of 10^{-3} for OFDM-QPSK with EMI signals.",
+      "use_in_sections": ["related_work"]
+    },
+    {
+      "claim": "Tian et al. showed that adapting a WaveNet architecture for 1D signal separation, with task-specific hyperparameter adjustments such as increased residual channels and customized dilation cycles, can achieve state-of-the-art performance on RF signal separation benchmarks.",
+      "use_in_sections": ["related_work"]
+    },
+    {
+      "claim": "The learnable dilation approach of Tian et al. demonstrates that making architectural parameters data-dependent, rather than fixing them a priori, improves a network's ability to handle diverse signal characteristics.",
+      "use_in_sections": ["related_work", "introduction"]
+    }
+  ],
+  "do_not_claim": [
+    "This paper addresses baseline correction or chromatographic signal processing",
+    "This paper uses algorithm unrolling or proximal gradient descent",
+    "This paper introduces the original WaveNet architecture",
+    "The authors' last name is Nguyen (the first author is Tian; the filename is misleading)"
+  ]
+}

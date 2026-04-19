@@ -1,0 +1,42 @@
+{
+  "id": "chen2025demun",
+  "title": "Comprehensive Examination of Unrolled Networks for Solving Linear Inverse Problems",
+  "authors": ["Chen", "Chen", "Maleki", "Jalali"],
+  "year": 2025,
+  "venue": "Entropy",
+  "citations": [
+    {
+      "claim": "Chen et al. proposed the Deep Memory Unrolled Network (DeMUN), which leverages the history of all gradients from previous iterations and generalizes a wide range of existing unrolled algorithms including projected gradient descent, heavy-ball methods, and approximate message passing as special cases.",
+      "use_in_sections": ["related_work"]
+    },
+    {
+      "claim": "Training unrolled networks with an unweighted intermediate loss function that penalizes reconstruction error at every layer uniformly outperforms training with a last-layer-only loss, likely due to a smoother optimization landscape that guides the network more effectively toward better minima.",
+      "use_in_sections": ["methodology", "related_work"]
+    },
+    {
+      "claim": "Incorporating residual connections of the form x_{i+1} = tilde{x}_i + P_C(tilde{x}_i) into unrolled networks consistently improves recovery performance across all sampling rates and projection steps.",
+      "use_in_sections": ["methodology", "related_work"]
+    },
+    {
+      "claim": "The adaptation of unrolled networks to new applications presents considerable challenges due to the multitude of design decisions including the optimization algorithm, loss function, number of unrolled steps, and neural network complexity, each potentially affecting performance.",
+      "use_in_sections": ["related_work", "methodology"]
+    },
+    {
+      "claim": "For unrolled networks, the number of unrolled iterations (projection steps) has a significantly greater impact on performance than the depth of the neural network used within each projection step.",
+      "use_in_sections": ["related_work", "methodology"]
+    },
+    {
+      "claim": "DeMUN demonstrated robustness to changes in measurement matrix type (Gaussian and DCT), additive noise levels, and image resolution, suggesting that design choices validated on one setting generalize well to others.",
+      "use_in_sections": ["related_work"]
+    },
+    {
+      "claim": "End-to-end deep networks for inverse problems face challenges including poor generalizability to changes in the forward model and forward model inconsistency, which unrolled networks address by integrating the known forward model directly into the network architecture.",
+      "use_in_sections": ["introduction", "related_work"]
+    }
+  ],
+  "do_not_claim": [
+    "DeMUN was not applied to one-dimensional signal processing, chromatography, or baseline correction",
+    "The paper does not propose or evaluate unrolling of BEADS or any proximal-gradient algorithm for signal decomposition",
+    "The paper does not address learning scalar parameters; its projector networks (DnCNN) have many convolutional parameters per layer"
+  ]
+}

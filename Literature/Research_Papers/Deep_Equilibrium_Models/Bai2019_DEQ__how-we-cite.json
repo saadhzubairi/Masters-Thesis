@@ -1,0 +1,55 @@
+{
+  "id": "bai2019deq",
+  "title": "Deep Equilibrium Models",
+  "authors": ["Bai", "Kolter", "Koltun"],
+  "year": 2019,
+  "venue": "NeurIPS 2019",
+  "citations": [
+    {
+      "claim": "Bai et al. proposed the deep equilibrium model (DEQ), which directly finds the fixed point of a weight-tied transformation via root-finding rather than iteratively stacking layers, effectively representing an infinite-depth network.",
+      "use_in_sections": ["introduction", "background", "related_work"]
+    },
+    {
+      "claim": "DEQ enables backpropagation through the equilibrium point using implicit differentiation, requiring only constant memory regardless of the effective depth of the network.",
+      "use_in_sections": ["background", "related_work"]
+    },
+    {
+      "claim": "Bai et al. demonstrated that DEQ can achieve up to 88% memory reduction compared to conventional deep networks while maintaining competitive performance on large-scale language modeling tasks.",
+      "use_in_sections": ["related_work"]
+    },
+    {
+      "claim": "DEQ uses Broyden's method, a quasi-Newton approach, to efficiently approximate the inverse Jacobian during both forward and backward passes, avoiding the cubic cost of direct inversion.",
+      "use_in_sections": ["background", "methodology"]
+    },
+    {
+      "claim": "Bai et al. proved that stacking multiple DEQs does not create extra representational power over a single DEQ, establishing the universality of single-layer DEQ models.",
+      "use_in_sections": ["background", "related_work"]
+    },
+    {
+      "claim": "Weight tying in deep networks acts as a form of regularization that stabilizes training and supports generalization, while significantly reducing the model size.",
+      "use_in_sections": ["background", "methodology"]
+    },
+    {
+      "claim": "DEQ was motivated by the observation that the hidden layers of many existing deep sequence models with weight tying converge towards a fixed point as depth increases.",
+      "use_in_sections": ["introduction", "background"]
+    },
+    {
+      "claim": "The DEQ approach is independent of the choice of the internal transformation function, and the same memory benefits apply regardless of the type of transformation used.",
+      "use_in_sections": ["background", "related_work"]
+    },
+    {
+      "claim": "DEQ can be instantiated with different architectures including trellis networks (weight-tied temporal convolutions) and universal transformers (weight-tied multi-head self-attention).",
+      "use_in_sections": ["related_work"]
+    },
+    {
+      "claim": "Unlike ODE-based methods that backpropagate through the entire latent trajectory using the adjoint system, DEQ solves directly for equilibria via quasi-Newton methods and backpropagates through the fixed point without regard for the solution path.",
+      "use_in_sections": ["background", "related_work"]
+    }
+  ],
+  "do_not_claim": [
+    "DEQ was proposed for signal processing or inverse problems (it was proposed for sequence modeling)",
+    "DEQ uses algorithm unrolling (it replaces unrolling with direct equilibrium computation)",
+    "DEQ was applied to baseline correction or chromatography",
+    "DEQ inherently learns per-signal parameters (it learns shared weight-tied transformations)"
+  ]
+}

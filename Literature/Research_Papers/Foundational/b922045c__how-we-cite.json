@@ -1,0 +1,46 @@
+{
+  "id": "zhang2010airpls",
+  "title": "Baseline correction using adaptive iteratively reweighted penalized least squares",
+  "authors": ["Zhang", "Chen", "Liang"],
+  "year": 2010,
+  "venue": "Analyst",
+  "citations": [
+    {
+      "claim": "Zhang et al. proposed the airPLS algorithm, which adaptively reweights the penalized least squares baseline estimation by setting weights to zero where the signal exceeds the current baseline estimate and using exponential weights proportional to the residual magnitude where the signal is below the estimate.",
+      "use_in_sections": ["related_work", "background"]
+    },
+    {
+      "claim": "The airPLS algorithm eliminates the need for peak detection or user-specified asymmetry parameters, requiring only a single smoothness parameter lambda to control the flexibility of the fitted baseline.",
+      "use_in_sections": ["related_work", "introduction"]
+    },
+    {
+      "claim": "Zhang et al. modeled analytical signals as the sum of a pure signal, a baseline, and random noise: s(x) = p(x) + b(x) + n(x).",
+      "use_in_sections": ["background"]
+    },
+    {
+      "claim": "Zhang et al. demonstrated that the airPLS algorithm converges in only a few iterations (typically 3 to 6) due to its exponential reweighting strategy.",
+      "use_in_sections": ["related_work"]
+    },
+    {
+      "claim": "Zhang et al. showed that the airPLS algorithm scales linearly with the number of data points due to the use of sparse matrices, processing a 16,384-variable NMR signal in 0.234 seconds.",
+      "use_in_sections": ["related_work"]
+    },
+    {
+      "claim": "Zhang et al. demonstrated the airPLS algorithm on chromatograms, Raman spectra, and NMR signals, showing that baseline correction improved PCA-based classification of Raman spectra of pharmaceutical tablets.",
+      "use_in_sections": ["related_work"]
+    },
+    {
+      "claim": "Zhang et al. noted that the Eilers AsLS method has the drawback that asymmetry parameters are uniform across all baseline region points, whereas the weights should vary according to the difference between the fitted baseline and the original signal.",
+      "use_in_sections": ["related_work"]
+    },
+    {
+      "claim": "The airPLS algorithm requires manual tuning of the smoothness parameter lambda, with Eilers' recommendation to search on a logarithmic grid.",
+      "use_in_sections": ["introduction", "related_work"]
+    }
+  ],
+  "do_not_claim": [
+    "Zhang et al. invented the penalized least squares smoothing framework (it was introduced by Whittaker in 1922 and modernized by Eilers in 2003)",
+    "airPLS is fully parameter-free (it still requires the smoothness parameter lambda to be specified by the user)",
+    "airPLS was specifically designed for chromatogram baseline correction (it was designed as a general-purpose algorithm demonstrated across chromatography, Raman, and NMR)"
+  ]
+}

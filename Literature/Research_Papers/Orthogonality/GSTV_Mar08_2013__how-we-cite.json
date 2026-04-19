@@ -1,0 +1,43 @@
+{
+  "id": "selesnick2013gstv",
+  "title": "Total Variation Denoising with Overlapping Group Sparsity",
+  "authors": ["Selesnick", "Chen"],
+  "year": 2013,
+  "venue": "IEEE International Conference on Acoustics, Speech, and Signal Processing (ICASSP)",
+  "citations": [
+    {
+      "claim": "Selesnick and Chen extended total variation denoising by incorporating overlapping group sparsity, assuming that large values of the first-order difference function tend to cluster together rather than occur in isolation, thereby alleviating the staircase artifact inherent to standard TV denoising.",
+      "use_in_sections": ["background", "related_work"]
+    },
+    {
+      "claim": "The group-sparse total variation (GS-TV) cost function is convex and uses a penalty that applies an L2 norm over sliding windows of size K on the difference signal, promoting structured sparsity in the derivative domain.",
+      "use_in_sections": ["background", "methodology"]
+    },
+    {
+      "claim": "Selesnick and Chen derived an efficient iterative algorithm for GS-TV denoising using the majorization-minimization (MM) framework, where each iteration requires solving only a tridiagonal (banded) system of linear equations, making the algorithm computationally efficient and free of step-size parameters.",
+      "use_in_sections": ["background", "methodology"]
+    },
+    {
+      "claim": "The MM algorithm for GS-TV denoising uses a quadratic majorizer of the group-sparsity penalty, leading to iteratively reweighted least squares updates where the diagonal weight matrix depends on local group norms of the current iterate.",
+      "use_in_sections": ["background", "methodology"]
+    },
+    {
+      "claim": "Standard total variation denoising is a special case of GS-TV with group size K=1, where the penalty reduces to the L1 norm of the first-order difference.",
+      "use_in_sections": ["background"]
+    },
+    {
+      "claim": "Selesnick and Chen demonstrated that GS-TV denoising achieves lower RMSE than standard TV denoising on signals with smooth transitions, as the overlapping group penalty smooths the sparse derivative rather than producing isolated large values.",
+      "use_in_sections": ["background", "related_work"]
+    },
+    {
+      "claim": "The MM algorithm avoids auxiliary variables and excess memory proportional to the group size, unlike previous algorithms for overlapping group sparsity that use variable splitting or replication.",
+      "use_in_sections": ["methodology"]
+    }
+  ],
+  "do_not_claim": [
+    "GS-TV was applied to chromatogram baseline correction",
+    "Selesnick and Chen used deep learning or neural networks in this work",
+    "GS-TV addresses the signal model y = x + f + n with separate baseline and peak components",
+    "This paper introduced the BEADS algorithm"
+  ]
+}

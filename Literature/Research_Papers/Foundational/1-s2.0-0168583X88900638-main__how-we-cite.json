@@ -1,0 +1,43 @@
+{
+  "id": "ryan1988snip",
+  "title": "SNIP, a Statistics-Sensitive Background Treatment for the Quantitative Analysis of PIXE Spectra in Geoscience Applications",
+  "authors": ["Ryan", "Clayton", "Griffin", "Sie", "Cousens"],
+  "year": 1988,
+  "venue": "Nuclear Instruments and Methods in Physics Research B34",
+  "citations": [
+    {
+      "claim": "Ryan et al. proposed the Statistics-sensitive Non-linear Iterative Peak-clipping (SNIP) algorithm, which estimates the background of a spectrum by iteratively replacing each channel value with the lesser of itself or the mean of two symmetrically placed neighbors.",
+      "use_in_sections": ["background", "related_work"]
+    },
+    {
+      "claim": "The SNIP algorithm compresses the dynamic range of channel counts using a double log transformation G(y) = log(log(y + 1) + 1) prior to peak clipping, which reduces the required number of iterations from approximately 700 to approximately 24.",
+      "use_in_sections": ["background", "related_work"]
+    },
+    {
+      "claim": "SNIP employs a low-statistics digital filter that adaptively smooths low-count regions of a spectrum while preserving peak shapes and inter-peak valleys, avoiding the trade-off inherent in fixed-width n-point smoothing.",
+      "use_in_sections": ["background", "related_work"]
+    },
+    {
+      "claim": "Monte Carlo simulations demonstrated that the SNIP background algorithm maintains stable trace element concentrations over a 100-fold change in counting statistics, with an average high-to-low statistics ratio of 0.98 and standard deviation of 0.09.",
+      "use_in_sections": ["related_work"]
+    },
+    {
+      "claim": "Simpler peak-clipping and family-of-parabolas background algorithms systematically overestimate peak areas as counting statistics decrease, with errors up to a factor of 4 for trace elements near the detection limit.",
+      "use_in_sections": ["related_work"]
+    },
+    {
+      "claim": "The SNIP algorithm is parameter-free and independent of detector energy calibration, enabling batch processing of spectra without user-adjustable settings.",
+      "use_in_sections": ["background", "related_work"]
+    },
+    {
+      "claim": "SNIP is an early and influential iterative baseline estimation method for spectral data, originally developed for PIXE X-ray spectra but subsequently adopted in other spectroscopy and signal processing domains.",
+      "use_in_sections": ["introduction", "related_work"]
+    }
+  ],
+  "do_not_claim": [
+    "SNIP was designed for or applied to chromatographic baseline correction",
+    "SNIP uses optimization or regularization to estimate the baseline",
+    "SNIP is a learning-based or data-driven method",
+    "SNIP produces a smooth baseline in the same sense as penalized least-squares methods"
+  ]
+}

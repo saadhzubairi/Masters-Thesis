@@ -1,0 +1,43 @@
+{
+  "id": "stoller2018waveunet",
+  "title": "Wave-U-Net: A Multi-Scale Neural Network for End-to-End Audio Source Separation",
+  "authors": ["Stoller", "Ewert", "Dixon"],
+  "year": 2018,
+  "venue": "ISMIR 2018",
+  "citations": [
+    {
+      "claim": "Stoller et al. proposed Wave-U-Net, a one-dimensional adaptation of the U-Net architecture that performs audio source separation directly in the time domain, avoiding fixed spectral transformations and enabling end-to-end learning of phase information.",
+      "use_in_sections": ["related_work", "introduction"]
+    },
+    {
+      "claim": "Wave-U-Net computes multi-scale features by repeatedly downsampling and upsampling 1D feature maps, combining high-level and low-level features at different time scales via skip connections.",
+      "use_in_sections": ["related_work", "background"]
+    },
+    {
+      "claim": "Stoller et al. demonstrated that operating directly on raw waveforms avoids dependence on STFT hyperparameters such as window size and overlap, which affect time-frequency resolution and are typically fixed rather than optimized.",
+      "use_in_sections": ["introduction", "related_work"]
+    },
+    {
+      "claim": "Stoller et al. introduced a difference output layer that enforces source additivity by computing the last source as the difference between the mixture and the sum of the other estimated sources.",
+      "use_in_sections": ["related_work"]
+    },
+    {
+      "claim": "Stoller et al. replaced strided transposed convolutions with linear interpolation followed by normal convolution for upsampling, avoiding high-frequency aliasing artifacts in the generated output.",
+      "use_in_sections": ["related_work"]
+    },
+    {
+      "claim": "Wave-U-Net showed that providing additional input context beyond the output prediction window avoids artifacts at output segment boundaries, which arise when zero-padding is used instead of proper temporal context.",
+      "use_in_sections": ["related_work"]
+    },
+    {
+      "claim": "Wave-U-Net achieved singing voice separation performance comparable to a state-of-the-art spectrogram-based U-Net architecture when trained under comparable settings.",
+      "use_in_sections": ["related_work"]
+    }
+  ],
+  "do_not_claim": [
+    "Wave-U-Net was applied to baseline correction or chromatographic signal processing",
+    "Wave-U-Net uses algorithm unrolling or iterative optimization",
+    "Wave-U-Net outperformed all spectrogram-based methods at the time of publication",
+    "Wave-U-Net uses dilated convolutions"
+  ]
+}

@@ -1,0 +1,47 @@
+{
+  "id": "zheng2022hybridista",
+  "title": "Hybrid ISTA: Unfolding ISTA With Convergence Guarantees Using Free-Form Deep Neural Networks",
+  "authors": ["Zheng", "Dai", "Xue", "Li", "Zou", "Xiong"],
+  "year": 2022,
+  "venue": "IEEE TPAMI 2022",
+  "citations": [
+    {
+      "claim": "Zheng et al. proposed Hybrid ISTA, which incorporates free-form deep neural networks (DNNs with arbitrary feasible architectures) into ISTA-based unfolded algorithms while maintaining theoretical convergence guarantees.",
+      "use_in_sections": ["related_work", "background"]
+    },
+    {
+      "claim": "Hybrid ISTA addresses a fundamental tension in algorithm unrolling: existing convergence-provable methods (LISTA-CP, LISTA-CPSS, ALISTA) restrict network architectures via partial weight coupling, while flexible methods (LISTA, ISTA-Net) lack convergence guarantees.",
+      "use_in_sections": ["related_work", "introduction"]
+    },
+    {
+      "claim": "HCISTA integrates classical ISTA with free-form DNNs using a balancing parameter that controls the convex combination of the ISTA update and the DNN-refined update, ensuring convergence equivalent to ISTA in the worst case even with untrained DNNs.",
+      "use_in_sections": ["related_work", "background"]
+    },
+    {
+      "claim": "HLISTA generalizes Hybrid ISTA to learned ISTA variants (LISTA-CP, LISTA-CPSS, ALISTA, Gated LISTA, ELISTA), enabling free-form DNN architectures while preserving linear convergence guarantees.",
+      "use_in_sections": ["related_work"]
+    },
+    {
+      "claim": "Zheng et al. proved that HCISTA converges under the Kurdyka-Lojasiewicz property, with convergence rates dependent on the KL exponent of the objective function.",
+      "use_in_sections": ["related_work", "background"]
+    },
+    {
+      "claim": "Hybrid ISTA is the first framework to provide convergence-provable ISTA-based unfolded algorithms that support free-form DNN architectures without constraints.",
+      "use_in_sections": ["related_work"]
+    },
+    {
+      "claim": "Zheng et al. demonstrated that the hybrid ISTA framework can be viewed as a special ISTA-based connectivity structure that endows empirically constructed DNNs with theoretical interpretation and convergence guarantees.",
+      "use_in_sections": ["related_work", "methodology"]
+    },
+    {
+      "claim": "In experiments on sparse recovery and compressive sensing, Hybrid ISTA models reduced reconstruction error with improved convergence rates compared to their non-hybrid counterparts.",
+      "use_in_sections": ["related_work"]
+    }
+  ],
+  "do_not_claim": [
+    "Hybrid ISTA was the first to unfold ISTA into a neural network",
+    "Hybrid ISTA eliminates the need for learned parameters entirely",
+    "Hybrid ISTA was applied to baseline correction or chromatography",
+    "Hybrid ISTA introduces the concept of algorithm unrolling"
+  ]
+}

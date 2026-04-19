@@ -1,0 +1,55 @@
+{
+  "id": "gregor2010lista",
+  "title": "Learning Fast Approximations of Sparse Coding",
+  "authors": ["Gregor", "LeCun"],
+  "year": 2010,
+  "venue": "ICML 2010",
+  "citations": [
+    {
+      "claim": "Gregor and LeCun introduced LISTA (Learned ISTA), the foundational algorithm unrolling method that unfolds a fixed number of ISTA iterations into a feed-forward neural network with learned parameters, achieving roughly 20 times faster convergence than FISTA for approximate sparse coding.",
+      "use_in_sections": ["introduction", "background", "related_work"]
+    },
+    {
+      "claim": "LISTA replaces the matrices W_e and S in ISTA, which are normally computed from the dictionary and sparsity parameters, with learned matrices optimized end-to-end via backpropagation to minimize the squared error between predicted and optimal sparse codes.",
+      "use_in_sections": ["background", "methodology"]
+    },
+    {
+      "claim": "Gregor and LeCun demonstrated that a trained K-layer LISTA network can be viewed as a time-unfolded recurrent neural network with shared weights across layers, to which backpropagation through time is applied for training.",
+      "use_in_sections": ["background"]
+    },
+    {
+      "claim": "LISTA with a single iteration achieved prediction error of 1.50 for 100-unit codes, compared to 21.0 for FISTA with one iteration, demonstrating that learning the iteration parameters dramatically improves per-iteration efficiency.",
+      "use_in_sections": ["background", "related_work"]
+    },
+    {
+      "claim": "Gregor and LeCun showed that it takes 18 iterations of FISTA to reach the same error as 1 iteration of LISTA for 100-dimensional codes, and 35 iterations for 400-dimensional codes.",
+      "use_in_sections": ["background", "related_work"]
+    },
+    {
+      "claim": "The LISTA architecture implements approximate explaining away between code components through the learned mutual inhibition matrix S, enabling competition between basis functions that simple feed-forward encoders cannot achieve.",
+      "use_in_sections": ["background"]
+    },
+    {
+      "claim": "Gregor and LeCun also proposed Learned Coordinate Descent (LCoD), which learns the matrices in a truncated coordinate descent algorithm, achieving approximately 20 times speedup over standard CoD with per-iteration cost of O(m) instead of O(m^2).",
+      "use_in_sections": ["related_work"]
+    },
+    {
+      "claim": "The LISTA encoder is differentiable with respect to both its parameters and its input, enabling it to be incorporated into larger globally-trained recognition systems via backpropagation.",
+      "use_in_sections": ["background", "methodology"]
+    },
+    {
+      "claim": "Gregor and LeCun established the paradigm of algorithm unrolling, where an iterative optimization algorithm is truncated to a fixed depth and its parameters are learned end-to-end, trading generality for speed on a specific data distribution.",
+      "use_in_sections": ["introduction", "background"]
+    },
+    {
+      "claim": "The LISTA framework trains a nonlinear feed-forward predictor with a specific architecture and fixed depth to produce the best possible approximation of the sparse code for inputs drawn from the training distribution.",
+      "use_in_sections": ["background"]
+    }
+  ],
+  "do_not_claim": [
+    "LISTA provides theoretical convergence guarantees",
+    "LISTA converges to the true optimal code when run for more steps than trained",
+    "LISTA was applied to baseline correction, chromatography, or signal denoising",
+    "LISTA learns only scalar parameters per layer"
+  ]
+}

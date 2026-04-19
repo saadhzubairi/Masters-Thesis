@@ -1,0 +1,55 @@
+{
+  "id": "liu2019alista",
+  "title": "ALISTA: Analytic Weights Are As Good As Learned Weights in LISTA",
+  "authors": ["Liu", "Chen", "Wang", "Yin"],
+  "year": 2019,
+  "venue": "ICLR 2019",
+  "citations": [
+    {
+      "claim": "Liu et al. proposed Analytic LISTA (ALISTA), which computes the weight matrix in LISTA analytically via a data-free coherence minimization problem, leaving only layer-wise step sizes and thresholds to be learned from data.",
+      "use_in_sections": ["related_work", "background"]
+    },
+    {
+      "claim": "ALISTA reduces the number of learnable parameters from O(KNM + K) in LISTA-CPSS to O(K), where K is the number of layers, by tying the weight matrix across all layers and computing it analytically.",
+      "use_in_sections": ["related_work", "methodology"]
+    },
+    {
+      "claim": "ALISTA decomposes training into a data-free analytic optimization stage that solves a convex quadratic program for the weight matrix, followed by a lightweight data-driven stage that learns only per-layer step sizes and thresholds.",
+      "use_in_sections": ["related_work", "methodology"]
+    },
+    {
+      "claim": "Liu et al. proved that ALISTA retains the optimal linear convergence rate established by Chen et al. (2018) despite computing weight matrices analytically rather than learning them.",
+      "use_in_sections": ["related_work", "background"]
+    },
+    {
+      "claim": "ALISTA established a minimum-coherence criterion between the weight matrix and the dictionary, formalized as minimizing the Frobenius norm of W^T D subject to unit diagonal constraints.",
+      "use_in_sections": ["background", "related_work"]
+    },
+    {
+      "claim": "Liu et al. proved a recovery error lower bound showing that LISTA convergence cannot be faster than linear rate, confirming that the analytically computed parameters are optimal in convergence order.",
+      "use_in_sections": ["background"]
+    },
+    {
+      "claim": "ALISTA demonstrated that learning only scalar parameters (step sizes and thresholds) per layer achieves performance comparable to full LISTA models that learn entire weight matrices.",
+      "use_in_sections": ["introduction", "methodology"]
+    },
+    {
+      "claim": "Liu et al. extended ALISTA to convolutional sparse coding by exploiting circular convolution approximations to efficiently solve the convolutional coherence minimization problem.",
+      "use_in_sections": ["related_work"]
+    },
+    {
+      "claim": "ALISTA introduced a robust training scheme that adds perturbations to the dictionary D during training, producing models with stronger robustness when the input distribution varies compared to classical LISTA.",
+      "use_in_sections": ["related_work"]
+    },
+    {
+      "claim": "The ALISTA framework demonstrates that the key learnable components in unfolded ISTA networks are the per-layer scalar parameters rather than the full weight matrices, providing insight into the working mechanism of LISTA.",
+      "use_in_sections": ["introduction", "methodology"]
+    }
+  ],
+  "do_not_claim": [
+    "ALISTA was the first work to unfold ISTA as a neural network",
+    "ALISTA introduced the concept of algorithm unrolling",
+    "ALISTA was applied to baseline correction or chromatography",
+    "ALISTA uses deep neural network sub-modules or free-form DNNs within its layers"
+  ]
+}

@@ -1,0 +1,55 @@
+{
+  "id": "zhang2018istanet",
+  "title": "ISTA-Net: Interpretable Optimization-Inspired Deep Network for Image Compressive Sensing",
+  "authors": ["Zhang", "Ghanem"],
+  "year": 2018,
+  "venue": "CVPR 2018",
+  "citations": [
+    {
+      "claim": "Zhang and Ghanem proposed ISTA-Net, a deep network whose architecture directly maps the iterative update steps of ISTA into a fixed number of network phases, where each phase corresponds to one ISTA iteration.",
+      "use_in_sections": ["background", "related_work"]
+    },
+    {
+      "claim": "Zhang and Ghanem replaced the hand-crafted linear sparsifying transform in ISTA with a learnable nonlinear transform composed of two convolutional operators separated by a ReLU, and introduced a corresponding learned inverse transform to recover the signal after soft-thresholding.",
+      "use_in_sections": ["background", "methodology"]
+    },
+    {
+      "claim": "Zhang and Ghanem learned all parameters in ISTA-Net end-to-end, including the nonlinear transforms, shrinkage thresholds, and step sizes, rather than hand-crafting them.",
+      "use_in_sections": ["introduction", "background", "methodology"]
+    },
+    {
+      "claim": "Zhang and Ghanem enforced a symmetry constraint between the forward and inverse transforms by adding a penalty term to the loss function that encourages the composition of the inverse and forward transforms to approximate the identity operator.",
+      "use_in_sections": ["methodology"]
+    },
+    {
+      "claim": "Zhang and Ghanem derived ISTA-Net+, an enhanced version that operates in the residual domain by explicitly extracting high-frequency residual components, which introduces skip connections analogous to ResNet and leads to approximately 1 dB improvement over ISTA-Net.",
+      "use_in_sections": ["background", "related_work"]
+    },
+    {
+      "claim": "Zhang and Ghanem allowed the step size, threshold, and transform parameters to vary across phases (iterations), finding that the unshared (most flexible) configuration achieved the best reconstruction performance.",
+      "use_in_sections": ["methodology", "background"]
+    },
+    {
+      "claim": "Zhang and Ghanem showed that ISTA-Net with 9 phases outperformed all existing optimization-based and network-based compressive sensing methods by large margins on the Set11 and BSD68 benchmarks, while maintaining fast computational speed.",
+      "use_in_sections": ["related_work"]
+    },
+    {
+      "claim": "Zhang and Ghanem demonstrated that the nonlinearity introduced by ReLU in the learned transforms is critical for reconstruction performance and training stability, as removing ReLU significantly degraded results and caused instability at higher feature map counts.",
+      "use_in_sections": ["background"]
+    },
+    {
+      "claim": "Zhang and Ghanem showed that ISTA-Net can be viewed as a significant extension of LISTA from the sparse coding problem to general compressive sensing reconstruction.",
+      "use_in_sections": ["background", "related_work"]
+    },
+    {
+      "claim": "Zhang and Ghanem demonstrated that ISTA-Net+ generalized to CS-MRI, outperforming the domain-specific ADMM-Net in both reconstruction quality and runtime.",
+      "use_in_sections": ["related_work"]
+    }
+  ],
+  "do_not_claim": [
+    "Zhang and Ghanem did not propose ISTA itself; ISTA is a classical algorithm by Beck and Teboulle (2009)",
+    "Zhang and Ghanem did not apply ISTA-Net to 1-D signal processing or chromatography problems",
+    "Zhang and Ghanem did not use curriculum learning or staged training strategies",
+    "Zhang and Ghanem did not propose the concept of algorithm unrolling; they cite Gregor and LeCun (2010) as the originator of LISTA"
+  ]
+}

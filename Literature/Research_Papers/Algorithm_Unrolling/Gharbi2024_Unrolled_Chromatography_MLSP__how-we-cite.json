@@ -1,0 +1,55 @@
+{
+  "id": "gharbi2024unrolled_chromatography",
+  "title": "Unrolled deep networks for sparse signal restoration in analytical chemistry",
+  "authors": ["Gharbi", "Villa", "Chouzenoux", "Pesquet", "Duval"],
+  "year": 2024,
+  "venue": "MLSP 2024 - 34th IEEE International Workshop on Machine Learning for Signal Processing",
+  "citations": [
+    {
+      "claim": "Gharbi et al. designed and compared three deep unrolled architectures -- unrolled primal-dual (U-PD), unrolled ISTA (U-ISTA), and unrolled half-quadratic (U-HQ) -- for sparse signal recovery in chromatography, demonstrating that unrolled methods outperform their iterative counterparts in restoration quality.",
+      "use_in_sections": ["related_work", "introduction"]
+    },
+    {
+      "claim": "Gharbi et al. noted that 1D signal restoration, as it occurs in analytical chemistry, remains scarcely studied in the deep unrolling literature compared to image processing applications.",
+      "use_in_sections": ["introduction", "related_work"]
+    },
+    {
+      "claim": "In the unrolled architectures of Gharbi et al., algorithm hyperparameters such as step sizes and regularization weights are untied across layers and learned end-to-end via backpropagation, with positivity enforced through the ReLU activation function.",
+      "use_in_sections": ["related_work", "methodology"]
+    },
+    {
+      "claim": "Gharbi et al. reported that U-HQ achieved the best restoration quality (lowest MSE and highest TSNR) among the three unrolled methods on synthetic chromatography data, while U-ISTA was the fastest at inference.",
+      "use_in_sections": ["related_work", "evaluation"]
+    },
+    {
+      "claim": "Gharbi et al. found that the U-HQ architecture, using a smoothed hybrid penalty mixing Fair and Cauchy potentials, better recovered non-null signal baselines and peak intensities without bias effect compared to L1-based unrolled methods on real chromatography data.",
+      "use_in_sections": ["related_work", "evaluation"]
+    },
+    {
+      "claim": "Gharbi et al. observed that inference time of unrolled methods is significantly lower than that of iterative methods, since the number of network layers is considerably lower than typical iteration counts and GPU implementation is used.",
+      "use_in_sections": ["related_work", "evaluation"]
+    },
+    {
+      "claim": "The unrolled architectures of Gharbi et al. address the problem z = Hx + epsilon where H is a linear convolution operator and the goal is to recover sparse spike signal x, differing from baseline correction problems where the baseline itself must be estimated.",
+      "use_in_sections": ["related_work"]
+    },
+    {
+      "claim": "Gharbi et al. concluded that the final choice of unrolling method remains highly dataset and task dependent, and benchmarking remains necessary for a given application.",
+      "use_in_sections": ["related_work", "conclusion"]
+    },
+    {
+      "claim": "The U-ISTA architecture of Gharbi et al. learns per-layer step sizes gamma_k and regularization parameters chi_k, yielding a total of 2K learnable scalar parameters for K layers.",
+      "use_in_sections": ["related_work", "methodology"]
+    },
+    {
+      "claim": "Gharbi et al. generated synthetic chromatography datasets using Fraser-Suzuki peak shapes convolved with random spiky signals, with a Toeplitz Gaussian blur matrix and i.i.d. Gaussian noise of standard deviation 0.02.",
+      "use_in_sections": ["evaluation"]
+    }
+  ],
+  "do_not_claim": [
+    "This paper addresses baseline correction or baseline estimation (it addresses sparse spike deconvolution/deblurring only)",
+    "This paper unrolls the BEADS algorithm",
+    "This paper uses asymmetric penalties for peak positivity in the ISTA or PD formulations",
+    "This paper proposes a novel unrolling paradigm (it benchmarks existing paradigms in a new domain)"
+  ]
+}

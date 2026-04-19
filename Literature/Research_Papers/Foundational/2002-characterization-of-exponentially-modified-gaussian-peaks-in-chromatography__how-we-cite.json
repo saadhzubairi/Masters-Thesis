@@ -1,0 +1,39 @@
+{
+  "id": "grushka1972emg",
+  "title": "Characterization of Exponentially Modified Gaussian Peaks in Chromatography",
+  "authors": ["Grushka"],
+  "year": 1972,
+  "venue": "Analytical Chemistry",
+  "citations": [
+    {
+      "claim": "Grushka defined the exponentially modified Gaussian (EMG) peak as the convolution of a Gaussian function with an exponential decay, providing a theoretically justified model for chromatographic peak shapes that accounts for extra-column band broadening.",
+      "use_in_sections": ["background", "methodology"]
+    },
+    {
+      "claim": "The EMG peak shape is parameterized by the Gaussian standard deviation sigma, the retention time tR, and the exponential time constant tau, where the ratio tau/sigma controls the degree of peak asymmetry.",
+      "use_in_sections": ["background", "methodology"]
+    },
+    {
+      "claim": "Grushka derived closed-form expressions for the first four statistical moments of the EMG peak: the first moment is M1 = tR + tau, the second central moment is M2 = sigma^2 + tau^2, and the third central moment is M3 = 2*tau^3.",
+      "use_in_sections": ["background"]
+    },
+    {
+      "claim": "The skewness of an EMG peak ranges from 0 (pure Gaussian, tau/sigma = 0) to 2.0 (pure exponential decay, tau/sigma approaching infinity), with the fastest change occurring at tau/sigma approximately equal to 0.81.",
+      "use_in_sections": ["background"]
+    },
+    {
+      "claim": "Extra-column contributions such as detector dead volume and mixing chambers exponentially modify the chromatographic peak, with each source characterized by a specific time constant that determines the extent of peak distortion.",
+      "use_in_sections": ["background"]
+    },
+    {
+      "claim": "The EMG model is widely used as a realistic synthetic peak shape for generating training data in chromatographic signal processing, owing to its theoretical justification and ability to reproduce the asymmetric tailing commonly observed in real chromatograms.",
+      "use_in_sections": ["methodology", "evaluation"]
+    }
+  ],
+  "do_not_claim": [
+    "Grushka proposed the EMG model for baseline correction",
+    "Grushka applied deep learning or any computational learning method",
+    "The EMG model accounts for baseline drift or wandering baselines",
+    "Grushka was the first to use convolution of Gaussian and exponential functions in any context"
+  ]
+}

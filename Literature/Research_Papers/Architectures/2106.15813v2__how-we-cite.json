@@ -1,0 +1,38 @@
+{
+  "id": "koizumi2021dfconformer",
+  "title": "DF-Conformer: Integrated Architecture of Conv-TasNet and Conformer Using Linear Complexity Self-Attention for Speech Enhancement",
+  "authors": ["Koizumi", "Karita", "Wisdom", "Erdogan", "Hershey", "Jones", "Bacchiani"],
+  "year": 2021,
+  "venue": "IEEE Workshop on Applications of Signal Processing to Audio and Acoustics (WASPAA)",
+  "citations": [
+    {
+      "claim": "Koizumi et al. proposed DF-Conformer, which integrates Conformer layers with dilated convolution layers from TDCN++ for single-channel speech enhancement, combining local and global sequential modeling.",
+      "use_in_sections": ["related_work"]
+    },
+    {
+      "claim": "DF-Conformer uses FAVOR+ (fast attention via positive orthogonal random features) to reduce the quadratic time complexity of multi-head self-attention to linear complexity, enabling the use of Conformer with short-hop trainable filterbanks.",
+      "use_in_sections": ["related_work", "background"]
+    },
+    {
+      "claim": "DF-Conformer replaces the standard depthwise convolution in the Conformer block with stacked 1-D dilated depthwise convolutions, enabling a larger temporal receptive field without increasing model size.",
+      "use_in_sections": ["related_work"]
+    },
+    {
+      "claim": "In DF-Conformer, attention matrices in earlier layers tend to capture global noise characteristics across the full utterance, while deeper layers refine the mask using local structure, suggesting a coarse-to-fine processing hierarchy across layers.",
+      "use_in_sections": ["related_work"]
+    },
+    {
+      "claim": "The Conv-TasNet framework combines trainable analysis/synthesis filterbanks with a mask prediction network, where the encoder maps the time-domain signal to a representation, a mask is predicted, and the decoder reconstructs the enhanced signal.",
+      "use_in_sections": ["background"]
+    },
+    {
+      "claim": "Koizumi et al. demonstrated that combining dilated convolutions for local modeling with linear-complexity self-attention for global modeling achieves higher SI-SNR than using either mechanism alone for speech enhancement.",
+      "use_in_sections": ["related_work"]
+    }
+  ],
+  "do_not_claim": [
+    "DF-Conformer was applied to chromatogram baseline correction or chemical signal processing",
+    "DF-Conformer uses algorithm unrolling or deep unfolding",
+    "DF-Conformer eliminates the need for hyperparameter tuning"
+  ]
+}

@@ -1,0 +1,47 @@
+{
+  "id": "chen2022resunet",
+  "title": "Baseline correction using a deep-learning model combining ResNet and UNet",
+  "authors": ["Chen", "Son", "Park", "Baek"],
+  "year": 2022,
+  "venue": "Analyst",
+  "citations": [
+    {
+      "claim": "Chen et al. proposed ResUNet, a deep-learning baseline-correction model combining ResNet and UNet architectures that directly maps a raw spectrum to its corrected form, eliminating the need for manual parameter adjustment.",
+      "use_in_sections": ["introduction", "related_work"]
+    },
+    {
+      "claim": "Chen et al. trained their ResUNet model on 210,000 synthetically generated spectra composed of randomly combined peaks (Hanning windows), cubic-spline baselines, and additive Gaussian noise, all normalized to length 512.",
+      "use_in_sections": ["related_work", "methodology"]
+    },
+    {
+      "claim": "ResUNet achieved RMSE of 5.40e-4 and MAE of 4.24e-4 on simulated test data, outperforming standalone ResNet (RMSE 6.11e-4), standalone UNet (RMSE 5.68e-4), arPLS (RMSE 59.75e-4), and asPLS (RMSE 39.64e-4).",
+      "use_in_sections": ["related_work", "evaluation"]
+    },
+    {
+      "claim": "Chen et al. demonstrated that deep-learning-based baseline-correction methods are significantly better than penalized-least-squares methods such as arPLS and asPLS, and that the deep-learning approach eliminates the need for per-spectrum parameter tuning.",
+      "use_in_sections": ["introduction", "related_work"]
+    },
+    {
+      "claim": "Chen et al. showed that acquiring sufficient manually labeled spectral data for training deep-learning baseline-correction networks is prohibitively expensive, motivating the use of synthetic training data.",
+      "use_in_sections": ["introduction", "methodology"]
+    },
+    {
+      "claim": "The ResUNet model of Chen et al. contains approximately 2.35 million trainable parameters and uses 1D convolutional layers for both downsampling and upsampling instead of max-pooling.",
+      "use_in_sections": ["related_work"]
+    },
+    {
+      "claim": "Chen et al. found that for one-dimensional spectral data, setting channel sizes by a factor of 1.5 rather than the standard doubling used in 2D image networks reduces the number of parameters while improving performance.",
+      "use_in_sections": ["related_work"]
+    },
+    {
+      "claim": "Chen et al. noted that penalized least squares methods such as arPLS and asPLS require manual setting of the smoothness parameter lambda, and that if the parameters are fixed, the baseline-correction result varies significantly based on the input spectrum.",
+      "use_in_sections": ["introduction", "background"]
+    }
+  ],
+  "do_not_claim": [
+    "That ResUNet uses algorithm unrolling or is derived from an iterative optimization algorithm",
+    "That ResUNet learns interpretable parameters of a classical algorithm",
+    "That ResUNet was tested on chromatographic data",
+    "That ResUNet performs simultaneous denoising and baseline correction as separate outputs"
+  ]
+}

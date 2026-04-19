@@ -1,0 +1,42 @@
+{
+  "id": "gulati2020conformer",
+  "title": "Conformer: Convolution-augmented Transformer for Speech Recognition",
+  "authors": ["Gulati", "Qin", "Chiu", "Parmar", "Zhang", "Yu", "Han", "Wang", "Zhang", "Wu", "Pang"],
+  "year": 2020,
+  "venue": "Interspeech 2020 (arXiv:2005.08100)",
+  "citations": [
+    {
+      "claim": "Gulati et al. proposed the Conformer, which combines self-attention for capturing global interactions with depthwise convolutions for extracting local features, achieving state-of-the-art speech recognition on LibriSpeech.",
+      "use_in_sections": ["related_work"]
+    },
+    {
+      "claim": "The Conformer architecture demonstrated that combining convolution and self-attention modules within a single block captures both local and global dependencies more effectively than either mechanism alone.",
+      "use_in_sections": ["introduction", "related_work"]
+    },
+    {
+      "claim": "Gulati et al. showed that Transformers are effective at modeling long-range global context but less capable of extracting fine-grained local feature patterns, while CNNs effectively exploit local information through position-based kernels.",
+      "use_in_sections": ["introduction", "background"]
+    },
+    {
+      "claim": "The Conformer uses a macaron-style sandwich structure with two half-step feed-forward layers surrounding a multi-headed self-attention module and a convolution module, connected by residual connections.",
+      "use_in_sections": ["related_work", "background"]
+    },
+    {
+      "claim": "Gulati et al. employed relative sinusoidal positional encoding from Transformer-XL, which allows the self-attention module to generalize better across different input lengths.",
+      "use_in_sections": ["related_work"]
+    },
+    {
+      "claim": "The Conformer achieved word error rates of 2.1%/4.3% on LibriSpeech test/testother without a language model, and 1.9%/3.9% with an external language model.",
+      "use_in_sections": ["related_work"]
+    },
+    {
+      "claim": "Gulati et al. found that depthwise convolution kernel sizes of 17 to 32 yielded the best performance, with larger kernels (65) causing degradation.",
+      "use_in_sections": ["related_work"]
+    }
+  ],
+  "do_not_claim": [
+    "The Conformer was designed for or applied to signal separation or baseline correction tasks",
+    "The Conformer uses algorithm unrolling or learned iterative optimization",
+    "The Conformer was applied to chromatographic or spectroscopic data"
+  ]
+}

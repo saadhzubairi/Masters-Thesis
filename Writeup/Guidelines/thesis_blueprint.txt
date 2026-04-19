@@ -1,0 +1,1127 @@
+================================================================================
+              LBEADS-NET THESIS — WRITING BLUEPRINT (Revised)
+              NYU Tandon MS Thesis (Mechatronics & Robotics)
+================================================================================
+
+Total target: ~65–80 pages (body only, excluding front matter & appendices)
+
+Revision note: This blueprint integrates the baseline leakage analysis as a
+narrative thread running through the entire thesis. The leakage problem is not
+confined to one section — it motivates the loss design (Ch. 3), shapes the
+evaluation (Ch. 4–5), and anchors the discussion (Ch. 6).
+
+================================================================================
+FILE STRUCTURE — What to create
+================================================================================
+
+Current template has: introduction/, background/, conclusions/
+You need to ADD these chapter directories (each with .tex + .bib):
+
+  Writeup/Document/
+  ├── thesis.tex                  <- UPDATE: add \input for all 7 chapters
+  ├── definitions.tex             <- UPDATE: add any new math commands
+  ├── abstract.tex                <- WRITE: ~300 words
+  ├── acknowledge.tex             <- WRITE
+  ├── vita.tex                    <- WRITE
+  ├── thesis.bib                  <- POPULATE with all references
+  ├── figures/                    <- CREATE: shared figures directory
+  ├── introduction/
+  │   ├── introduction.tex        <- REWRITE for LBEADS-NET
+  │   └── introduction.bib
+  ├── background/
+  │   ├── background.tex          <- REWRITE for Ch. 2
+  │   └── background.bib
+  ├── method/                     <- CREATE
+  │   ├── method.tex
+  │   └── method.bib
+  ├── experiments/                <- CREATE
+  │   ├── experiments.tex
+  │   └── experiments.bib
+  ├── results/                    <- CREATE
+  │   ├── results.tex
+  │   └── results.bib
+  ├── discussion/                 <- CREATE
+  │   ├── discussion.tex
+  │   └── discussion.bib
+  ├── conclusions/
+  │   ├── conclusions.tex         <- REWRITE for Ch. 7
+  │   └── conclusions.bib
+  └── appendix/
+      └── app1.tex                <- Mathematical derivations, extra tables
+
+thesis.tex changes needed:
+  - Update \thesistitle to LBEADS-NET title
+  - Update \thesisauthor, \thesisadvisor, \graddate
+  - Add \input lines for method, experiments, results, discussion chapters
+  - Change \setcounter{tocdepth}{2} (show subsections in TOC)
+
+================================================================================
+CHAPTER 1 — INTRODUCTION                                    (~5–7 pages)
+================================================================================
+
+File: introduction/introduction.tex
+
+SECTION 1.1: The Problem — Baseline Drift in Chromatography
+  - What chromatography is (1–2 sentences, not a tutorial)
+  - Define baseline drift: low-frequency signal corruption from column bleed,
+    detector drift, temperature gradients
+  - Why it matters: corrupts peak areas -> wrong concentrations -> bad
+    quantitative analysis
+  - Include ONE motivating figure: a raw chromatogram showing visible drift
+    vs. the true baseline
+
+SECTION 1.2: Limitations of Existing Approaches
+  - Classical methods (BEADS, arPLS, etc.) require per-signal parameter tuning
+    (lambda_0, lambda_1, lambda_2, r, fc)
+  - No single parameter set generalizes across signal types
+  - Deep learning alternatives exist but are black-box, not interpretable
+  - Gap: no method combines learned generalization with algorithmic
+    interpretability
+  - NEW: Preview the baseline leakage challenge — sparsity-based methods
+    fundamentally struggle with dense-peak regions, a problem that persists
+    even when parameters are learned
+
+SECTION 1.3: Contribution — LBEADS-NET
+  - State clearly: "We propose LBEADS-NET, an algorithm-unrolled neural
+    network that converts the iterative BEADS algorithm into a trainable
+    architecture with learnable parameters per layer."
+  - Key contributions (bulleted):
+    (1) Algorithm unrolling of BEADS into differentiable layers with
+        per-layer learnable parameters (26 learned scalars total)
+    (2) Multi-stage curriculum training with composite loss designed to
+        suppress baseline leakage
+    (3) Systematic diagnosis and mitigation of baseline leakage —
+        identifying three root causes (sparsity violation, filter bandwidth
+        mismatch, uniform regularization) and engineering loss-based
+        countermeasures across six development iterations (v3-v7)
+    (4) Analysis of failure modes: CG variant gradient collapse,
+        fc non-learnability at the autograd boundary, and fundamental
+        limits of sparsity-based decomposition in dense-peak regimes
+    (5) Hybrid inference pipeline with quality-scored stage selection
+
+SECTION 1.4: Thesis Outline
+  - One paragraph mapping chapters 2–7, mentioning that the baseline
+    leakage thread runs through method design, evaluation, and discussion
+
+KEY FIGURES:
+  - Fig 1.1: Motivating example — raw signal with drift vs. corrected
+
+KEY REFERENCES TO CITE:
+  - BEADS original paper (Ning, Selesnick & Duval, 2014)
+  - 1–2 algorithm unrolling survey papers (Monga et al., 2021)
+  - 1–2 chromatography quantification references
+  - Gharbi et al. (2024) — briefly, as validation that this is a recognized
+    community problem
+
+--------------------------------------------------------------------------------
+
+================================================================================
+CHAPTER 2 — BACKGROUND & RELATED WORK                       (~14–17 pages)
+================================================================================
+
+File: background/background.tex
+
+SECTION 2.1: Chromatogram Signal Processing (~3–4 pages)
+  - Signal model: y = x + f + w
+    . y: observed chromatogram
+    . x: sparse peak component (analyte responses)
+    . f: smooth baseline (low-frequency drift)
+    . w: additive noise
+  - Physical causes of baseline drift (column bleed, detector aging,
+    temperature fluctuation, mobile phase composition changes)
+  - Why baseline matters for quantification: peak area integration,
+    limit of detection, calibration curves
+  - Peak shapes: Exponentially Modified Gaussian (EMG) model as the gold
+    standard for chromatographic peaks (Grushka, 1972; Naish & Hartwell, 1988)
+    — relevant because our synthetic data and evaluation use this model
+  - Include figure: annotated chromatogram labeling peaks, baseline, noise
+
+SECTION 2.2: Classical Baseline Correction Methods (~6–8 pages)
+
+  2.2.1: BEADS — Baseline Estimation And Denoising using Sparsity (~4–5 pages)
+    THIS IS THE CORE — cover in full mathematical detail:
+
+    The optimization problem:
+      minimize  ||Dx||_1 + lambda_0*||x||_1 + (lambda_1/2)*||Hf||_2^2
+                + (lambda_2/2)*||f||_2^2
+      subject to  y = x + f  (+ noise tolerance)
+
+    Variable splitting / MM derivation (high level):
+    - Majorization-Minimization for non-smooth L1 terms
+    - Iterative reweighting: w(z) = 1/(|z| + eps)
+
+    The BAfilt construction:
+    - Band-pass filter via cascaded Butterworth sections
+    - scipy.signal.butter -> banded Toeplitz matrices A and B
+    - Role of filter order d and cutoff frequency fc
+
+    The iterative update scheme:
+    . f-update: banded linear solve
+      (B^T B + lambda_1 H^T H + lambda_2 I) f = B^T(y - x)
+    . x-update: proximal/shrinkage with asymmetric penalty
+      Theta weighting: how r controls asymmetry
+    . Reweighting step: update w(z) = 1/(|z| + eps)
+
+    Role of each parameter:
+    | Parameter | Controls                          | Range      |
+    |-----------|-----------------------------------|------------|
+    | lambda_0  | Peak sparsity (L1 weight)         | 0.001-1.0  |
+    | lambda_1  | Baseline smoothness (1st deriv)    | 0.01-10    |
+    | lambda_2  | Baseline fidelity (2nd deriv)      | 0.01-10    |
+    | r         | Asymmetry ratio                   | 1-10       |
+    | fc        | Cutoff frequency (band-pass)       | 0.001-0.1  |
+    | d         | Filter order                      | 1 or 2     |
+
+    Why these parameters are hard to tune per-signal
+
+    *** NEW: Why BEADS Leaks in Dense-Peak Regions ***
+    Three mechanistic failure modes (0.5-1 page within 2.2.1):
+
+    (1) Sparsity assumption violation: The L1 penalty on x and its
+        derivatives assumes peaks are sparse — most of x should be zero.
+        When peaks are densely packed (metabolomics, complex mixtures),
+        the composite signal is neither sparse nor has sparse derivatives.
+        The L1 penalty over-shrinks peaks, and the surplus energy is
+        attributed to the baseline.
+
+    (2) Low-pass filter bandwidth mismatch: fc determines what counts
+        as "baseline." When peak tails overlap and their valleys don't
+        reach the true baseline, the sustained elevation appears
+        low-frequency to the filter, causing it to interpret overlapping
+        peak tails as baseline content. No single fc handles both sparse
+        and dense regions.
+
+    (3) Uniform regularization: Classical BEADS applies the same
+        lambda_0, lambda_1, lambda_2 everywhere. Dense-peak regions need
+        different regularization than sparse regions, but the algorithm
+        has no mechanism to adapt spatially.
+
+    Frame these as inherent to the BEADS formulation, not implementation
+    bugs — this motivates the LBEADS-NET design choices in Chapter 3.
+
+    Include figure: BEADS iteration diagram / block diagram
+    Include table: parameter roles and typical ranges
+
+  2.2.2: Other Classical Methods (~1.5–2 pages)
+    - arPLS (Baek et al., 2015): asymmetric reweighted penalized least
+      squares — iterative logistic-function reweighting
+    - airPLS (Zhang et al., 2010): adaptive iteratively reweighted PLS
+    - SNIP: Statistics-sensitive Non-linear Iterative Peak-clipping
+    - AsLS (Eilers, 2003): Asymmetric Least Squares — foundational
+
+    Position relative to BEADS: why BEADS is a good unrolling candidate
+    (explicit optimization, clear per-iteration structure, interpretable params)
+
+    *** NEW: BEADS vs arPLS failure mode contrast ***
+    Key insight (one paragraph): arPLS has NO sparsity assumption — it
+    fits a smooth curve below the data with adaptive weighting. In dense
+    regions:
+      - arPLS failure mode = "elevation" (baseline too high, but smooth)
+      - BEADS failure mode = "leakage" (baseline follows peak shapes)
+    Elevation is less damaging than leakage for quantification.
+    This contrast motivates the LBEADS-NET design goal: learn to behave
+    more like arPLS in dense regions and more like BEADS in sparse regions.
+
+SECTION 2.3: Algorithm Unrolling (~4–5 pages)
+  - Core idea: convert K iterations of an iterative algorithm into K
+    trainable network layers, where algorithm parameters become learnable
+  - LISTA lineage: Gregor & LeCun (2010) — the original unrolled ISTA
+  - General framework: iterative algorithm -> computation graph -> backprop
+  - Why it works: preserves algorithmic structure (interpretability) while
+    allowing data-driven parameter learning (generalization)
+  - Key advantages over black-box deep learning:
+    . Interpretable intermediate representations
+    . Fewer parameters (structured vs. free)
+    . Convergence guarantees (in some cases)
+  - Key unrolling architectures (brief survey):
+    . LISTA (Gregor & LeCun, 2010): founding work
+    . ALISTA (Liu et al., ICLR 2019): analytic weight initialization
+    . ISTA-Net+ (Zhang & Ghanem, CVPR 2018): learned nonlinear transforms
+    . ISTA-Net++ (You et al., IEEE TIP 2021): dynamic input-conditioned params
+    . Hybrid ISTA (Zheng et al., TPAMI 2022): convergence guarantees
+    . ADMM-Net (Yang et al., NeurIPS 2016): unrolled ADMM with learned
+      piecewise-linear shrinkage
+    . DeMUN (2025): comprehensive examination, intermediate supervision
+  - How this applies to BEADS: each BEADS iteration becomes a BEADSLayer
+    with learnable lambda_0, lambda_1, lambda_2, r per layer
+
+  *** NEW: Baseline leakage as a known limitation of unrolled sparse recovery ***
+  One paragraph: Gharbi, Chouzenoux, Pesquet & Duval (MLSP 2024,
+  Signal Processing 2024) compared unrolled primal-dual, unrolled ISTA,
+  and unrolled Half-Quadratic for 1D chromatographic signal restoration
+  and found that unrolled HQ underestimates peak intensities (measured
+  by TSNR). This confirms that baseline leakage is fundamental to the
+  class of unrolled sparse-recovery networks, not specific to LBEADS-NET.
+  DIRAS+ (Analytical Chemistry, 2025) explicitly called out baseline leakage
+  as a fundamental limitation of end-to-end deep learning approaches.
+  This validates the leakage problem addressed in this thesis.
+
+SECTION 2.4: Neural Approaches to Baseline Correction (~2–3 pages)
+  *** NEW SECTION — not in original blueprint ***
+
+  2.4.1: Deep Learning for Chromatography / Spectroscopy
+    - Kensert et al. (J. Chromatography A, 2021): 1D convolutional
+      autoencoder trained on 190K simulated chromatograms. RMSE 1.094 mAU
+      vs 2.074 for Savitzky-Golay. Demonstrates feasibility of synthetic-
+      data-trained neural baseline correction.
+    - CAE+ (Han et al., Sensors, 2024): convolutional autoencoder with
+      comparison function for Raman spectroscopy. Peak preservation rates
+      0.851-0.96. Found airPLS shows 2-3x higher error in peak regions
+      vs CAE+ — quantifying the leakage problem.
+    - ResNet+UNet (Chen et al., Analyst, 2022): hybrid architecture for
+      Raman baseline correction, eliminating manual parameter adjustment.
+    - 1dTrans (Zhao et al., 2025): first Transformer-based baseline
+      estimator. Lower MAE than CNN, ResUNet, and classical methods.
+    - RSPSSL (Hu et al., Light: Sci. & Appl., 2024): self-supervised via
+      Raman Spectral GAN. 88% RMSE reduction, ~1900 spectra/second.
+
+  2.4.2: Physics-Informed / Hybrid Approaches
+    - DIRAS+ (Analytical Chemistry, 2025): CNN+XGBoost pipeline predicting
+      optimal lambda per-spectrum, achieving 0.036 s/spectrum inference.
+      Explicitly identifies baseline leakage as a fundamental limitation.
+    - OP-airPLS (Analytical Chemistry, 2025): ML-predicted parameters for
+      airPLS, 2100x speedup over grid search.
+
+  2.4.3: Positioning LBEADS-NET
+    - Black-box neural methods: better generalization but no interpretability
+    - Physics-informed hybrids: use ML to predict classical method params
+    - LBEADS-NET: algorithm unrolling = the structure IS the model.
+      Neither black-box nor external parameter prediction — parameters
+      are learned jointly as part of the optimization architecture.
+    - This is the unique positioning in the related work landscape.
+
+KEY FIGURES:
+  - Fig 2.1: Annotated chromatogram (peaks, baseline, noise labeled)
+  - Fig 2.2: BEADS algorithm block diagram / iteration flow
+  - Fig 2.3: Generic algorithm unrolling concept diagram
+            (iterative algorithm -> unrolled network)
+  - Fig 2.4: Related work landscape positioning diagram (optional)
+
+KEY REFERENCES:
+  - Ning, Selesnick & Duval (2014) — BEADS
+  - Baek et al. (2015) — arPLS
+  - Zhang et al. (2010) — airPLS
+  - Eilers (2003) — AsLS / perfect smoother
+  - Grushka (1972) — EMG peak model
+  - Naish & Hartwell (1988) — EMG validation
+  - Gregor & LeCun (2010) — LISTA
+  - Monga et al. (2021) — algorithm unrolling survey
+  - Gharbi et al. (2024) — unrolled sparse recovery for chromatography
+  - DIRAS+ (2025), OP-airPLS (2025) — physics-informed hybrid
+  - Kensert et al. (2021), Han et al. (2024), Chen et al. (2022) — neural
+  - Hu et al. (2024) — RSPSSL
+  - Liu et al. (2019) — ALISTA
+  - Zhang & Ghanem (2018) — ISTA-Net+
+  - You et al. (2021) — ISTA-Net++
+  - Zheng et al. (2022) — Hybrid ISTA
+  - Yang et al. (2016) — ADMM-Net
+  - DeMUN (2025) — comprehensive unrolling examination
+
+--------------------------------------------------------------------------------
+
+================================================================================
+CHAPTER 3 — PROPOSED METHOD: LBEADS-NET                     (~15–18 pages)
+================================================================================
+
+File: method/method.tex
+
+SECTION 3.1: Problem Formulation (~1–2 pages)
+  - Restate the signal decomposition: y = x + f + w
+  - Goal: learn a mapping (y; Theta) -> (x_hat, f_hat) where Theta are
+    trainable params
+  - Design philosophy: unroll BEADS, don't replace it
+  - Frame the challenge: the loss function must not only train the network
+    to decompose signals, but actively counteract the sparsity-induced
+    leakage inherent to the BEADS formulation (see Ch. 2.2.1)
+
+SECTION 3.2: From BEADS to BEADSLayer (~4–5 pages)
+  - How one BEADS iteration maps to one neural network layer
+  - Learnable parameters per layer:
+    . log_lambda_0, log_lambda_1, log_lambda_2: log-space for positivity
+    . log_r: asymmetry ratio in log-space
+    . step_size: learned gradient step size (ISTA variant)
+    . output_gain: output scaling factor
+    Total: 26 learned scalar parameters across 8 layers
+  - BAfilt construction within the layer: banded Toeplitz structure,
+    how the butterworth filter coefficients are computed
+  - f-update step: banded linear system solve
+    . Show the matrix equation: (B^T B + lambda_1 H^T H + lambda_2 I) f
+      = B^T(y - x)
+    . Banded structure -> efficient solve
+  - x-update step: proximal/shrinkage operator
+    . Soft-thresholding with asymmetric weights
+    . The Theta weighting matrix and role of r
+  - Include ALGORITHM BOX: single BEADSLayer forward pass pseudocode
+  - Include FIGURE: single BEADSLayer architecture diagram
+
+SECTION 3.3: The ISTA-Style Fast Variant (~2–3 pages)
+  *** KEY ANALYTICAL CONTENT ***
+  - Original design: CG-based variant (conjugate gradient for f-update)
+  - Why CG failed: weak gradients through unrolled CG iterations,
+    gradient vanishing over K layers, CG convergence criterion not
+    differentiable
+  - The fix: ISTA-style splitting for the f-update
+    . Replace CG with a single-step proximal gradient update
+    . Trade per-iteration accuracy for better gradient flow
+  - Analytical argument: gradient flow comparison between CG and ISTA
+    variants (this is examiner-grade content)
+  - Design principle: simpler per-layer computation + more layers beats
+    complex per-layer computation + fewer layers
+  - Include FIGURE: gradient magnitude comparison across layers
+
+SECTION 3.4: Full K-Layer Pipeline (~2–3 pages)
+  - K=8 BEADSLayers stacked sequentially
+  - Each layer has independent learnable parameters
+  - Parameter specialization: early layers do coarse separation,
+    later layers refine
+  - Output: x_hat_K (peak estimate) and f_hat_K (baseline estimate)
+  - Intermediate outputs at every layer: used for intermediate supervision
+    and quality-scored stage selection
+  - Include FIGURE: full K-layer pipeline diagram showing data flow
+
+SECTION 3.5: Non-Learnable fc and the Autograd Boundary (~1–2 pages)
+  *** ANOTHER KEY ANALYTICAL SECTION ***
+  - fc (cutoff frequency) controls the BAfilt butterworth filter
+  - BAfilt uses scipy.signal.butter -> NumPy/SciPy outside PyTorch autograd
+  - Cannot backpropagate through scipy operations
+  - Consequence: fc must be fixed as a hyperparameter (fc=0.006), not learned
+  - This limits adaptivity to signals with different baseline frequency
+    characteristics
+  - Connection to leakage: fc directly controls the frequency boundary
+    between "baseline" and "peaks" — a fixed fc means the model cannot
+    adapt this boundary to dense vs sparse regions
+  - Discussion: potential solutions (differentiable filter design,
+    surrogate gradients) — connect to future work
+
+SECTION 3.6: Multi-Stage Curriculum Training (~2–3 pages)
+  - Motivation: composite loss is complex, direct optimization fails
+
+  - Stage A (warmup, 5 epochs): MSE-only loss
+    . Establishes basic peak/baseline separation
+    . Prevents early divergence from conflicting loss gradients
+
+  - Stage B (structured learning, 15 epochs):
+    MSE + baseline supervision + asymmetric loss + orthogonality
+    . Teaches correct separation behavior
+    . Anti-leakage losses activate here: asymmetric baseline loss
+      penalizes over-estimation 9x more than under-estimation,
+      orthogonality forces mutual exclusivity of x and f
+
+  - Stage C (refinement, 10 epochs): Full composite loss with all terms
+    . Adds envelope constraint, frequency separation, all sparsity terms
+    . Fine-tunes leakage suppression
+    . Intermediate supervision enabled: loss at every unrolled layer
+      with linearly increasing weights (0.1 -> 1.0)
+
+  - Include TABLE: stage configuration (epochs, active loss terms, weights)
+
+SECTION 3.7: Composite Loss Function (~3–4 pages)
+  *** Frame as "engineering against leakage" ***
+
+  Opening paragraph: The composite loss is designed with two objectives:
+  (1) train accurate signal decomposition, and (2) actively suppress
+  baseline leakage — the tendency of the sparsity-biased BEADS formulation
+  to absorb peak energy into the baseline estimate. Each term targets a
+  specific failure mode identified in Section 2.2.1.
+
+  3.7.1: Reconstruction Loss
+    - MSE: ||y - (x_hat + f_hat)||_2^2
+    - Anchor term, alpha_mse = 1.0
+    - Ensures decomposition reconstructs the original signal
+
+  3.7.2: Sparsity Penalties
+    - L1 on peaks: ||x_hat||_1 (alpha_l1 = 0.01)
+    - TV on peaks: ||nabla x_hat||_1 (alpha_tv = 0.01)
+    - Purpose: enforce sparse, sharp peak structure
+    - Note the tension: these penalties are the CAUSE of leakage in
+      dense regions (L1 pushes energy out of peaks), but are necessary
+      for correct behavior in sparse regions. The weights are kept low
+      to balance this tradeoff.
+
+  3.7.3: Baseline Supervision (the critical fix, v4)
+    - Masked MSE against ground-truth baseline in non-peak regions
+    - alpha_baseline = 0.5
+    - The masking strategy: only supervise where peaks are absent
+    - This was the single most impactful anti-leakage intervention —
+      directly tells the network what the baseline should look like
+
+  3.7.4: Smoothness Penalty
+    - ||nabla^2 f_hat||_2^2 on baseline (alpha_smooth = 0.2)
+    - Enforces smooth, low-frequency baseline
+
+  3.7.5: Non-Negativity Penalty + Softplus Constraint
+    - Soft penalty: max(0, -x_hat)^2 (alpha_neg = 0.5)
+    - Architectural constraint: softplus(x, beta=5) after output_gain
+    - Why softplus over ReLU: smooth gradients, avoids dead neurons
+    - beta=5 gives near-ReLU sharpness while maintaining differentiability
+    - Connection to leakage: negative peak artifacts enable a mode where
+      the network produces negative peaks to offset baseline over-estimation.
+      Softplus eliminates this degenerate solution.
+
+  3.7.6: Baseline Leakage Penalty
+    - Correlation between peak residual and baseline (alpha_leakage = 0.3)
+    - Detects when peak energy leaks into baseline estimate
+    - Complements baseline supervision (which requires ground truth)
+
+  3.7.7: Asymmetric Baseline Loss (NEW in v7, anti-leakage)
+    - Penalizes over-estimation 9x more than under-estimation
+    - alpha_asym_baseline = 1.0, asymmetry ratio alpha = 0.9
+    - Rationale: baseline rising above true level = leakage = worse for
+      quantification than slight under-estimation
+    - Derived from AsLS family (Eilers, 2005) and arPLS (Baek et al., 2015)
+
+  3.7.8: Element-Wise Orthogonality (evolved v6->v7, anti-leakage)
+    - ||x_hat . f_hat||_1 (alpha_ortho = 0.1)
+    - Enforces mutual exclusivity of peaks and baseline
+    - Adapted from orthogonal NMF (Ding et al., KDD 2006; Pompili et al.,
+      IEEE TKDE 2014)
+    - Evolution: v6 used gradient-based penalty (mean(|diff1(f)|^2)) ->
+      v7 switched to direct element-wise product, which is more effective
+
+  3.7.9: Envelope Constraint (anti-leakage)
+    - Baseline <= local signal minimum (alpha_envelope = 0.5)
+    - Soft local minimum via temperature-scaled log-sum-exp:
+      soft_min = -tau * logsumexp(-y_unfold / tau)
+    - Prevents baseline from rising above what the signal supports
+    - Window size = 51 (approximately 3x typical peak FWHM)
+
+  3.7.10: Frequency Separation Loss
+    - FFT-based: penalizes high-freq in baseline, low-freq in peaks
+    - alpha_freq = 0.05
+    - Enforces spectral role: baseline = low-frequency, peaks = broadband
+    - Limitation: dense peaks themselves contain low-frequency energy,
+      making perfect spectral separation impossible
+
+  - Include TABLE: all loss terms, formulas, weights, which training
+    stage activates them, and which failure mode each targets
+
+SECTION 3.8: Hybrid Inference Pipeline (~1–2 pages)
+  - LBEADS-NET output -> optional classical BEADS refinement
+  - Stage selection via quality scoring (baseline_hf_ratio, residual_hf_rms)
+  - Why hybrid: LBEADS provides good initialization, classical BEADS
+    provides convergence guarantees
+  - Empirical finding: "short_refine" (classical refinement) selected
+    for all test samples — LBEADS alone doesn't fully converge
+  - Include FIGURE: hybrid inference pipeline diagram
+
+KEY FIGURES:
+  - Fig 3.1: Single BEADSLayer architecture diagram
+  - Fig 3.2: Gradient flow comparison (CG vs ISTA variant)
+  - Fig 3.3: Full K-layer LBEADS-NET pipeline
+  - Fig 3.4: Hybrid inference pipeline
+  - Fig 3.5: Training stage progression diagram
+
+KEY TABLES:
+  - Table 3.1: Learnable parameters per BEADSLayer
+  - Table 3.2: Training stage configuration
+  - Table 3.3: Complete loss function summary (term, formula, weight,
+    stage activated, failure mode targeted)
+
+KEY ALGORITHMS:
+  - Algorithm 3.1: BEADSLayer forward pass
+  - Algorithm 3.2: LBEADS-NET training procedure
+  - Algorithm 3.3: Hybrid inference with quality scoring
+
+--------------------------------------------------------------------------------
+
+================================================================================
+CHAPTER 4 — EXPERIMENTAL SETUP                              (~7–9 pages)
+================================================================================
+
+File: experiments/experiments.tex
+
+SECTION 4.1: Synthetic Data Generation (~2–3 pages)
+  - SyntheticDataGenerator class
+  - Peak generation: piecewise-linear peaks with controllable:
+    . Number of peaks (range)
+    . Peak width distribution
+    . Peak height distribution
+    . Peak overlap probability
+  - Baseline generation: smooth functions via:
+    . Low-order polynomials
+    . Sinusoidal combinations
+    . Spline interpolation of random control points
+  - Noise model: additive Gaussian with controllable SNR (std=0.01 in v7)
+  - Signal length: N = 1024 training samples
+  - Note: the EMG peak model (Grushka, 1972) is the gold standard for
+    chromatographic simulation, but the current implementation uses
+    simpler piecewise-linear peaks. Discuss tradeoffs.
+  - Include FIGURE: example synthetic data (signal, peaks, baseline, noise)
+  - Include TABLE: data generation parameter ranges
+
+SECTION 4.2: Training Protocol (~2–3 pages)
+  - Architecture: K = 8 unrolled layers
+  - Signal length: N = 1024
+  - Optimizer: Adam, lr = 1e-3
+  - Batch size: 24
+  - Three-stage curriculum (reference Ch. 3.6):
+    . Stage A: 5 epochs, MSE only
+    . Stage B: 15 epochs, MSE + baseline supervision + asymmetric + ortho
+    . Stage C: 10 epochs, full composite loss
+  - Total: 30 epochs
+  - Loss weight schedule across stages
+  - Include TABLE: hyperparameter summary
+  - Include FIGURE: training loss curves across stages
+
+SECTION 4.3: Evaluation Metrics (~2–3 pages)
+
+  4.3.1: Standard Signal Decomposition Metrics
+    - MSE(x, x_hat): mean squared error on peaks
+    - MAE(x, x_hat): mean absolute error on peaks
+    - Correlation(x, x_hat): Pearson correlation
+    - MSE(f, f_hat): baseline estimation error
+    - Area error: |integral(x) - integral(x_hat)| / integral(x)
+    - Peak localization MAE (position error in samples)
+    - Peak match rate (% of true peaks detected)
+    - Define each precisely with formula
+
+  4.3.2: Baseline Leakage Detection Metrics (NEW)
+    *** These are critical for the thesis narrative ***
+
+    Baseline Leakage Index (BLI):
+      residual = f_pred - f_true
+      leakage = ReLU(residual) * peak_mask   (only over-estimation in peaks)
+      BLI = leakage.sum() / (peak_energy + eps)
+    BLI > 0 indicates baseline absorbing peak energy. This metric
+    directly measures the failure mode that motivated much of the
+    loss function design.
+
+    Peak-to-Baseline Error Ratio (PBER):
+      PBER = RMSE(f_pred[peak_mask], f_true[peak_mask])
+           / RMSE(f_pred[~peak_mask], f_true[~peak_mask])
+    PBER > 1 indicates worse performance in peak regions = leakage.
+    CAE+ (Han et al., 2024) found airPLS shows 2-3x higher error in
+    peak vs baseline regions.
+
+    Stratified Evaluation:
+    - Classify regions as "sparse" (<1 peak per window) or "dense"
+      (>3 overlapping peaks per window)
+    - Report ALL metrics separately for sparse vs dense regions
+    - Dense-region penalty = metric_dense / metric_sparse - 1
+      -> quantifies degradation in the problematic regime
+
+    Additional leakage-related metrics:
+    - Peak-region RMSE: RMSE computed within +/- 3*sigma of each peak
+    - Peak area preservation: |A_pred - A_true| / A_true * 100%
+    - Peak height preservation: |H_pred - H_true| / H_true * 100%
+    - L-infinity (max error): max|f_pred - f_true| (worst-case leakage)
+    - Non-negativity fraction: % of corrected signal that is negative
+
+SECTION 4.4: Baseline Comparison Methods (~1–2 pages)
+  - Classical BEADS (with manually tuned parameters)
+  - pybaselines implementations:
+    . arPLS (lam=1e6)
+    . airPLS
+    . SNIP (max_half_window=40)
+    . AsLS
+  - Parameter selection strategy for each classical method
+  - Real chromatogram data: from the original BEADS paper
+  - Note: comparison is not about beating classical BEADS numerically —
+    the contribution is generalization without per-signal tuning
+
+KEY FIGURES:
+  - Fig 4.1: Example synthetic data samples (easy, medium, hard)
+  - Fig 4.2: Training loss curves (3-stage progression)
+
+KEY TABLES:
+  - Table 4.1: Synthetic data generation parameters
+  - Table 4.2: Training hyperparameters
+  - Table 4.3: Evaluation metrics summary (standard + leakage-specific)
+
+--------------------------------------------------------------------------------
+
+================================================================================
+CHAPTER 5 — RESULTS & ANALYSIS                              (~13–16 pages)
+================================================================================
+
+File: results/results.tex
+
+SECTION 5.1: Synthetic Data Results (~7–9 pages)
+
+  5.1.1: Convergence and Training Dynamics (~2 pages)
+    - Loss curves across three training stages
+    - Loss decomposition: contribution of each term over training
+    - Stage transition behavior (how loss landscape changes)
+    - Note how anti-leakage losses (asymmetric, orthogonality) behave:
+      brief spike at activation then decrease as the network adapts
+
+  5.1.2: Learned Parameter Evolution (~2–3 pages)
+    *** KEY RESULT — UNIQUE TO ALGORITHM UNROLLING ***
+    - How lambda_0, lambda_1, lambda_2, r values differ across layers 1->K
+    - Do parameters specialize? (early layers: coarse, later: fine)
+    - Compare learned parameters to manually-tuned BEADS parameters
+    - Reference v6 diagnostics: lam0 ~ 0.002 (very small = weak sparsity),
+      r ~ 5.8-6.2 (near default 6.0), step ~ 0.986 (near 1.0)
+    - v7 uses 8 layers — extract updated parameter profiles
+    - This is a KEY result: demonstrates that unrolling adds value over
+      fixed-parameter iteration
+    - Include FIGURE: parameter values per layer (bar/line chart)
+
+  5.1.3: Quantitative Comparison (~2 pages)
+    - LBEADS-NET vs. classical BEADS vs. pybaselines methods
+    - Include TABLE: full comparison across all metrics
+    - Statistical significance: mean +/- std over test set
+    - Breakdown by signal difficulty (SNR, peak density, baseline type)
+    - Frame honestly: LBEADS-NET may not beat tuned BEADS numerically —
+      the advantage is generalization (one model, no tuning)
+
+  5.1.4: Baseline Leakage Analysis (~2 pages)
+    *** NEW SECTION — central to thesis narrative ***
+    - Report BLI and PBER for LBEADS-NET vs all comparison methods
+    - Stratified results: sparse regions vs dense regions
+    - Show that leakage metrics improve from v3 -> v7 as mitigations
+      were added (if data available from multiple versions)
+    - Dense-region penalty metric: how much worse does each method
+      perform in dense vs sparse regions?
+    - Comparative finding: leakage pattern differs by method
+      . BEADS: highest leakage in dense regions (sparsity violation)
+      . arPLS: elevation rather than leakage (smoother failure mode)
+      . LBEADS-NET: reduced leakage vs classical BEADS but not eliminated
+    - Include FIGURE: BLI comparison bar chart across methods
+
+  5.1.5: Qualitative Examples (~1–2 pages)
+    - 3–4 example signals showing:
+      . Input signal y
+      . Ground truth peaks and baseline
+      . LBEADS-NET output
+      . Classical BEADS output
+      . Best pybaselines output
+    - Choose examples strategically:
+      Example 1: Easy — well-separated peaks, LBEADS works well
+      Example 2: Complex baseline, LBEADS outperforms classical
+      Example 3: Dense peaks — show leakage behavior, honest assessment
+      Example 4: Failure case — extreme density, LBEADS struggles
+
+SECTION 5.2: Real Chromatogram Results (~4–5 pages)
+
+  5.2.1: Chromatogram Demo Results (~2 pages)
+    - Visual comparison: before/after baseline correction
+    - Side-by-side: LBEADS-NET vs. classical BEADS
+    - No ground truth — assessment is qualitative + quality metrics
+    - Unsupervised quality indicators:
+      . Non-negativity fraction of corrected signal
+      . Baseline smoothness: TV(f_hat) and ||D^2 f_hat||_2^2
+      . Residual autocorrelation in peak-free regions (Durbin-Watson)
+
+  5.2.2: Hybrid Pipeline Performance (~1–2 pages)
+    - Compare: LBEADS alone vs LBEADS + classical refinement vs full hybrid
+    - Key finding: classical refinement selected for ALL test samples
+    - LBEADS provides good initialization -> refinement converges faster
+    - Energy comparison: x_lbeads << x_true (undershoots), x_hybrid corrects
+
+  5.2.3: Where It Works and Where It Doesn't (~1 page)
+    - Success cases: moderate drift, separated peaks
+    - Partial success: dense peaks, some leakage but manageable
+    - Failure cases: extreme drift, very dense overlapping peaks
+    - Transitions naturally to Chapter 6
+
+KEY FIGURES:
+  - Fig 5.1: Training convergence curves (3 stages)
+  - Fig 5.2: Loss decomposition over training
+  - Fig 5.3: Learned parameter evolution across layers (KEY FIGURE)
+  - Fig 5.4: Baseline leakage metrics comparison (NEW, KEY FIGURE)
+  - Fig 5.5: Synthetic data comparison panels (3–4 examples)
+  - Fig 5.6: Real chromatogram comparison panels
+  - Fig 5.7: Hybrid pipeline comparison
+
+KEY TABLES:
+  - Table 5.1: Synthetic data — full metrics comparison
+  - Table 5.2: Baseline leakage metrics — BLI, PBER, stratified results (NEW)
+  - Table 5.3: Hybrid vs. standalone performance
+  - Table 5.4: Real data qualitative assessment
+
+--------------------------------------------------------------------------------
+
+================================================================================
+CHAPTER 6 — DISCUSSION & LIMITATIONS                        (~8–11 pages)
+================================================================================
+
+File: discussion/discussion.tex
+
+*** TURN WEAKNESSES INTO THESIS STRENGTH — ANALYZE, DON'T JUST REPORT ***
+*** BASELINE LEAKAGE IS THE CENTERPIECE OF THIS CHAPTER ***
+
+SECTION 6.1: Baseline Leakage — Diagnosis and Mitigation (~3–4 pages)
+  *** THE CORE DISCUSSION SECTION ***
+
+  6.1.1: Root Cause Analysis (~1 page)
+    - Restate the three failure modes from Ch. 2.2.1:
+      (1) Sparsity assumption violation in dense-peak regions
+      (2) Low-pass filter bandwidth mismatch — no single fc handles both
+          sparse and dense regions
+      (3) Uniform regularization — no spatial adaptivity
+    - Frame as INHERENT to BEADS, not an implementation issue
+    - Cite Gharbi et al. (2024) confirming this is a community-wide problem
+    - Cite DIRAS+ (2025) identifying leakage as a fundamental DL limitation
+
+  6.1.2: The Mitigation Journey — v3 to v7 (~1.5–2 pages)
+    Tell the engineering story systematically:
+
+    | Version | Mitigation                    | Outcome                         |
+    |---------|-------------------------------|--------------------------------|
+    | v3      | Sparsity losses (L1, TV)      | Made peaks sparser but didn't   |
+    |         |                               | fix leakage — L1 is the CAUSE  |
+    | v4      | Baseline supervision (masked  | Major improvement — baseline    |
+    |         | MSE)                          | stops following peaks           |
+    | v6      | Gradient-based orthogonality  | Modest — gradient penalty is    |
+    |         |                               | indirect                       |
+    | v7      | Asymmetric baseline loss (9:1)| Reduced over-estimation         |
+    | v7      | Element-wise orthogonality    | Better mutual exclusivity       |
+    | v7      | Envelope constraint           | Prevents baseline excursions    |
+    |         |                               | above local minimum            |
+    | v7      | Frequency separation (FFT)    | Enforces spectral roles, but    |
+    |         |                               | dense peaks have low-freq too  |
+    | v7      | Softplus constraint           | Eliminates negative-peak        |
+    |         |                               | artifacts (a degenerate mode)  |
+
+    For each: what the mitigation targeted, how it helped, and why it
+    wasn't sufficient alone. Quantitative improvement where available
+    (BLI reduction, PBER improvement).
+
+  6.1.3: Fundamental Limits of Sparsity-Based Decomposition (~1 page)
+    The thesis-level takeaway:
+    - All mitigations are REGULARIZERS on top of a sparsity-biased
+      formulation
+    - The core BEADS optimization assumes sparsity; no amount of loss
+      engineering fully overcomes this when the assumption is violated
+    - The arPLS insight: methods without sparsity assumptions exhibit
+      "elevation" (baseline too high but smooth) rather than "leakage"
+      (baseline follows peak shapes) — a qualitatively different and
+      less damaging failure mode
+    - To truly fix the problem: need either (a) signal-adaptive sparsity
+      that relaxes in dense regions, or (b) a non-sparsity-based
+      decomposition (different paradigm)
+    - This is not specific to BEADS or chromatography — any unrolled
+      network inheriting L1-based sparsity will face this in dense regimes
+    - This insight is a contribution to the algorithm unrolling community
+
+SECTION 6.2: Training/Inference Length Mismatch (~1.5 pages)
+  - Training: N = 1024, Inference: often N = 4096+
+  - Distribution shift: longer signals have different spectral properties
+  - Which components are length-sensitive (BAfilt, frequency separation)
+    vs length-invariant (pointwise shrinkage, TV penalty)
+  - fc=0.006 may be suboptimal at different N — different Nyquist-relative
+    position
+  - Potential fixes: variable-length training, sliding-window inference,
+    convolutional architecture
+
+SECTION 6.3: The CG Variant's Failure (~1.5 pages)
+  *** ANALYTICAL CONTENT EXAMINERS VALUE ***
+  - CG-based f-update: K_inner CG steps per layer x K_outer layers
+  - Problem: gradient backprops through K_inner * K_outer sequential ops
+    (e.g., 10 * 8 = 80 operations -> vanishing gradients)
+  - CG convergence criterion is not differentiable
+  - Lesson: not all iterative algorithms unroll equally well — the
+    inner solver's gradient properties determine trainability
+  - Design principle: simpler per-layer + more layers > complex per-layer
+    + fewer layers
+  - Connection to implicit differentiation literature
+  - Include FIGURE: gradient magnitude per layer comparison
+
+SECTION 6.4: Non-Learnable fc and the Autograd Boundary (~1 page)
+  - fc controls butterworth filter cutoff in BAfilt
+  - scipy.signal.butter -> outside PyTorch autograd
+  - Cannot compute d(loss)/d(fc)
+  - This limits adaptivity: signals with different baseline frequency
+    characteristics all get the same fc
+  - Connection to leakage: a learnable fc would allow the model to
+    widen the baseline bandwidth in sparse regions and narrow it in
+    dense regions, partially addressing the bandwidth mismatch failure mode
+  - Potential fix: differentiable IIR filter design (future work)
+
+SECTION 6.5: Softplus Approximation — Train/Inference Gap (~0.5–1 page)
+  - softplus(x, beta=5) ~ ReLU but softplus(0) = ln(2)/5 ~ 0.139
+  - Training: smooth gradients enable learning through zero-crossing
+  - Inference: small positive bias in near-zero regions (~0.000016 min val)
+  - General lesson for the unrolling community: learned proximal operators
+    using approximate activations face train/test mismatch
+  - This is a broader insight about differentiable relaxations
+
+KEY FIGURES:
+  - Fig 6.1: Dense-peak leakage example — ground truth vs LBEADS output
+    with visible leakage. Annotated to show where and how leakage manifests.
+  - Fig 6.2: Version progression — same signal processed by v3, v4, v6, v7
+    showing progressive improvement in leakage suppression (NEW, KEY FIGURE)
+  - Fig 6.3: Gradient magnitude per layer (CG vs ISTA variant)
+  - Fig 6.4: Length mismatch — same model on N=1024 vs N=4096
+
+--------------------------------------------------------------------------------
+
+================================================================================
+CHAPTER 7 — CONCLUSION & FUTURE WORK                        (~4–5 pages)
+================================================================================
+
+File: conclusions/conclusions.tex
+
+SECTION 7.1: Summary of Contributions (~1.5–2 pages)
+  - LBEADS-NET: first algorithm-unrolled network for baseline correction
+  - Demonstrated that BEADS iterations map naturally to trainable layers
+    with emergent per-layer parameter specialization
+  - Multi-stage curriculum training enables stable optimization of
+    complex composite loss with 11 terms
+  - Systematic diagnosis and mitigation of baseline leakage:
+    . Identified three root causes (sparsity violation, bandwidth mismatch,
+      uniform regularization)
+    . Engineered loss-based countermeasures (asymmetric loss, orthogonality,
+      envelope constraint)
+    . Documented the mitigation journey across six development iterations
+    . Established fundamental limits of sparsity-based decomposition in
+      dense-peak regimes
+  - Hybrid inference pipeline bridges learned and classical methods
+  - Analytical insights: CG gradient collapse, fc non-learnability,
+    softplus train/inference gap — valuable to the unrolling community
+
+SECTION 7.2: Generalization Argument (~0.5 pages)
+  - The unrolling methodology is not specific to BEADS
+  - Any iterative signal decomposition algorithm with clear per-iteration
+    structure is a candidate for unrolling
+  - LBEADS-NET demonstrates the template: identify parameters -> make
+    learnable -> design loss -> curriculum training
+  - The leakage analysis generalizes too: any unrolled L1-based method
+    will face similar challenges in dense regimes
+
+SECTION 7.3: Future Directions (~2–2.5 pages)
+  *** Enriched with concrete directions from leakage research ***
+
+  7.3.1: Learned Proximal Operators
+    - Replace hand-designed soft-thresholding with small learned CNN
+    - Residual structure: output = soft_threshold(x) + CNN(x)
+    - Follows ISTA-Net+ (Zhang & Ghanem, CVPR 2018)
+    - Key advantage for leakage: can learn to NOT shrink in dense regions
+    - Convergence guarantees: Hybrid ISTA (Zheng et al., TPAMI 2022) proves
+      convergence if learned component satisfies contractivity condition
+
+  7.3.2: Signal-Adaptive Parameter Prediction
+    - Small encoder predicting per-signal lambda adjustments
+    - Follows ISTA-Net++ (You et al., IEEE TIP 2021)
+    - DIRAS+ uses CNN+XGBoost for per-spectrum lambda prediction
+    - Most principled fix for leakage: dense regions get lower lambda_0
+      automatically — the network learns when to relax sparsity
+
+  7.3.3: Making fc Differentiable
+    - Differentiable IIR filter design: parameterize frequency response
+      directly in PyTorch
+    - Replace butterworth with learnable 1D convolution kernels
+    - Signal-adaptive fc via meta-learning / hypernetwork
+    - Would allow the model to adapt the baseline/peak frequency boundary
+
+  7.3.4: ADMM Reformulation
+    - Unroll ADMM instead of MM/ISTA
+    - ADMM variable splitting: peaks and baseline as separate auxiliary vars
+    - ADMM-Net (Yang et al., NeurIPS 2016): piecewise-linear shrinkage
+      more flexible than soft-thresholding
+    - Natural separation between data fidelity and regularization
+
+  7.3.5: Deep Equilibrium Model (DEQ)
+    - Convert LBEADS-NET to DEQ: iterate until convergence per signal
+    - Dense-peak signals that need more iterations get them automatically
+    - O(1) memory via implicit differentiation
+    - MsDC-DEQ-Net (Yu & Dansereau, 2024), GUDL (2025)
+    - Bai, Kolter & Koltun (NeurIPS 2019)
+
+  7.3.6: Alternative Architectures
+    - Conformer (Gulati et al., 2020): convolution + self-attention captures
+      both local peak shapes and global baseline trends
+    - Wave-U-Net (Stoller et al., 2018): difference output layer enforces
+      energy conservation (peaks = signal - baseline)
+    - WaveNet-style dilated convolutions: large receptive field preserving
+      sample-level resolution. Learnable dilation won MIT RF Challenge
+      (ICASSP 2024).
+    - Mamba / SSMs (Gu & Dao, 2023): linear O(N) with data-dependent
+      selection. No paper has applied Mamba to chromatography baseline
+      correction — novel direction.
+
+  7.3.7: Extension to Other Signal Types
+    - Raman spectroscopy baseline correction
+    - Mass spectrometry
+    - ECG baseline wander correction
+    - Cross-domain generalization
+
+--------------------------------------------------------------------------------
+
+================================================================================
+FRONT MATTER NOTES
+================================================================================
+
+ABSTRACT (~300 words):
+  - Problem: baseline drift in chromatography
+  - Gap: existing methods need per-signal tuning, black-box DL lacks
+    interpretability
+  - Method: LBEADS-NET = algorithm-unrolled BEADS with 26 learnable
+    parameters across 8 layers
+  - Anti-leakage design: multi-stage curriculum training with composite
+    loss engineered to suppress sparsity-induced baseline leakage
+  - Key results: competitive with tuned classical methods, learned
+    parameter specialization across layers, systematic analysis of
+    leakage failure modes
+  - Significance: template for unrolling signal decomposition algorithms
+    + insights on fundamental limits of sparsity-based decomposition
+
+TITLE (update in thesis.tex):
+  "LBEADS-NET: Algorithm Unrolling for Learned Baseline
+  Estimation and Denoising in Chromatographic Signals"
+
+================================================================================
+THESIS.TEX — REQUIRED CHAPTER INCLUDES
+================================================================================
+
+Replace the current \input section with:
+
+  \input{introduction/introduction}    % Chapter 1
+  \input{background/background}        % Chapter 2
+  \input{method/method}                % Chapter 3
+  \input{experiments/experiments}       % Chapter 4
+  \input{results/results}              % Chapter 5
+  \input{discussion/discussion}        % Chapter 6
+  \input{conclusions/conclusions}       % Chapter 7
+
+And update the bibliography line to include all chapter bibs:
+
+  \bibliography{thesis,introduction/introduction,background/background,
+    method/method,experiments/experiments,results/results,
+    discussion/discussion,conclusions/conclusions}
+
+================================================================================
+DEFINITIONS.TEX — SUGGESTED ADDITIONS
+================================================================================
+
+Math commands you'll need:
+
+  \newcommand{\vx}{\mathbf{x}}          % peak vector
+  \newcommand{\vf}{\mathbf{f}}          % baseline vector
+  \newcommand{\vy}{\mathbf{y}}          % observed signal
+  \newcommand{\vw}{\mathbf{w}}          % noise vector
+  \newcommand{\mB}{\mathbf{B}}          % BAfilt matrix
+  \newcommand{\mH}{\mathbf{H}}          % smoothness matrix
+  \newcommand{\mD}{\mathbf{D}}          % difference matrix
+  \newcommand{\mTheta}{\boldsymbol{\Theta}}  % parameter set
+  \DeclareMathOperator{\softplus}{softplus}
+  \DeclareMathOperator{\shrink}{shrink}
+  \newcommand{\lbeads}{\textsc{LBeads-Net}\xspace}
+
+================================================================================
+WRITING ORDER RECOMMENDATION
+================================================================================
+
+  1. Chapter 3 (Method) — write first, it's the core contribution
+  2. Chapter 4 (Experiments) — straightforward, needs method defined
+  3. Chapter 5 (Results) — needs experiments defined, write as you run them
+  4. Chapter 2 (Background) — write after method is solid, so you know
+     exactly what background to cover
+  5. Chapter 6 (Discussion) — write after results, the leakage narrative
+     needs results data to reference
+  6. Chapter 1 (Introduction) — write second-to-last, frames everything
+  7. Chapter 7 (Conclusion) — write last, summarizes all contributions
+  8. Abstract — write very last
+
+================================================================================
+PAGE BUDGET SUMMARY
+================================================================================
+
+  Chapter 1: Introduction ............... 5–7 pages
+  Chapter 2: Background & Related Work .. 14–17 pages  (+2 vs original: Sec 2.4)
+  Chapter 3: Proposed Method ............ 15–18 pages
+  Chapter 4: Experimental Setup ......... 7–9 pages    (+1: leakage metrics)
+  Chapter 5: Results & Analysis ......... 13–16 pages   (+1: leakage analysis)
+  Chapter 6: Discussion & Limitations ... 8–11 pages    (+3: expanded leakage)
+  Chapter 7: Conclusion & Future Work ... 4–5 pages     (+1: enriched future work)
+  -------------------------------------------------------
+  TOTAL BODY ............................ 66–83 pages
+
+  Front matter (cover, abstract, TOC, etc.) adds ~8–10 pages
+  Appendices add ~5–10 pages
+  TOTAL DOCUMENT: ~80–103 pages
+
+================================================================================
+BASELINE LEAKAGE NARRATIVE — THREAD MAP
+================================================================================
+
+This is the overarching story that connects the leakage material across
+chapters. Each chapter contributes a piece:
+
+  Ch. 1 (Intro):      Preview the challenge — sparsity-based methods
+                       struggle with dense peaks. Frame leakage analysis
+                       as a contribution.
+
+  Ch. 2 (Background): ROOT CAUSE ANALYSIS — three failure modes of BEADS
+                       in dense regions. arPLS contrast (elevation vs
+                       leakage). Gharbi et al. confirming it's fundamental
+                       to unrolled sparse recovery.
+
+  Ch. 3 (Method):     ENGINEERING RESPONSE — the composite loss is designed
+                       as anti-leakage engineering. Each loss term targets
+                       a specific failure mode. The curriculum training
+                       introduces anti-leakage losses strategically.
+
+  Ch. 4 (Experiments): MEASUREMENT — BLI and PBER metrics that directly
+                       quantify leakage. Stratified evaluation (sparse vs
+                       dense regions) to isolate the problem.
+
+  Ch. 5 (Results):    EVIDENCE — leakage metrics across methods, stratified
+                       results, comparison of failure patterns (BEADS
+                       leakage vs arPLS elevation vs LBEADS-NET reduction).
+
+  Ch. 6 (Discussion): THE FULL STORY — root cause + mitigation journey
+                       (v3->v7) + fundamental insight about sparsity limits.
+                       This is the intellectual centerpiece.
+
+  Ch. 7 (Conclusion): FORWARD PATH — concrete future directions motivated
+                       by the leakage analysis: learned proximal operators,
+                       signal-adaptive parameters, DEQ, alternative archs.
+
+================================================================================
+KEY REFERENCES — COMPLETE LIST
+================================================================================
+
+Foundational:
+  - Ning, Selesnick & Duval (2014) — BEADS
+  - Eilers (2003) — AsLS / perfect smoother
+  - Baek et al. (2015) — arPLS
+  - Zhang et al. (2010) — airPLS
+  - Ryan et al. (1988) — SNIP
+  - Grushka (1972) — EMG peak model
+  - Naish & Hartwell (1988) — EMG validation
+
+Algorithm Unrolling:
+  - Gregor & LeCun (2010) — LISTA
+  - Monga, Li & Eldar (2021) — survey
+  - Gharbi et al. (2024) — unrolled sparse recovery for chromatography
+  - Liu et al. (2019) — ALISTA
+  - Zhang & Ghanem (2018) — ISTA-Net+
+  - You et al. (2021) — ISTA-Net++
+  - Zheng et al. (2022) — Hybrid ISTA
+  - Yang et al. (2016) — ADMM-Net
+  - Diamond & Sitzmann (2017) — Unrolled Optimization with Deep Priors
+  - DeMUN (2025) — comprehensive examination
+
+Neural Baseline Correction:
+  - Kensert et al. (2021) — convolutional autoencoder, 190K synth. chromatograms
+  - Han et al. (2024) — CAE+, peak preservation rates
+  - Chen et al. (2022) — ResNet+UNet for Raman
+  - Zhao et al. (2025) — 1dTrans, Transformer baseline estimation
+  - Hu et al. (2024) — RSPSSL, self-supervised Raman
+  - DIRAS+ (2025) — physics-informed, identifies leakage as fundamental
+  - OP-airPLS (2025) — ML-predicted parameters
+
+Deep Equilibrium Models:
+  - Bai, Kolter & Koltun (2019) — DEQ
+  - Yu & Dansereau (2024) — MsDC-DEQ-Net
+  - GUDL (2025) — unsupervised DEQ
+
+Architectures (future work):
+  - Gulati et al. (2020) — Conformer
+  - Stoller et al. (2018) — Wave-U-Net
+  - van den Oord et al. (2016) — WaveNet
+  - Nguyen et al. (2024) — learnable dilation WaveNet
+  - Luo et al. (2022) — DF-Conformer
+  - Gu & Dao (2023) — Mamba
+
+Orthogonality / NMF:
+  - Ding et al. (2006) — Orthogonal NMF
+  - Pompili et al. (2014) — Orthogonal NMF algorithms
+  - Selesnick & Chen (2013) — OGS-TV
+
+Curriculum Learning:
+  - Hacohen & Weinshall (2019) — curriculum learning
+
+================================================================================

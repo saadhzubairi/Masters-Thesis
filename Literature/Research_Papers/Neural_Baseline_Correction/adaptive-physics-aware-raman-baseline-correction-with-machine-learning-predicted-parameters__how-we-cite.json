@@ -1,0 +1,56 @@
+{
+  "id": "aradhye2025diras",
+  "title": "Adaptive Physics-Aware Raman Baseline Correction with Machine Learning Predicted Parameters",
+  "authors": ["Aradhye", "Mandal", "Gray", "Campbell"],
+  "year": 2025,
+  "venue": "Analytical Chemistry",
+  "citations": [
+    {
+      "claim": "Aradhye et al. developed DIRAS, a baseline-correction method that integrates autoregressive spectral modeling with dynamically evolving weight controls, reducing sensitivity to the smoothing parameter lambda while retaining a physics-grounded iterative solver.",
+      "use_in_sections": ["related_work"]
+    },
+    {
+      "claim": "Aradhye et al. developed DIRAS+, a hybrid framework that uses a CNN autoencoder plus XGBoost regressor to predict the optimal log10(lambda) for the DIRAS solver, achieving Optuna-level baseline-correction accuracy without per-spectrum tuning.",
+      "use_in_sections": ["related_work", "introduction"]
+    },
+    {
+      "claim": "Aradhye et al. argued that end-to-end deep learning models for baseline correction are limited by substantial data requirements, fixed deterministic baselines, high computational demands, lack of interpretability, and poor generalization to spectral conditions not seen in training.",
+      "use_in_sections": ["introduction", "related_work"]
+    },
+    {
+      "claim": "DIRAS+ combines machine-learning-based parameter prediction with a mathematically grounded iterative solver, offering interpretability and user control that fully end-to-end architectures lack.",
+      "use_in_sections": ["related_work", "methodology"]
+    },
+    {
+      "claim": "Aradhye et al. used the Structural Similarity Index Measure (SSIM) adapted to 1D signals as the loss function for lambda optimization, finding that 1-SSIM outperforms MSE and MAE for selecting regularization parameters that recover true baselines.",
+      "use_in_sections": ["related_work", "evaluation"]
+    },
+    {
+      "claim": "DIRAS+ trained on 22,000 synthetic Raman spectra with Voigt-profile peaks and sinusoidal baselines, using a ResNet-inspired 1D autoencoder to compress spectra into a 48-dimensional latent space before predicting lambda with XGBoost.",
+      "use_in_sections": ["related_work"]
+    },
+    {
+      "claim": "Aradhye et al. demonstrated that DIRAS outperformed ALS, arPLS, and SEALS in batch correction of 300 synthetic spectra, achieving the lowest 1-SSIM (0.011) and near-zero AUC residual while using a single fixed lambda.",
+      "use_in_sections": ["related_work", "evaluation"]
+    },
+    {
+      "claim": "Aradhye et al. showed that poor baseline correction directly degrades downstream quantitative analysis, with DIRAS+ achieving R-squared of 0.832 in a pH sensing regression task compared to 0.475 for SEALS with optimally chosen fixed lambda.",
+      "use_in_sections": ["introduction", "related_work"]
+    },
+    {
+      "claim": "Aradhye et al. noted that classical baseline-correction methods such as ALS and arPLS require careful trial-and-error tuning of the smoothing parameter lambda, and parameters tuned on one data set frequently break down on another, undermining reproducibility.",
+      "use_in_sections": ["introduction"]
+    },
+    {
+      "claim": "The DIRAS+ hybrid approach confines the machine-learning model's role to predicting a single scalar parameter (lambda), while the physics-based DIRAS solver handles the actual baseline estimation, ensuring physically consistent results.",
+      "use_in_sections": ["related_work", "methodology"]
+    }
+  ],
+  "do_not_claim": [
+    "That DIRAS or DIRAS+ uses algorithm unrolling or deep unfolding",
+    "That DIRAS+ is trained end-to-end through the iterative solver",
+    "That DIRAS+ was applied to chromatographic data",
+    "That DIRAS+ learns multiple parameters simultaneously -- it only predicts lambda",
+    "That DIRAS is a neural network -- it is an iterative algorithmic method with no learned weights"
+  ]
+}
