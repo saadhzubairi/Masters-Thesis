@@ -1568,7 +1568,16 @@ def run_training(config: dict, output_dir: str, callback=None):
     stages_cfg = config.get("stages", [])
 
     N = mc.get("N", 4096)
-    device = 'cuda' if torch.cuda.is_available() else 'cpu'
+    device_cfg = config.get("device", "cpu")
+    if device_cfg == "mps" and torch.backends.mps.is_available():
+        device = "mps"
+        # Allow MPS to use full unified memory instead of conservative default
+        os.environ["PYTORCH_MPS_HIGH_WATERMARK_RATIO"] = "0.0"
+    elif device_cfg == "cuda" and torch.cuda.is_available():
+        device = "cuda"
+    else:
+        device = "cpu"
+    print(f"Using device: {device}")
 
     # 1. Generate synthetic data
     dc = config.get("data") or {}
@@ -1636,7 +1645,23 @@ def run_training(config: dict, output_dir: str, callback=None):
             init_step_size=mf.get("init_step_size", 0.1),
             lowpass_iterations=mf.get("lowpass_iterations", 3),
             lowpass_cg_iters=mf.get("lowpass_cg_iters", 12),
-        ).to(device)
+        )
+    elif model_type == "lbeads_v5":
+        mf = config.get("model_fast", mc)
+        N = mf.get("N", N)
+        model = LBEADS_NET_Fast(
+            N=N,
+            d=mf.get("d", 1),
+            fc=mf.get("fc", 0.006),
+            num_layers=mf.get("num_layers", 20),
+            init_lam0=mf.get("init_lam0", 0.01),
+            init_lam1=mf.get("init_lam1", 0.5),
+            init_lam2=mf.get("init_lam2", 0.5),
+            init_r=mf.get("init_r", 6.0),
+            init_step_size=mf.get("init_step_size", 0.05),
+            lowpass_iterations=mf.get("lowpass_iterations", 1),
+            lowpass_cg_iters=mf.get("lowpass_cg_iters", 12),
+        )
     else:
         model = LBEADS_NET(
             N=N,
@@ -1653,7 +1678,12 @@ def run_training(config: dict, output_dir: str, callback=None):
             init_r=mc.get("init_r", 6.0),
             init_step=mc.get("init_step", 1.0),
             init_output_gain=mc.get("init_output_gain", 1.0),
-        ).to(device)
+        )
+
+    # MPS does not support float64 — cast to float32 before moving to device
+    if device == "mps":
+        model = model.float()
+    model = model.to(device)
 
     # 3. Build loss_config (global defaults + user overrides)
     loss_config = {
@@ -1760,7 +1790,7 @@ def run_training(config: dict, output_dir: str, callback=None):
     torch.save({
         'model_type': model_type,
         'model_state_dict': model.state_dict(),
-        'model_config': config.get("model_fast", mc) if model_type == "lbeads_fast" else mc,
+        'model_config': config.get("model_fast", mc) if model_type in ("lbeads_fast", "lbeads_v5") else mc,
         'loss_config': loss_config,
         'stage_configs': stage_configs,
         'final_params': final_params,

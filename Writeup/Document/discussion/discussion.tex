@@ -1,0 +1,233 @@
+%!TEX root = ../thesis.tex
+\chapter{Discussion and Limitations}
+\label{chap:discussion}
+
+The results presented in \refchap{chap:results} establish that LBEADS-NET achieves meaningful improvements over classical BEADS with fixed parameters, while simultaneously revealing persistent failure modes that loss engineering alone cannot resolve. This chapter provides an analytical treatment of the principal limitations, organized from the most consequential to the most specific. \refsec{sec:disc_leakage} presents the centerpiece analysis: the diagnosis, mitigation journey, and fundamental limits of baseline leakage. \refsec{sec:disc_length} addresses the training/inference signal length mismatch. \refsec{sec:disc_cg} analyzes the conjugate gradient variant's gradient collapse and extracts design principles for algorithm unrolling. \refsec{sec:disc_fc} discusses the non-learnable cutoff frequency and its implications. \refsec{sec:disc_softplus} examines the softplus approximation and its train/inference gap. \refsec{sec:disc_overreg} revisits the over-regularization problem from a multi-objective optimization perspective.
+
+Each section follows a common analytical structure: observation of the failure mode, identification of its mechanism, summary of mitigation attempts, explanation of why the limitation persists, and extraction of a generalizable lesson for the algorithm unrolling community.
+
+
+% ====================================================================
+\section{Baseline Leakage ,  Diagnosis and Mitigation}
+\label{sec:disc_leakage}
+% ====================================================================
+
+Baseline leakage, the absorption of peak energy into the baseline estimate, is the central failure mode of LBEADS-NET and, more broadly, of any sparsity-based signal decomposition applied to dense-peak chromatographic signals. The progressive experiment series in \refsec{sec:results_leakage} demonstrates that the Baseline Leakage Index (BLI) plateaus at approximately 0.59 across all LBEADS-NET configurations, regardless of loss complexity. This section provides a root cause analysis, traces the mitigation journey across development iterations, and articulates the fundamental limits that produce this plateau.
+
+
+% --------------------------------------------------------------------
+\subsection{Root Cause Analysis}
+\label{sec:disc_leakage_root}
+% --------------------------------------------------------------------
+
+The baseline leakage phenomenon in LBEADS-NET is inherited from the classical BEADS formulation. Three interacting failure modes, identified in \refsec{sec:bg_beads_failures}, drive the leakage:
+
+\myparagraph{Sparsity assumption violation.}
+The $\ell_1$ penalty $\lambda_0 \sum_n \theta(x_n)$ in the BEADS cost function (\refeq{eq:beads_cost}) assumes that the peak component $\xvec$ is sparse: most entries are zero, and non-zero values are concentrated at isolated peak locations. In dense-peak regions, common in metabolomics, complex mixture analysis, and gradient elution chromatography, this assumption is violated. The penalty over-shrinks the aggregate peak energy, and the surplus is redistributed into the baseline estimate $\hat{\fvec}$. In the unrolled LBEADS-NET, this mechanism manifests through the asymmetric soft-thresholding operator (\refeq{eq:asym_threshold}), which applies element-wise $\ell_1$-type shrinkage at every layer. The shrinkage is cumulative: $K = 20$ layers of soft thresholding compound the over-shrinkage effect in dense regions.
+
+\myparagraph{Low-pass filter bandwidth mismatch.}
+The Butterworth filter cutoff frequency $f_c = 0.006$ defines a fixed spectral boundary between peak and baseline content. Broad peaks, and closely spaced peaks whose aggregate spectral energy extends into the low-frequency band below $f_c$, have their low-frequency content captured by the low-pass filter $L$ and attributed to the baseline. This mechanism operates independently of the sparsity penalty: even with $\lambda_0 = 0$, the low-pass filter would absorb some peak energy in dense regions. Conversely, if $f_c$ is reduced to preserve broad peaks, rapidly varying baseline features escape the filter and contaminate the peak estimate.
+
+\myparagraph{Spatially uniform regularization.}
+The regularization weights $\lambda_0^k$, $\lambda_1^k$, $\lambda_2^k$ are scalar values applied uniformly across all signal positions within each layer. A sparse region with well-separated peaks requires strong sparsity enforcement to suppress false peaks between true peaks; a dense region requires weaker enforcement to preserve the aggregate peak signal. Uniform weights represent a compromise that is suboptimal in both regimes. Although the per-layer parameterization of LBEADS-NET allows different regularization strengths at different depths, it does not provide spatial adaptivity within a single layer.
+
+These three failure modes are not independent. In dense-peak regions, the sparsity penalty over-shrinks the peak estimate (Failure Mode~1), and the resulting surplus energy has a spectral profile that overlaps with the low-frequency baseline band (Failure Mode~2). The uniform regularization (Failure Mode~3) prevents the network from selectively weakening the sparsity penalty in dense regions while maintaining it in sparse regions. The compounding of these mechanisms produces the systematic upward bias in the baseline estimate that the BLI metric captures.
+
+The community-wide nature of this challenge is confirmed by concurrent work. Gharbi et al.~\cite{gharbi2024unrolled} reported that $\ell_1$-based unrolled architectures (U-PD, U-ISTA) exhibit bias in recovered signal baselines and peak intensities, and that a hybrid penalty mixing Fair and Cauchy potentials partially mitigated this effect. The DIRAS+ framework~\cite{diras2025} similarly identified that physics-based baseline correction methods with sparsity assumptions produce systematic errors in dense-peak regions. These independent findings corroborate the thesis that baseline leakage is an inherent property of sparsity-based signal decomposition, not an artifact of a particular implementation.
+
+
+% --------------------------------------------------------------------
+\subsection{The Mitigation Journey}
+\label{sec:disc_leakage_journey}
+% --------------------------------------------------------------------
+
+The development of LBEADS-NET spanned six major iterations (v3--v8), with baseline leakage mitigation as a central design objective from v3 onward. Each iteration introduced specific loss terms or architectural modifications targeting one or more of the three root causes. This section traces the engineering progression, documenting what each intervention targeted, how it helped, and why it was insufficient alone. The quantitative effects are summarized in the progressive experiment series (\reftab{tab:leakage_comparison}).
+
+\myparagraph{v3: Sparsity losses ($\ell_1$, total variation).}
+The initial loss configuration included $\ell_1$ and total variation penalties on the peak estimate, intended to produce sparse, piecewise-smooth peaks. These terms improved peak shape quality, peak correlation increased from 0.748 (MSE only, Experiment~1.1) to 0.785 (Experiment~1.2), and reduced the negative fraction from 0.295 to 0.216. However, the BLI remained essentially unchanged (0.593 to 0.597). The irony is clear in retrospect: the $\ell_1$ penalty is itself the primary cause of leakage in dense regions. Adding stronger sparsity enforcement improves peak shapes in sparse regions while exacerbating the over-shrinkage that drives leakage in dense regions.
+
+\myparagraph{v4: Baseline supervision (masked MSE).}
+The introduction of masked baseline reconstruction (\refeq{eq:baseline_loss}) was the single most impactful addition across the entire development trajectory. By providing direct gradient signal about baseline quality in non-peak regions, this term addressed an information gap: the reconstruction loss $\mathcal{L}_{\text{recon}}$ supervises only the peak estimate, providing no direct incentive for baseline accuracy. Masked baseline supervision produced the best peak correlation (0.793 in Experiment~1.3) and the best peak MSE ($9.30 \times 10^{-3}$). The masking strategy, supervising the baseline only where peaks are absent, was a critical design choice, avoiding the circular reasoning that would arise from supervising the baseline under peaks.
+
+Despite these improvements, the BLI remained at 0.596, nearly identical to the MSE-only configuration. The explanation is that masked baseline supervision improves baseline accuracy in non-peak regions but provides no gradient signal in the dense-peak regions where leakage actually occurs. The loss function has no mechanism to detect that the baseline is over-estimated under peaks, because the mask excludes precisely those regions from supervision.
+
+\myparagraph{v6: Gradient-based orthogonality.}
+The peak-baseline orthogonality loss (\refeq{eq:ortho_loss}) penalized the first derivative of the baseline, weighted by the ground-truth peak magnitude, enforcing the principle that the baseline should be locally flat wherever peaks are present. This term achieved the lowest BLI in the progressive series (0.592 in Experiment~1.4) and the best baseline MSE ($7.40 \times 10^{-3}$). The improvement was modest, a BLI reduction of 0.004 from the MSE-only baseline, indicating that the indirect penalty on baseline shape could suppress some leakage signatures but could not eliminate the underlying energy redistribution.
+
+\myparagraph{v7: Full anti-leakage battery.}
+The v7 configuration activated the complete set of anti-leakage terms: asymmetric baseline loss ($9{:}1$ penalty ratio for baseline over-estimation vs.\ under-estimation), element-wise orthogonality, envelope constraint (preventing the baseline from exceeding local signal minima), and frequency separation (enforcing spectral role assignment in the Fourier domain). Additionally, a softplus activation was applied to enforce strict non-negativity of the peak estimate.
+
+The v7 results (Experiment~1.5) revealed a counterintuitive outcome: the full anti-leakage battery produced \emph{worse} performance than simpler configurations. The BLI increased to 0.611, peak correlation dropped to 0.744, and the negative fraction rose to 0.305 despite a $20\times$ increase in the non-negativity weight. The over-regularization analysis in \refsec{sec:results_overreg} explains this degradation: twelve competing loss terms with only 30 training epochs produce conflicting gradient directions that prevent convergence on any individual objective.
+
+\myparagraph{v7: Softplus constraint.}
+The application of $\text{softplus}(\hat{\xvec}, \beta)$ as a final activation enforced strict positivity of the peak estimate, eliminating a degenerate failure mode in which the network produced negative peak values to satisfy the orthogonality constraint. While this architectural modification did not directly reduce the BLI, it closed off a pathological solution pathway that could emerge when the orthogonality and non-negativity losses competed.
+
+\myparagraph{Summary: diminishing returns.}
+The mitigation journey reveals a pattern of diminishing returns. The largest improvement came from the simplest intervention (masked baseline supervision), and each subsequent addition produced progressively smaller gains. Beyond Experiment~1.3, the BLI varied by only 0.019 across all configurations (0.592 to 0.611), with the most complex configuration performing worst. This pattern is not coincidental; it reflects a fundamental limit that the next section articulates.
+
+
+% --------------------------------------------------------------------
+\subsection{Fundamental Limits of Sparsity-Based Decomposition}
+\label{sec:disc_leakage_fundamental}
+% --------------------------------------------------------------------
+
+The persistent BLI plateau at approximately 0.59 across all LBEADS-NET configurations represents a fundamental limit of the $\ell_1$-based sparsity formulation, not a failure of the loss engineering effort. This section articulates why loss-level interventions cannot overcome this limit and identifies the generalizable insight for the algorithm unrolling community.
+
+\myparagraph{All mitigations are regularizers on a sparsity-biased architecture.}
+The anti-leakage loss terms (asymmetric baseline, orthogonality, envelope constraint, frequency separation) are external regularizers applied to the \emph{output} of a network whose \emph{forward computation} is governed by $\ell_1$-based soft thresholding. The soft-thresholding operator (\refeq{eq:asym_threshold}) is embedded in the architecture: it is applied at every layer, and its shrinkage behavior is determined by the learned parameters $\lambda_0^k$ and $\eta^k$. The loss function can adjust these parameters through gradient descent, but it cannot alter the functional form of the operator itself. The shrinkage is element-wise: it operates on individual signal samples without awareness of their spatial context or peak membership.
+
+When the peak signal is dense, element-wise shrinkage systematically underestimates the peak amplitude at every position, because the soft-thresholding function subtracts a positive threshold $\lambda_0^k \eta^k$ from each sample. In sparse regions, this subtraction produces the desired sparsification (small values are driven to zero). In dense regions, it produces a uniform amplitude reduction that the low-pass filter captures and attributes to the baseline. No loss term can prevent this mechanism without either (i)~driving the effective threshold to zero (which would disable the sparsity prior entirely) or (ii)~making the threshold spatially adaptive (which the current architecture does not support).
+
+\myparagraph{The BLI plateau as evidence.}
+The near-invariance of the BLI across Experiments~1.1--1.4 (0.592--0.597) provides empirical evidence for this fundamental limit. Four progressively more complex loss configurations, spanning from a single MSE term to eleven active terms, produced a BLI range of 0.005. The optimizer adjusted the learned parameters differently under each loss configuration, but converged to approximately the same leakage level. This convergence suggests that the BLI plateau is determined by the architectural inductive bias (element-wise $\ell_1$ shrinkage) rather than by the loss landscape.
+
+\myparagraph{Contrast with arPLS: qualitatively different failure modes.}
+An instructive comparison with the arPLS family of methods clarifies the nature of the sparsity-induced limit. As discussed in \refsec{sec:bg_beads_failures}, arPLS makes no sparsity assumption on the peak signal. Its failure mode in dense-peak regions is \emph{baseline elevation}: the estimated baseline follows the lower envelope of the dense peaks, producing an overestimate that is smooth and monotonic in the peak region. This failure mode is qualitatively different from the \emph{baseline leakage} observed in BEADS and LBEADS-NET, where the baseline estimate acquires high-frequency content that tracks the shapes of individual peaks.
+
+The distinction is significant for downstream analysis. Baseline elevation (arPLS-type failure) produces a systematic but smooth bias in peak areas that is approximately constant across neighboring peaks. Baseline leakage (BEADS-type failure) produces a peak-shape-dependent bias that varies from peak to peak, making post-hoc correction more difficult. The arPLS failure mode is arguably less damaging for quantitative analysis, suggesting that sparsity-free formulations may offer advantages in dense-peak regimes despite their own limitations.
+
+\myparagraph{Generalization to the algorithm unrolling community.}
+This analysis generalizes beyond LBEADS-NET to any unrolled network that inherits $\ell_1$-based sparsity priors. The conclusion is: \emph{the inductive bias of the proximal operator defines the performance floor that loss engineering cannot breach}. For unrolled ISTA networks applied to signals that violate the sparsity assumption, the element-wise soft-thresholding operator imposes a structural constraint on the decomposition that no loss function, however complex, can fully overcome. Addressing this limit requires architectural modifications that change the proximal operator itself, for example, replacing element-wise $\ell_1$ shrinkage with group sparsity operators that act at the peak level rather than the sample level, or adopting learned proximal maps that can adapt their shrinkage profile to local signal density.
+
+This finding contributes to the growing understanding that the choice of proximal operator in unrolled networks is not merely a convenience but a fundamental design decision that determines the network's representational limits. Gharbi et al.~\cite{gharbi2024unrolled} arrived at a related conclusion through their comparison of $\ell_1$-based and hybrid-penalty unrolled architectures, finding that the penalty function's convexity properties directly influence the bias-variance trade-off in the recovered signal.
+
+
+% ====================================================================
+\section{Training/Inference Length Mismatch}
+\label{sec:disc_length}
+% ====================================================================
+
+LBEADS-NET is trained on synthetic signals of fixed length $N = 1024$ but must process real chromatographic signals that commonly range from $N = 2048$ to $N = 8192$ or longer. This section analyzes which architectural components are sensitive to signal length, which are invariant, and how the mismatch affects inference quality.
+
+\myparagraph{Length-sensitive components: dense filter matrices.}
+The precomputed dense matrices $A$, $B$, $L = I - BA^{-1}$, and $B^\top B$ are all $N \times N$ (\refsec{sec:method_filters}). Changing $N$ requires recomputing all filter matrices from the Butterworth coefficients $\mathbf{a}$ and $\mathbf{b}$. While the filter coefficients themselves depend only on $f_c$ and $d$ (not on $N$), the Toeplitz matrices $A$ and $B$ are $N$-dependent in their dimensions and boundary conditions. The boundary treatment, how the banded structure is handled at the edges of the matrix, changes with $N$, producing slightly different filtering behavior near the signal endpoints. For interior samples far from the boundaries, the filter behavior is length-invariant; for samples within $d$ positions of either endpoint, the behavior differs between training and inference lengths.
+
+\myparagraph{Length-sensitive components: spectral resolution.}
+The normalized cutoff frequency $f_c = 0.006$ specifies the peak-baseline boundary relative to the Nyquist frequency. At $N = 1024$, the corresponding physical frequency depends on the sampling rate; at $N = 4096$, the same $f_c$ corresponds to a different number of spectral bins, altering the effective sharpness of the frequency transition in the discrete domain. In particular, a signal of length $N = 4096$ has $4\times$ the spectral resolution of an $N = 1024$ signal, meaning that the low-pass filter $L$ operates on a finer frequency grid. The learned parameters $\lambda_0^k$, $\eta^k$, etc., were optimized for the spectral characteristics at $N = 1024$ and may not be optimal at different resolutions.
+
+\myparagraph{Length-invariant components.}
+Several components are inherently length-invariant. The element-wise soft-thresholding operator (\refeq{eq:asym_threshold}) applies independently to each sample and is unaffected by signal length. The first- and second-difference operators $D_1$, $D_2$ and their transposes (\refeq{eq:diff1}--\refeq{eq:diff2_T}) are implemented as vectorized slicing operations that naturally extend to any length. The log-space parameterization and the proximal gradient update rule (\refeq{eq:grad_step}) are length-agnostic.
+
+\myparagraph{Practical implications.}
+At inference time, the filter matrices are recomputed for the input signal length, so the network can process signals of arbitrary length. However, the learned parameters were optimized for a specific spectral resolution and boundary condition regime. The primary risk is that $f_c = 0.006$ may be suboptimal at $N = 4096$: the finer spectral grid means that the low-pass filter has a narrower transition band (in physical frequency units), potentially producing sharper frequency separation than the training regime assumed. This could manifest as either improved or degraded baseline estimation, depending on the spectral content of the input signal.
+
+\myparagraph{Potential mitigations.}
+Several approaches could address the length mismatch. Variable-length training, in which the training data includes signals of multiple lengths, would expose the network to diverse spectral resolutions and boundary conditions. Sliding-window inference, in which long signals are processed in overlapping segments of the training length and the results are blended, would avoid the filter recomputation issue entirely. A convolutional architecture that replaces the dense matrix filter with learned convolutional kernels would be inherently length-invariant, at the cost of departing from the BEADS filter structure. These directions are left for future work.
+
+
+% ====================================================================
+\section{The Conjugate Gradient Variant's Failure}
+\label{sec:disc_cg}
+% ====================================================================
+
+The ISTA-style layer described in \refsec{sec:method_beadslayer} was adopted after an earlier conjugate gradient (CG) variant failed to train effectively. This section provides a detailed analysis of the CG failure, as it yields design principles that are relevant to the algorithm unrolling community beyond the specific context of baseline correction.
+
+
+% --------------------------------------------------------------------
+\subsection{Backpropagation Depth and Gradient Vanishing}
+\label{sec:disc_cg_depth}
+% --------------------------------------------------------------------
+
+The CG-based architecture (\refsec{sec:method_cg_variant}) solves the full BEADS linear system (\refeq{eq:linear_system}) at each of $K$ outer layers using $K_{\text{inner}}$ fixed CG iterations. Backpropagation through the trained network must differentiate through every CG iteration within every layer, producing a computational graph of effective depth $K \times K_{\text{inner}}$. With the training configuration of $K = 8$ outer layers and $K_{\text{inner}} = 12$ CG steps, this yields an effective backpropagation depth of 96 sequential differentiable operations.
+
+Each CG iteration involves multiple matrix-vector products with the banded operators $A$, $B$, $D_1$, $D_2$ and their transposes, inner products for computing step sizes and conjugate directions, and scalar divisions. The Jacobian of the CG iterate at step $j+1$ with respect to the iterate at step $j$ depends on the intermediate CG state, specifically, on the search direction, residual, and step size at step $j$. The product of 12 such Jacobians within a single layer produces a composite Jacobian whose spectral radius can either grow (causing gradient explosion) or contract (causing gradient vanishing), depending on the conditioning of the linear system.
+
+In practice, the conditioning of $B^\top B + A^\top M^{(k)} A$ varies across training samples and across layers, because the reweighting matrix $M^{(k)}$ depends on the current peak estimate $\xvec^{k-1}$. This variability makes the gradient dynamics unpredictable: some samples produce well-conditioned systems with stable gradients, while others produce ill-conditioned systems with rapidly decaying gradients. The net effect, averaged over training batches, is gradient vanishing: the early layers receive gradient magnitudes that are orders of magnitude smaller than the later layers, effectively preventing them from learning meaningful parameter updates.
+
+The ISTA variant eliminates this depth problem entirely. Each ISTA layer performs exactly one gradient step (\refeq{eq:grad_step}) followed by one element-wise proximal operation (\refeq{eq:asym_threshold}), yielding an effective backpropagation depth of $K = 20$, roughly $5\times$ shallower than the CG variant at $K = 8$, despite having $2.5\times$ more layers. The per-layer Jacobian of the ISTA update is dominated by the low-pass matrix $L$ (a fixed linear operator) and the element-wise soft-thresholding function (whose Jacobian is a diagonal matrix of zeros and ones). The spectral properties of these operators are stable across samples and layers, producing consistent gradient flow throughout the network.
+
+
+% --------------------------------------------------------------------
+\subsection{CG Convergence and Differentiability}
+\label{sec:disc_cg_convergence}
+% --------------------------------------------------------------------
+
+A subtler issue with the CG variant is that the CG solver's convergence behavior is not smoothly differentiable. In exact arithmetic, CG converges to the exact solution in at most $N$ iterations for an $N \times N$ system. In practice, $K_{\text{inner}} = 12$ iterations provide only an approximate solution, and the quality of this approximation depends on the condition number of the system matrix $B^\top B + A^\top M^{(k)} A$. The approximation error is not a smooth function of the system matrix entries, small perturbations in $M^{(k)}$ can produce disproportionate changes in the CG trajectory when the system is near-singular.
+
+This non-smoothness creates two problems for training. First, the loss landscape inherits the CG solver's sensitivity to conditioning, producing sharp ridges and valleys that gradient-based optimizers navigate poorly. Second, the CG residual norm, which is typically used as a convergence criterion in classical CG, is not differentiable at the point where the solver would terminate in an adaptive-stopping implementation. Although LBEADS-NET uses fixed-iteration CG (avoiding the non-differentiable stopping criterion), the underlying sensitivity to conditioning remains.
+
+
+% --------------------------------------------------------------------
+\subsection{Design Principle for Algorithm Unrolling}
+\label{sec:disc_cg_principle}
+% --------------------------------------------------------------------
+
+The failure of the CG variant and the success of the ISTA variant yield a concrete design principle: \emph{not all iterative algorithms unroll equally well, and the inner solver's gradient properties determine trainability}. Specifically:
+
+\begin{itemize}
+    \item Algorithms with simple per-iteration operations (single gradient step, element-wise proximal operator) produce stable gradient flow and train effectively at depths of 20 or more layers.
+
+    \item Algorithms with complex per-iteration operations (inner iterative solvers such as CG) produce deep computational graphs within each layer, causing gradient vanishing that limits effective depth to only a few layers.
+
+    \item The design preference for unrolled networks should be: \emph{simpler per-layer computations with more layers}, rather than complex per-layer computations with fewer layers. The ISTA variant's 20 layers of simple updates outperform the CG variant's 8 layers of complex updates, both in training stability and in final decomposition quality.
+\end{itemize}
+
+This principle aligns with findings in the broader algorithm unrolling literature. Chen et al.~\cite{chen2025demun} found that the number of unrolled iterations has a significantly greater impact on performance than the complexity of the neural network used within each iteration. The LBEADS-NET experience provides a complementary finding from the opposite direction: making the per-iteration computation \emph{more} complex (CG solver vs.\ gradient step) degrades performance by limiting the achievable depth.
+
+The practical implication for practitioners is clear: when unrolling an iterative algorithm that contains an inner solver (such as a linear system solve, an eigendecomposition, or a nested optimization), the inner solver should be replaced with a single-step approximation (such as a gradient step or a proximal operator) that maintains stable gradient flow. The loss in per-layer accuracy is more than compensated by the ability to train deeper networks with more effective parameter specialization.
+
+
+% ====================================================================
+\section{Non-Learnable Cutoff Frequency and the Autograd Boundary}
+\label{sec:disc_fc}
+% ====================================================================
+
+The Butterworth filter cutoff frequency $f_c$ is arguably the most consequential hyperparameter in the BEADS formulation. It defines the spectral boundary between content attributed to peaks (above $f_c$) and content attributed to the baseline (below $f_c$). In LBEADS-NET, $f_c = 0.006$ is a fixed, non-learnable hyperparameter. This section explains why, and discusses the implications.
+
+\myparagraph{The autograd boundary.}
+The filter matrices $A$ and $B$ are constructed by the \texttt{BAfilt} function, which computes the Butterworth coefficient vectors $\mathbf{a}$ and $\mathbf{b}$ from $f_c$ and the filter order $d$ (\refsec{sec:method_filters}). This computation uses SciPy's sparse matrix construction routines and NumPy array operations to build the banded Toeplitz matrices, which are then converted to dense PyTorch tensors and registered as non-learnable buffers. The conversion from SciPy to PyTorch crosses an \emph{autograd boundary}: PyTorch's automatic differentiation engine cannot trace through SciPy operations, so the gradient $\partial \mathcal{L} / \partial f_c$ is undefined. Without a gradient, $f_c$ cannot be updated by backpropagation.
+
+\myparagraph{Why this matters for leakage.}
+The fixed cutoff frequency interacts directly with the baseline leakage mechanism. Consider two signals processed by the same trained network: one with narrow, well-separated peaks whose spectral content is concentrated above $f_c$, and another with broad, densely packed peaks whose spectral content extends below $f_c$. For the first signal, the frequency separation between peaks and baseline is clean, and the low-pass filter correctly assigns low-frequency content to the baseline. For the second signal, the low-frequency tails of broad peaks are captured by the low-pass filter and erroneously attributed to the baseline, a direct mechanism for leakage that operates independently of the $\ell_1$ penalty.
+
+A learnable $f_c$ could in principle adapt the frequency boundary to the spectral characteristics of each input signal. For signals with broad peaks, the network could learn a lower $f_c$, preserving more peak energy in the high-pass band. For signals with narrow peaks and a rapidly varying baseline, it could learn a higher $f_c$, capturing more baseline variation. The current fixed $f_c$ represents a compromise that is suboptimal for both extremes.
+
+\myparagraph{Connection to spatially varying $f_c$.}
+An even more expressive extension would be a spatially varying cutoff frequency $f_c(n)$ that adapts to local signal characteristics at each position $n$. Dense-peak regions would use a lower $f_c$ to avoid absorbing peak energy, while baseline-only regions would use a higher $f_c$ to capture all baseline variation. This would address Failure Mode~3 (spatially uniform regularization) at the filter level, complementing any spatial adaptivity in the regularization weights. However, a spatially varying cutoff frequency would require replacing the Toeplitz-structured Butterworth filter with a non-stationary filter, fundamentally changing the BEADS formulation.
+
+\myparagraph{Potential solutions.}
+Three approaches could make the filter cutoff learnable, as outlined in \refsec{sec:method_fc}: (i)~implementing a differentiable IIR filter design entirely within PyTorch, replacing the SciPy coefficient computation with differentiable arithmetic on the frequency-warping parameter $t$ (\refeq{eq:t_param}) and the coefficient polynomials; (ii)~replacing the Butterworth filter with learned convolutional kernels trained end-to-end; or (iii)~using a lightweight auxiliary network to predict $f_c$ from signal features such as the spectral energy distribution. Each approach involves trade-offs between expressiveness, interpretability, and computational cost. The first approach preserves the Butterworth structure and is the most natural extension of the current architecture; the second sacrifices the Butterworth interpretation but gains full flexibility; the third preserves interpretability but introduces a secondary model that must be jointly trained.
+
+
+% ====================================================================
+\section{Softplus Approximation ,  Train/Inference Gap}
+\label{sec:disc_softplus}
+% ====================================================================
+
+The v7 development iteration introduced a softplus activation to enforce non-negativity of the peak estimate. The softplus function is defined as
+\begin{equation}
+    \text{softplus}(x; \beta) = \frac{1}{\beta} \ln(1 + e^{\beta x}),
+\end{equation}
+which approximates $\max(0, x)$ (the ReLU function) for large $\beta$. With $\beta = 5$, as used in the v7 architecture, the approximation is close but imperfect: $\text{softplus}(0; 5) = \frac{\ln 2}{5} \approx 0.139$, compared to $\text{ReLU}(0) = 0$.
+
+\myparagraph{Training advantage.}
+During training, the softplus activation provides a smooth gradient at and near the zero crossing, enabling gradient flow through samples whose true peak value is zero. A hard ReLU would produce zero gradient for all negative inputs, preventing the optimizer from adjusting parameters that affect the peak estimate in baseline-only regions. The softplus activation thus improves trainability at the cost of a small positive bias.
+
+\myparagraph{Inference artifact.}
+At inference time, the positive bias $\ln(2)/\beta \approx 0.139$ (for $\beta = 5$) manifests as a small pedestal in the peak estimate at positions where the true peak value is zero. In baseline-only regions, the network's pre-activation output is near zero or slightly negative; the softplus maps these values to approximately 0.139 rather than exactly zero. This pedestal is small relative to peak amplitudes (which are order unity in the normalized signal) but is systematic: it affects every sample in every baseline-only region.
+
+The pedestal has two consequences. First, it inflates the computed peak area, introducing a length-dependent positive bias (proportional to the number of baseline-only samples). Second, it reduces the apparent sparsity of the peak estimate, because baseline-only samples are mapped to a small positive value rather than exactly zero. Both effects are minor for well-separated peaks with large amplitudes, but they become measurable for low-amplitude peaks near the noise floor.
+
+\myparagraph{General lesson.}
+The softplus train/inference gap illustrates a broader challenge in algorithm unrolling: differentiable relaxations of non-smooth operators introduce systematic biases that do not cancel between training and inference. In the proximal gradient framework, the canonical proximal operators (soft thresholding, projection onto non-negative orthant) are non-smooth, and their gradients are discontinuous at the origin. Replacing them with smooth approximations improves trainability but introduces a train/test mismatch whose magnitude depends on the approximation tightness. Practitioners should be aware of this trade-off and validate that the bias introduced by smooth approximations is acceptable for the downstream application. Increasing $\beta$ reduces the bias but steepens the gradient near zero, potentially reintroducing the vanishing gradient problem that the softplus was intended to resolve.
+
+
+% ====================================================================
+\section{The Over-Regularization Problem}
+\label{sec:disc_overreg}
+% ====================================================================
+
+Experiment~1.5 (\refsec{sec:results_overreg}) demonstrated that the full v7 configuration with twelve active loss terms performed worse than several simpler configurations on multiple metrics. This section analyzes the over-regularization phenomenon from a multi-objective optimization perspective and extracts practical lessons for loss design in algorithm unrolling.
+
+\myparagraph{Non-monotonic relationship between loss complexity and model quality.}
+The progressive experiment results reveal a clear non-monotonic relationship. Performance improves from Experiment~1.1 (1 loss term) through Experiment~1.3 (6 loss terms), reaching optimal peak correlation at 0.793 with the addition of baseline supervision. Beyond this point, adding orthogonality (Experiment~1.4, 8 terms) produces marginal improvement in baseline quality (BLI 0.592 vs.\ 0.596) at the cost of slight peak correlation degradation (0.785 vs.\ 0.793). The full v7 configuration (Experiment~1.5, 12 terms) degrades on four of seven metrics relative to Experiment~1.3.
+
+This non-monotonic pattern is consistent with the multi-objective optimization literature. Each loss term defines a separate objective, and the gradient of the total loss is a weighted sum of per-term gradients. When the per-term gradients point in compatible directions (as with MSE and baseline supervision, which both encourage accurate decomposition), their combination accelerates convergence. When they point in conflicting directions (as with the $\ell_1$ penalty, which encourages sparse peaks, and the asymmetric baseline loss, which discourages baseline over-estimation), their combination can produce a gradient field with saddle points and narrow valleys that the optimizer navigates poorly.
+
+\myparagraph{The training budget constraint.}
+The over-regularization effect is exacerbated by the limited training budget. With 30 training epochs (10 gradient steps per epoch, totaling 300 gradient updates), the optimizer has insufficient time to navigate the twelve-dimensional trade-off surface. The curriculum training strategy (\refsec{sec:method_curriculum}) was designed to address this by introducing loss terms in stages, allowing the model to settle on a good solution for simpler objectives before confronting harder ones. However, the progressive experiments used a uniform training protocol (all terms active from epoch 1) to isolate the contribution of each addition, which exposed the over-regularization effect.
+
+\myparagraph{Practical lesson: match loss complexity to training budget.}
+The over-regularization finding carries a direct practical lesson for algorithm unrolling: the number of active loss terms should be matched to the available training budget. With a limited budget (tens of epochs), a simpler loss configuration with three to six well-chosen terms outperforms a complex configuration with twelve terms. The marginal benefit of each additional loss term decreases as the total number of terms increases, while the marginal cost (in terms of optimization difficulty) increases. The optimal operating point is problem-specific and depends on the number of training epochs, the learning rate schedule, the batch size, and the degree of conflict among the loss terms.
+
+This observation connects to the broader question of curriculum design in multi-objective optimization. The three-stage curriculum (\refsec{sec:method_curriculum}), pure reconstruction, then structured separation, then full refinement, provides one principled approach to managing loss complexity. Alternative strategies, such as loss-weight annealing (gradually increasing the weights of anti-leakage terms), Pareto-optimal loss balancing (dynamically adjusting weights to maintain progress on all objectives), or population-based training (searching over loss weight configurations), could further improve the trade-off between loss complexity and training efficiency.

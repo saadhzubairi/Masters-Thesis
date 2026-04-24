@@ -72,3 +72,4 @@ Code / libraries
 - torchdeq — PyTorch DEQ library for deep equilibrium models
 - Conformer PyTorch — github.com/sooftware/conformer
 - Kensert autoencoder — github.com/akensert/autoencoder-chromatogram-enhancement
+

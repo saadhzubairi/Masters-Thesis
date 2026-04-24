@@ -11,6 +11,11 @@ import type { RunConfig } from "@/lib/types"
 const FIELD_DESCRIPTIONS = `### model_type
 - "lbeads": Full unrolled BEADS with CG solver per layer. More accurate, slower to train.
 - "lbeads_fast": Proximal gradient with asymmetric soft thresholding. Faster, fully differentiable.
+- "lbeads_v5": Same architecture as lbeads_fast but with v5 defaults (20 layers, smaller lambdas, lowpass_iterations=1). Optimized for stable refinement.
+
+### device
+- "cpu": Train on CPU (default)
+- "mps": Train on Apple Silicon GPU (much faster on Mac)
 
 ### model (for model_type "lbeads")
 - N: Signal length in samples (optimal: 4096, range: 512-8192)
@@ -27,7 +32,7 @@ const FIELD_DESCRIPTIONS = `### model_type
 - init_step: Initial layer relaxation step size (optimal: 1.0, range: 0.05-2.0)
 - init_output_gain: Initial output gain multiplier (optimal: 1.0, range: 0.1-10.0)
 
-### model_fast (for model_type "lbeads_fast")
+### model_fast (for model_type "lbeads_fast" or "lbeads_v5")
 - N, d, fc, num_layers: Same as above
 - lowpass_iterations: Number of iterated low-pass filter applications (optimal: 3, range: 1-5)
 - lowpass_cg_iters: CG iterations for low-pass filter (optimal: 12, range: 8-48)
@@ -76,8 +81,9 @@ ${FIELD_DESCRIPTIONS}
 
 Rules:
 - Return the COMPLETE JSON object with all fields
-- model_type must be "lbeads" or "lbeads_fast"
-- Include "model" key always. Include "model_fast" only if model_type is "lbeads_fast"
+- device must be "cpu" or "mps"
+- model_type must be "lbeads", "lbeads_fast", or "lbeads_v5"
+- Include "model" key always. Include "model_fast" if model_type is "lbeads_fast" or "lbeads_v5"
 - All numeric values must be non-negative
 - stages must be a non-empty array`
 }
@@ -88,8 +94,8 @@ function validateConfig(obj: unknown): { valid: true; config: Partial<RunConfig>
   }
   const cfg = obj as Record<string, unknown>
 
-  if (cfg.model_type !== undefined && cfg.model_type !== "lbeads" && cfg.model_type !== "lbeads_fast") {
-    return { valid: false, error: `Invalid model_type: "${cfg.model_type}". Must be "lbeads" or "lbeads_fast".` }
+  if (cfg.model_type !== undefined && cfg.model_type !== "lbeads" && cfg.model_type !== "lbeads_fast" && cfg.model_type !== "lbeads_v5") {
+    return { valid: false, error: `Invalid model_type: "${cfg.model_type}". Must be "lbeads", "lbeads_fast", or "lbeads_v5".` }
   }
 
   if (cfg.stages !== undefined) {

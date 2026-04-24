@@ -105,4 +105,115 @@ Y.~Yang, J.~Sun, H.~Li, and Z.~Xu, ``{ADMM-CSNet}: A deep learning approach for
   image compressive sensing,'' \emph{IEEE Transactions on Pattern Analysis and
   Machine Intelligence}, vol.~42, no.~3, pp. 521--538, 2020.
 
+\bibitem{grushka1972emg}
+E.~Grushka, ``Characterization of exponentially modified {Gaussian} peaks in
+  chromatography,'' \emph{Analytical Chemistry}, vol.~44, no.~11, pp.
+  1733--1738, 1972.
+
+\bibitem{naish1988emg}
+P.~J. Naish and S.~Hartwell, ``Exponentially modified {Gaussian} functions---a
+  good model for chromatographic peaks in isocratic {HPLC}?''
+  \emph{Chromatographia}, vol.~26, pp. 285--296, 1988.
+
+\bibitem{eilers2003smoother}
+P.~H.~C. Eilers, ``A perfect smoother,'' \emph{Analytical Chemistry}, vol.~75,
+  no.~14, pp. 3631--3636, 2003.
+
+\bibitem{ryan1988snip}
+C.~G. Ryan, E.~Clayton, W.~L. Griffin, S.~H. Sie, and D.~R. Cousens, ``{SNIP},
+  a statistics-sensitive background treatment for the quantitative analysis of
+  {PIXE} spectra in geoscience applications,'' \emph{Nuclear Instruments and
+  Methods in Physics Research Section B}, vol.~34, no.~3, pp. 396--402, 1988.
+
+\bibitem{liu2019alista}
+J.~Liu, X.~Chen, Z.~Wang, and W.~Yin, ``{ALISTA}: Analytic weights are as good
+  as learned weights in {LISTA},'' in \emph{Proceedings of the International
+  Conference on Learning Representations (ICLR)}, 2019.
+
+\bibitem{you2021istanetpp}
+D.~You, J.~Xie, and J.~Zhang, ``{ISTA-Net++}: Flexible deep unfolding network
+  for compressive sensing,'' in \emph{Proceedings of the IEEE International
+  Conference on Multimedia and Expo (ICME)}, 2021, pp. 1--6.
+
+\bibitem{zheng2022hybridista}
+Z.~Zheng, W.~Dai, D.~Xue, C.~Li, J.~Zou, and H.~Xiong, ``Hybrid {ISTA}:
+  Unfolding {ISTA} with convergence guarantees using free-form deep neural
+  networks,'' \emph{IEEE Transactions on Pattern Analysis and Machine
+  Intelligence}, vol.~45, no.~5, pp. 5985--6000, 2023.
+
+\bibitem{yang2016admmnet}
+Y.~Yang, J.~Sun, H.~Li, and Z.~Xu, ``Deep {ADMM-Net} for compressive sensing
+  {MRI},'' in \emph{Advances in Neural Information Processing Systems
+  (NeurIPS)}, 2016, pp. 10--18.
+
+\bibitem{diamond2018odp}
+S.~Diamond, V.~Sitzmann, F.~Heide, and G.~Wetzstein, ``Unrolled optimization
+  with deep priors,'' \emph{arXiv preprint arXiv:1705.08041}, 2018.
+
+\bibitem{chen2025demun}
+Y.~Chen, J.~Chen, A.~Maleki, and S.~Jalali, ``Comprehensive examination of
+  unrolled networks for solving linear inverse problems,'' \emph{Entropy},
+  vol.~27, no.~1, p.~85, 2025.
+
+\bibitem{gharbi2023unrolled_sparse}
+H.~Gharbi, C.~Villa, E.~Chouzenoux, and J.-C. Pesquet, ``Unrolled deep networks
+  for sparse signal restoration,'' in \emph{HAL Preprint (hal-03988686v2)},
+  2023.
+
+\bibitem{han2024caeplus}
+Q.~Han, Y.~Dang, and Q.~Han, ``Denoising and baseline correction methods for
+  {Raman} spectroscopy based on convolutional autoencoder: A unified
+  solution,'' \emph{Sensors}, vol.~24, no.~11, p. 3468, 2024.
+
+\bibitem{chen2022resunet}
+T.~Chen, H.~Son, B.~Park, and S.-J. Baek, ``Baseline correction using a
+  deep-learning model combining {ResNet} and {UNet},'' \emph{Analyst}, vol.
+  147, no.~18, pp. 4285--4292, 2022.
+
+\bibitem{aradhye2025diras}
+A.~Aradhye, S.~Mandal, I.~Gray, and J.~Campbell, ``Adaptive physics-aware
+  {Raman} baseline correction with machine learning predicted parameters,''
+  \emph{Analytical Chemistry}, 2025.
+
+\bibitem{cui2025opairpls}
+H.~Cui, Y.~Chen, and J.~Zhao, ``Beyond traditional {airPLS}: Improved baseline
+  removal in {SERS} with parameter-focused optimization and prediction,''
+  \emph{Analytical Chemistry}, 2025.
+
+\bibitem{daubechies2004ista}
+I.~Daubechies, M.~Defrise, and C.~De~Mol, ``An iterative thresholding algorithm
+  for linear inverse problems with a sparsity constraint,''
+  \emph{Communications on Pure and Applied Mathematics}, vol.~57, no.~11, pp.
+  1413--1457, 2004.
+
+\bibitem{beck2009fista}
+A.~Beck and M.~Teboulle, ``A fast iterative shrinkage-thresholding algorithm
+  for linear inverse problems,'' \emph{SIAM Journal on Imaging Sciences},
+  vol.~2, no.~1, pp. 183--202, 2009.
+
+\bibitem{hacohen2019curriculum}
+G.~Hacohen and D.~Weinshall, ``On the power of curriculum learning in training
+  deep networks,'' in \emph{Proceedings of the 36th International Conference on
+  Machine Learning (ICML)}, 2019, pp. 2535--2544.
+
+\bibitem{huber1964robust}
+P.~J. Huber, ``Robust estimation of a location parameter,'' \emph{The Annals of
+  Mathematical Statistics}, vol.~35, no.~1, pp. 73--101, 1964.
+
+\bibitem{ding2006orthonmf}
+C.~Ding, T.~Li, W.~Peng, and H.~Park, ``Orthogonal nonnegative matrix
+  tri-factorizations for clustering,'' in \emph{Proceedings of the 12th ACM
+  SIGKDD International Conference on Knowledge Discovery and Data Mining},
+  2006, pp. 126--135.
+
+\bibitem{pompili2014onmf}
+F.~Pompili, N.~Gillis, P.-A. Absil, and F.~Glineur, ``Two algorithms for
+  orthogonal nonnegative matrix factorization with application to clustering,''
+  \emph{Neurocomputing}, vol. 141, pp. 15--25, 2014.
+
+\bibitem{kingma2015adam}
+D.~P. Kingma and J.~Ba, ``Adam: A method for stochastic optimization,'' in
+  \emph{Proceedings of the 3rd International Conference on Learning
+  Representations (ICLR)}, 2015.
+
 \end{thebibliography}

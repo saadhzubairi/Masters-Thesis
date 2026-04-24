@@ -6,7 +6,7 @@ import { Button } from "@/components/ui/button"
 import { Badge } from "@/components/ui/badge"
 import { useRouter } from "next/navigation"
 import { toast } from "sonner"
-import { getRun, stopRun, retryRun, softDeleteRun, restoreRun, permanentlyDeleteRun, streamRun } from "@/lib/api"
+import { getRun, stopRun, retryRun, runDemos, softDeleteRun, restoreRun, permanentlyDeleteRun, streamRun } from "@/lib/api"
 import type { RunConfig } from "@/lib/types"
 import { EpochTable } from "@/app/components/epoch-table"
 import { LossChart } from "@/app/components/loss-chart"
@@ -139,6 +139,7 @@ export default function RunDetailPage({ params }: { params: Promise<{ id: string
   const router = useRouter()
   const [run, setRun] = useState<RunDetail | null>(null)
   const [retryOpen, setRetryOpen] = useState(false)
+  const [demosRunning, setDemosRunning] = useState(false)
   const [batchProgress, setBatchProgress] = useState<{ batch: number; total: number; loss: number; gradNorm: number } | null>(null)
   const rollingElapsed = useRollingElapsed(run)
 
@@ -219,6 +220,24 @@ export default function RunDetailPage({ params }: { params: Promise<{ id: string
     router.push(`/runs/${run_id}`)
   }, [id, router])
 
+  const handleRunDemos = useCallback(async () => {
+    setDemosRunning(true)
+    toast.info("Running demos...", { id: "demos-running", duration: Infinity })
+    try {
+      const result = await runDemos(id)
+      if (result.errors.length > 0) {
+        toast.error(`Demos finished with ${result.errors.length} error(s)`, { id: "demos-running" })
+      } else {
+        toast.success("Demos completed!", { id: "demos-running" })
+      }
+      loadRun()
+    } catch (err) {
+      toast.error(`Demo failed: ${err}`, { id: "demos-running" })
+    } finally {
+      setDemosRunning(false)
+    }
+  }, [id, loadRun])
+
   if (!run) {
     return (
       <div className="p-6 flex items-center gap-2 text-sm text-muted-foreground">
@@ -261,10 +280,52 @@ export default function RunDetailPage({ params }: { params: Promise<{ id: string
             Run #{id.slice(-6)} — {run.name}
           </h2>
           <span className="text-[10px] font-mono px-1.5 py-0.5 border bg-zinc-50 text-muted-foreground">
-            {run.config?.model_type === "lbeads_fast" ? "LBEADS-NET Fast" : "LBEADS-NET"}
+            {run.config?.model_type === "lbeads_fast" ? "LBEADS-NET Fast" : run.config?.model_type === "lbeads_v5" ? "LBEADS-NET v5" : "LBEADS-NET"}
           </span>
         </div>
         <div className="flex items-center gap-3">
+          <Button
+            variant="outline"
+            size="sm"
+            className="text-muted-foreground"
+            onClick={() => {
+              const lastEp = epochs[epochs.length - 1]
+              const payload = {
+                id: run.id,
+                name: run.name,
+                status: run.status,
+                config: run.config,
+                summary: {
+                  total_epochs: totalEpochs,
+                  completed_epochs: epochCount,
+                  train_loss: lastEp?.train_loss ?? null,
+                  test_loss: lastEp?.test_loss ?? null,
+                  stage: lastEp?.stage ?? null,
+                  elapsed_s: lastEp?.elapsed_s ?? null,
+                  elapsed_formatted: displayElapsed > 0 ? formatElapsed(displayElapsed) : null,
+                  avg_per_epoch_s: avgPerEpoch > 0 ? +avgPerEpoch.toFixed(2) : null,
+                  epochs_per_min: avgPerEpoch > 0 ? +(60 / avgPerEpoch).toFixed(2) : null,
+                  loss_components: lastEp?.components ?? null,
+                },
+                metrics: run.metrics?.summary ?? null,
+                epochs: epochs.map(e => ({
+                  epoch: e.epoch,
+                  stage: e.stage,
+                  train_loss: e.train_loss,
+                  test_loss: e.test_loss ?? null,
+                  components: e.components,
+                  learned_params: e.learned_params ?? null,
+                  elapsed_s: e.elapsed_s ?? null,
+                })),
+                errors: run.metrics?.errors ?? null,
+              }
+              navigator.clipboard.writeText(JSON.stringify(payload, null, 2))
+              toast.success("Run data copied to clipboard")
+            }}
+          >
+            <svg xmlns="http://www.w3.org/2000/svg" width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round"><rect x="9" y="9" width="13" height="13" rx="2" ry="2"/><path d="M5 15H4a2 2 0 0 1-2-2V4a2 2 0 0 1 2-2h9a2 2 0 0 1 2 2v1"/></svg>
+            Copy
+          </Button>
           <Badge
             variant="outline"
             className={`${statusVariant[run.status] || ""} ${
@@ -289,6 +350,21 @@ export default function RunDetailPage({ params }: { params: Promise<{ id: string
             </>
           ) : run.status !== "running" && run.status !== "pending" ? (
             <>
+              <Button
+                variant="outline"
+                size="sm"
+                disabled={demosRunning}
+                onClick={handleRunDemos}
+              >
+                {demosRunning ? (
+                  <>
+                    <span className="inline-block h-3 w-3 border-2 border-zinc-300 border-t-zinc-600 rounded-full animate-spin mr-1.5" />
+                    Running...
+                  </>
+                ) : (
+                  "Run Demos"
+                )}
+              </Button>
               <div className="relative">
                 <Button variant="outline" size="sm" onClick={() => setRetryOpen(!retryOpen)}>
                   Retry

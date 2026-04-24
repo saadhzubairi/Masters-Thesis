@@ -1,0 +1,475 @@
+%!TEX root = ../thesis.tex
+\chapter{Experimental Setup}
+\label{chap:experiments}
+
+This chapter describes the experimental framework used to evaluate LBEADS-NET. \refsec{sec:exp_data} details the synthetic data generation process that produces ground-truth-labeled training and test signals. \refsec{sec:exp_training} specifies the training protocol, including architecture hyperparameters and optimizer configuration. \refsec{sec:exp_metrics} defines the evaluation metrics, including two novel leakage-specific measures. \refsec{sec:exp_progressive} presents the progressive experiment design that systematically isolates the contribution of each loss term. \refsec{sec:exp_baselines} describes the baseline comparison methods.
+
+
+% ====================================================================
+\section{Synthetic Data Generation}
+\label{sec:exp_data}
+% ====================================================================
+
+Evaluating baseline correction methods requires ground-truth knowledge of the peak signal $\xvec$, the baseline $\fvec$, and the noise $\wvec$ individually. Since real chromatograms provide only the observed mixture $\yvec = \xvec + \fvec + \wvec$, we train and evaluate on synthetic data where all three components are generated independently and combined according to the additive signal model (\refeq{eq:signal_model}).
+
+The data generation procedure is designed to produce signals whose statistical characteristics match those of real liquid chromatography (LC) and gas chromatography (GC) data. The design parameters were calibrated against a reference set of eight real chromatographic signals of length $N = 4000$, from which we measured peak heights (10--2600+), peak widths (FWHM 3--370+ samples), peak counts (29--58 per signal), baseline amplitudes (0--35), and noise levels ($\sigma \approx 5$). The generator, implemented as the \texttt{SyntheticDataGenerator} class, produces signals of length $N = 4096$ using a dedicated NumPy random number generator seeded for reproducibility.
+
+
+% --------------------------------------------------------------------
+\subsection{Peak Generation}
+\label{sec:exp_peaks}
+% --------------------------------------------------------------------
+
+Chromatographic peaks are generated using a \emph{bi-Gaussian} (asymmetric Gaussian) model that captures the peak tailing commonly observed in real chromatography. For a peak centered at position $c$ with left-side standard deviation $\sigma$ and tailing parameter $\tau$, the peak shape is
+\begin{equation}
+    p(t) =
+    \begin{cases}
+        A \exp\!\big(-{(t - c)^2}/{(2\sigma^2)}\big) & t \leq c, \\
+        A \exp\!\big(-{(t - c)^2}/{(2(\sigma + \tau)^2)}\big) & t > c,
+    \end{cases}
+    \label{eq:bigaussian_peak}
+\end{equation}
+where $A$ is the peak amplitude and the effective right-side width $\sigma + \tau$ exceeds the left-side width $\sigma$, producing the characteristic tailing shape. The tailing parameter is set to $\tau = \tau_{\text{raw}} \cdot \sigma / 5$, where $\tau_{\text{raw}}$ is drawn uniformly from $[1.0, 15.0]$, with tailing applied to 60\% of peaks.
+
+The number of peaks per signal is drawn uniformly from $[20, 55]$. Peak positions are generated through a combination of uniformly distributed isolated peaks and Gaussian-distributed \emph{clusters} (2--4 peaks with spread 15--80 samples), with a cluster probability of 0.4. This clustering mechanism produces the dense, overlapping peak groups that challenge sparsity-based methods and are central to the baseline leakage problem.
+
+Peak widths are log-uniformly distributed with $\sigma \in [1.5, 25.0]$, producing FWHM values ($2.355\sigma$) from approximately 3.5 to 59 samples. Peak amplitudes are also log-uniformly distributed over $[15.0, 2500.0]$, with an 8\% probability of generating a high-amplitude outlier peak (amplitude in $[1000.0, 2500.0]$). The log-uniform distributions ensure that the generator produces both narrow/weak and broad/strong peaks, matching the large dynamic range observed in real chromatographic data.
+
+The total peak signal is the sum of all individual peaks: $\xvec = \sum_{j=1}^{J} p_j$, where $J$ is the number of peaks. In regions where multiple peaks overlap, their contributions sum constructively, producing the dense-peak configurations that stress-test the sparsity assumption.
+
+
+% --------------------------------------------------------------------
+\subsection{Baseline Generation}
+\label{sec:exp_baseline}
+% --------------------------------------------------------------------
+
+Baselines are generated using one of three drift types, selected uniformly at random:
+
+\myparagraph{Cubic spline.} A smooth baseline is constructed by cubic spline interpolation through randomly placed knot points. The number of internal knots is drawn from $[4, 8]$, with knot positions uniformly distributed along the signal. Knot amplitudes are drawn from $[0, A_{\text{base}}]$, where $A_{\text{base}} \sim \mathcal{U}(2, 35)$. Endpoint knots are constrained to low amplitudes ($\leq 0.3 \cdot A_{\text{base}}$) to mimic the common pattern of baselines that are near zero at the beginning and end of a chromatographic run. Natural boundary conditions are applied.
+
+\myparagraph{Exponential decay with hump.} An exponential decay $A_{\text{base}} \exp(-\beta t)$ with decay rate $\beta \sim \mathcal{U}(0.5, 3.0)$ is combined with a broad Gaussian hump centered at a random position. This models the solvent front and column conditioning effects common in liquid chromatography.
+
+\myparagraph{Mixed (polynomial $+$ sinusoidal).} A low-degree polynomial (degree 2--3) is combined with 1--2 sinusoidal components of frequency 0.3--2.0 cycles per signal. This produces the slowly oscillating baseline drift observed in long-duration chromatographic runs.
+
+After generation, the baseline amplitude is rescaled so that its peak value stands in a target ratio to the peak signal amplitude. The target ratio is log-uniformly distributed over $[0.01, 0.5]$, ensuring that the dataset includes both low-amplitude baselines (where correction is straightforward) and high-amplitude baselines (where the baseline dominates the observed signal). Baselines with minimum values below $-2.0$ are shifted upward to maintain approximate non-negativity.
+
+
+% --------------------------------------------------------------------
+\subsection{Noise and Signal Assembly}
+\label{sec:exp_noise}
+% --------------------------------------------------------------------
+
+Additive Gaussian noise $\wvec \sim \mathcal{N}(0, \sigma_w^2 I)$ is added to each signal, with the noise standard deviation $\sigma_w$ drawn uniformly from $[2.0, 6.0]$. The three components are combined to form the observed signal:
+\begin{equation}
+    \yvec = \xvec + \fvec + \wvec.
+\end{equation}
+
+
+% --------------------------------------------------------------------
+\subsection{Dataset and Normalization}
+\label{sec:exp_dataset}
+% --------------------------------------------------------------------
+
+The complete dataset consists of 200 synthetic signals generated with seed 42 for reproducibility. The dataset is split 80/20 into 160 training signals and 40 test signals using a shuffled permutation (also seeded with 42). All experiments share this identical split.
+
+Each signal is normalized independently by dividing all three components ($\yvec$, $\xvec$, $\fvec$) by $\max(|\yvec|)$:
+\begin{equation}
+    \tilde{\yvec} = \frac{\yvec}{\max_i |y_i|}, \qquad
+    \tilde{\xvec} = \frac{\xvec}{\max_i |y_i|}, \qquad
+    \tilde{\fvec} = \frac{\fvec}{\max_i |y_i|}.
+    \label{eq:normalization}
+\end{equation}
+This per-sample normalization maps each observed signal to the range $[-1, 1]$, allowing the network to operate on signals of comparable scale regardless of their original amplitude. The normalization preserves the additive relationship $\tilde{\yvec} = \tilde{\xvec} + \tilde{\fvec} + \tilde{\wvec}$ (where $\tilde{\wvec} = \wvec / \max_i |y_i|$), so the ground-truth labels remain valid after normalization.
+
+\reftab{tab:data_params} summarizes all data generation parameters.
+
+\begin{table}[t]
+    \centering
+    \caption{Synthetic data generation parameters. All ranges denote uniform or log-uniform distributions as described in the text.}
+    \label{tab:data_params}
+    \small
+    \begin{tabular}{@{}llr@{}}
+        \toprule
+        \textbf{Parameter} & \textbf{Description} & \textbf{Value / Range} \\
+        \midrule
+        $N$ & Signal length & 4096 \\
+        $n_{\text{signals}}$ & Total signals generated & 200 \\
+        Train / test split & Ratio & 80 / 20 \\
+        Seed & Random seed & 42 \\
+        \midrule
+        \multicolumn{3}{@{}l}{\textit{Peaks}} \\
+        Number of peaks & Per signal & $[20, 55]$ \\
+        Amplitude $A$ & Log-uniform & $[15, 2500]$ \\
+        Width $\sigma$ & Log-uniform & $[1.5, 25.0]$ \\
+        Tailing $\tau_{\text{raw}}$ & Uniform (60\% of peaks) & $[1.0, 15.0]$ \\
+        Cluster probability & & 0.4 \\
+        Cluster size & Peaks per cluster & $[2, 4]$ \\
+        Cluster spread & Standard deviation (samples) & $[15, 80]$ \\
+        \midrule
+        \multicolumn{3}{@{}l}{\textit{Baseline}} \\
+        Drift types & Equally probable & Spline / Exp.\ decay / Mixed \\
+        Amplitude $A_{\text{base}}$ & Uniform & $[2, 35]$ \\
+        Baseline-to-peak ratio & Log-uniform & $[0.01, 0.5]$ \\
+        Spline knots & Uniform (internal) & $[4, 8]$ \\
+        \midrule
+        \multicolumn{3}{@{}l}{\textit{Noise}} \\
+        $\sigma_w$ & Noise std.\ dev. & $[2.0, 6.0]$ \\
+        \midrule
+        \multicolumn{3}{@{}l}{\textit{Normalization}} \\
+        Method & Per-sample & $\yvec / \max|\yvec|$ \\
+        \bottomrule
+    \end{tabular}
+\end{table}
+
+% TODO: Uncomment and add figure file when ready.
+% \begin{figure}[t]
+%     \centering
+%     \includegraphics[width=\textwidth]{figures/fig_4_1_synthetic_examples.pdf}
+%     \caption{Representative synthetic signals from the training set. Each panel shows the
+%     observed signal $\yvec$ (gray), the ground-truth peak component $\xvec$ (blue),
+%     the ground-truth baseline $\fvec$ (red), and the noise level (shaded).
+%     \textbf{(a)}~A sparse signal with well-separated peaks and low baseline amplitude.
+%     \textbf{(b)}~A dense signal with overlapping peak clusters and high baseline amplitude.
+%     \textbf{(c)}~A signal with mixed peak density and an exponential-decay baseline.}
+%     \label{fig:synthetic_examples}
+% \end{figure}
+
+
+% ====================================================================
+\section{Training Protocol}
+\label{sec:exp_training}
+% ====================================================================
+
+All LBEADS-NET models in the progressive experiments share the same architecture and training procedure, differing only in their loss function configurations. This section describes the common setup.
+
+
+% --------------------------------------------------------------------
+\subsection{Architecture Configuration}
+\label{sec:exp_architecture}
+% --------------------------------------------------------------------
+
+Each experiment trains a fresh instance of the \texttt{LBEADS\_NET\_Fast} architecture described in \refsec{sec:method_pipeline}. The architecture is configured with $K = 20$ unrolled ISTA layers, Butterworth filter order $d = 1$, and normalized cutoff frequency $f_c = 0.006$. The low-pass filter uses a single iteration ($p = 1$), matching the classical BEADS formulation.
+
+Each layer has five independently learnable scalar parameters, yielding a total of $5 \times 20 = 100$ learnable parameters. The initial values are chosen to be conservative, smaller than the classical BEADS defaults, to ensure stable refinement from the high-pass initialization:
+\begin{itemize}
+    \item $\lambda_0 = 0.01$ (sparsity weight; classical default: 0.4),
+    \item $\lambda_1 = 0.5$ (first-derivative penalty; classical default: 4.0),
+    \item $\lambda_2 = 0.5$ (second-derivative penalty; classical default: 3.2),
+    \item $r = 6.0$ (asymmetry ratio; same as classical default),
+    \item $\eta = 0.05$ (step size; no classical analogue).
+\end{itemize}
+All parameters are stored in log-space and recovered via exponentiation, guaranteeing positivity without clamping (\refsec{sec:method_params}).
+
+
+% --------------------------------------------------------------------
+\subsection{Optimizer and Schedule}
+\label{sec:exp_optimizer}
+% --------------------------------------------------------------------
+
+Training uses the Adam optimizer~\cite{kingma2015adam} with learning rate $10^{-3}$ and default momentum parameters ($\beta_1 = 0.9$, $\beta_2 = 0.999$). A step-wise learning rate schedule reduces the learning rate by a factor of 0.5 every 50 epochs, though this has minimal effect in the 30-epoch training budget used in the progressive experiments. Gradient norms are clipped to a maximum of 1.0 to prevent training instability from occasional large-gradient batches.
+
+Training runs for 30 epochs with a batch size of 16. Given the training set of 160 signals, each epoch consists of 10 gradient update steps. The reconstruction loss uses the Huber function with $\delta = 0.1$ (tighter than the $\delta = 1.0$ used in the curriculum training of \refsec{sec:method_curriculum}, reflecting the normalized signal scale). All computations use float64 precision for numerical stability in the BEADS matrix operations.
+
+Device selection follows a priority order: CUDA GPU if available, otherwise CPU. The MPS (Apple Silicon) backend is explicitly bypassed because it does not support float64 operations required by the BEADS filter matrices.
+
+Each experiment is initialized with a fresh random seed (42), ensuring that differences between experiments arise solely from the loss function configuration, not from initialization or data-ordering stochasticity.
+
+\myparagraph{Single-stage vs.\ curriculum training.}
+The progressive experiments described in \refsec{sec:exp_progressive} use \emph{single-stage} training: the loss configuration is fixed for all 30 epochs. This design choice is deliberate, the goal is to isolate the effect of each loss term under controlled conditions, without the confound of stage transitions. The multi-stage curriculum described in \refsec{sec:method_curriculum} is the training strategy for the final deployed model, not for the ablation-style progressive experiments.
+
+\reftab{tab:training_params} summarizes the training hyperparameters.
+
+\begin{table}[t]
+    \centering
+    \caption{Training hyperparameters. All progressive experiments share this configuration; only the loss function weights differ across experiments.}
+    \label{tab:training_params}
+    \begin{tabular}{@{}llr@{}}
+        \toprule
+        \textbf{Hyperparameter} & \textbf{Description} & \textbf{Value} \\
+        \midrule
+        \multicolumn{3}{@{}l}{\textit{Architecture}} \\
+        $K$ & Number of unrolled ISTA layers & 20 \\
+        $d$ & Butterworth filter order & 1 \\
+        $f_c$ & Normalized cutoff frequency & 0.006 \\
+        $p$ & Low-pass filter iterations & 1 \\
+        Parameters & Total learnable scalars & 100 \\
+        Precision & Floating-point format & float64 \\
+        \midrule
+        \multicolumn{3}{@{}l}{\textit{Optimizer}} \\
+        Algorithm & & Adam \\
+        Learning rate & & $10^{-3}$ \\
+        $\beta_1, \beta_2$ & Momentum parameters & $0.9, 0.999$ \\
+        Gradient clipping & Max norm & 1.0 \\
+        \midrule
+        \multicolumn{3}{@{}l}{\textit{Training}} \\
+        Epochs & Per experiment & 30 \\
+        Batch size & & 16 \\
+        Huber $\delta$ & Reconstruction loss & 0.1 \\
+        Seed & Initialization and data order & 42 \\
+        \bottomrule
+    \end{tabular}
+\end{table}
+
+
+% ====================================================================
+\section{Evaluation Metrics}
+\label{sec:exp_metrics}
+% ====================================================================
+
+All experiments are evaluated on the 40-signal held-out test set using nine metrics organized into four groups: peak reconstruction quality, baseline accuracy, quantification fidelity, and leakage detection. All metrics are computed per signal and reported as test-set averages (mean $\pm$ standard deviation).
+
+
+% --------------------------------------------------------------------
+\subsection{Peak Reconstruction}
+\label{sec:exp_metrics_peak}
+% --------------------------------------------------------------------
+
+\myparagraph{Peak MSE.} The mean squared error between the predicted and ground-truth peak signals measures point-wise reconstruction accuracy:
+\begin{equation}
+    \text{Peak MSE} = \frac{1}{N} \sum_{i=1}^{N} (\hat{x}_i - x_i)^2.
+    \label{eq:peak_mse}
+\end{equation}
+
+\myparagraph{Peak MAE.} The mean absolute error provides a robust alternative less sensitive to outlier errors:
+\begin{equation}
+    \text{Peak MAE} = \frac{1}{N} \sum_{i=1}^{N} |\hat{x}_i - x_i|.
+    \label{eq:peak_mae}
+\end{equation}
+
+\myparagraph{Peak correlation.} The Pearson correlation coefficient measures the linear relationship between predicted and true peak shapes, independent of scale:
+\begin{equation}
+    \rho = \frac{\sum_{i=1}^{N} (\hat{x}_i - \bar{\hat{x}})(x_i - \bar{x})}{\sqrt{\sum_{i=1}^{N} (\hat{x}_i - \bar{\hat{x}})^2 \sum_{i=1}^{N} (x_i - \bar{x})^2}},
+    \label{eq:peak_corr}
+\end{equation}
+where $\bar{\hat{x}}$ and $\bar{x}$ denote the sample means. A correlation of 1.0 indicates perfect shape recovery; values significantly below 1.0 indicate systematic shape distortion. If either signal has zero variance (a degenerate case), the correlation is set to 0.0.
+
+
+% --------------------------------------------------------------------
+\subsection{Baseline Accuracy}
+\label{sec:exp_metrics_baseline}
+% --------------------------------------------------------------------
+
+\myparagraph{Baseline MSE.} The mean squared error between the predicted and ground-truth baselines:
+\begin{equation}
+    \text{Baseline MSE} = \frac{1}{N} \sum_{i=1}^{N} (\hat{f}_i - f_i)^2.
+    \label{eq:baseline_mse}
+\end{equation}
+
+\myparagraph{Baseline MAE.} The mean absolute error for the baseline:
+\begin{equation}
+    \text{Baseline MAE} = \frac{1}{N} \sum_{i=1}^{N} |\hat{f}_i - f_i|.
+    \label{eq:baseline_mae}
+\end{equation}
+
+
+% --------------------------------------------------------------------
+\subsection{Quantification Fidelity}
+\label{sec:exp_metrics_quant}
+% --------------------------------------------------------------------
+
+\myparagraph{Area error.} Peak area integration is the standard method for determining analyte concentration in chromatography. The relative area error measures how well the predicted peaks preserve total integrated area:
+\begin{equation}
+    \text{Area Error} = \frac{\left|\sum_{i=1}^{N} \hat{x}_i - \sum_{i=1}^{N} x_i\right|}{\sum_{i=1}^{N} x_i + \epsilon} \times 100\%,
+    \label{eq:area_error}
+\end{equation}
+where $\epsilon = 10^{-12}$ prevents division by zero. An area error of 0\% indicates perfect preservation of total peak area. This metric is critical for analytical chemistry applications, where area errors directly translate to concentration measurement errors.
+
+
+% --------------------------------------------------------------------
+\subsection{Leakage Detection}
+\label{sec:exp_metrics_leakage}
+% --------------------------------------------------------------------
+
+Two novel metrics are introduced to detect and quantify baseline leakage, the phenomenon in which peak energy is erroneously absorbed into the baseline estimate. Both metrics rely on a binary \emph{peak mask} constructed from the ground-truth peak signal:
+\begin{equation}
+    m_i = \mathbf{1}\!\Big[|x_i| \geq \max\!\big(\gamma \cdot \max_j |x_j|,\; \tau_{\min}\big)\Big],
+    \label{eq:eval_peak_mask}
+\end{equation}
+with relative threshold $\gamma = 0.02$ and absolute floor $\tau_{\min} = 10^{-4}$. The complementary background mask is $m_i^{\text{bg}} = 1 - m_i$.
+
+\myparagraph{Baseline Leakage Index (BLI).} The BLI measures the extent to which the predicted baseline \emph{over-estimates} the true baseline in peak regions, which is the signature of peak energy being absorbed into the baseline:
+\begin{equation}
+    \text{BLI} = \frac{\sum_{i=1}^{N} \max(0,\; \hat{f}_i - f_i) \cdot m_i}{\sum_{i=1}^{N} x_i \cdot m_i + \epsilon}.
+    \label{eq:bli}
+\end{equation}
+The numerator sums only the positive baseline residual (over-estimation) at peak locations, and the denominator normalizes by the total peak energy in those locations. A BLI of zero indicates no baseline over-estimation at peak locations. Positive BLI values indicate leakage: the predicted baseline rises above the true baseline where peaks are present, absorbing peak energy. The $\max(0, \cdot)$ function ensures that baseline \emph{under}-estimation does not reduce the BLI, since under-estimation is a different failure mode (conservative baseline estimate) that does not constitute leakage.
+
+\myparagraph{Peak-to-Baseline Error Ratio (PBER).} The PBER compares the root-mean-squared baseline error in peak regions to the baseline error in background regions:
+\begin{equation}
+    \text{PBER} = \frac{\text{RMSE}_{\text{peak}}}{\text{RMSE}_{\text{bg}} + \epsilon},
+\end{equation}
+where
+\begin{equation}
+    \text{RMSE}_{\text{peak}} = \sqrt{\frac{\sum_{i} m_i (\hat{f}_i - f_i)^2}{\sum_{i} m_i}}, \qquad
+    \text{RMSE}_{\text{bg}} = \sqrt{\frac{\sum_{i} m_i^{\text{bg}} (\hat{f}_i - f_i)^2}{\sum_{i} m_i^{\text{bg}}}}.
+    \label{eq:pber}
+\end{equation}
+A PBER of approximately 1.0 indicates that baseline errors are uniformly distributed, the baseline is equally accurate in peak and non-peak regions. A PBER significantly greater than 1.0 indicates that the baseline is \emph{worse} where peaks are present, which is the hallmark of leakage. The PBER complements the BLI: while the BLI measures the magnitude of directional (upward) leakage, the PBER detects any systematic degradation of baseline accuracy at peak locations, regardless of sign.
+
+
+% --------------------------------------------------------------------
+\subsection{Peak Quality}
+\label{sec:exp_metrics_quality}
+% --------------------------------------------------------------------
+
+\myparagraph{Negative fraction.} The fraction of predicted peak samples with negative values:
+\begin{equation}
+    \text{Neg.\ Fraction} = \frac{1}{N} \sum_{i=1}^{N} \mathbf{1}[\hat{x}_i < 0].
+    \label{eq:neg_fraction}
+\end{equation}
+Since chromatographic peaks are physically non-negative, the negative fraction should be near zero for a well-behaved model. Non-zero values indicate either over-correction artifacts (the model subtracts too much baseline in some regions) or insufficient asymmetric thresholding. This metric is directly related to the non-negativity loss term (\refsec{sec:method_loss_sparsity}).
+
+
+% ====================================================================
+\section{Progressive Experiment Design}
+\label{sec:exp_progressive}
+% ====================================================================
+
+The progressive experiment series is the primary evaluation strategy for this thesis. The central premise is that classical BEADS requires careful per-signal parameter optimization, and our goal is to demonstrate how progressive loss engineering builds toward a model that generalizes without tuning. Each experiment in the series adds one key idea to the loss function and measures its impact on all nine evaluation metrics, isolating the contribution of each loss term under otherwise identical conditions.
+
+The six experiments are structured as a development narrative: starting from a classical (non-learned) baseline and advancing through increasingly sophisticated loss configurations. The first experiment uses classical BEADS with no learning; the remaining five train LBEADS-NET with progressively richer loss functions. All five trained models share the architecture, optimizer, training data, test data, and hyperparameters described in \refsec{sec:exp_training}, only the loss weights differ.
+
+
+% --------------------------------------------------------------------
+\subsection{Experiment 1.0: Classical BEADS Baseline}
+\label{sec:exp_1_0}
+% --------------------------------------------------------------------
+
+The first experiment applies the classical (non-learned) BEADS algorithm directly to the normalized test signals, without any training. The algorithm is run with fixed parameters: $f_c = 0.006$, $d = 1$, $r = 6$, $\lambda_0 = 0.4$, $\lambda_1 = 4.0$, $\lambda_2 = 3.2$, and 30 iterations.
+
+These parameter values are the published defaults from Ning et al.~\cite{ning2014beads}, not optimized for the synthetic test data. The test signals have been normalized to unit scale (\refsec{sec:exp_dataset}), but the BEADS parameters were designed for unnormalized chromatograms with amplitudes in the hundreds. This deliberate mismatch demonstrates the core limitation of classical BEADS: \emph{a single parameter configuration cannot generalize across signal conditions}. Tuning $\lambda_0$, $\lambda_1$, $\lambda_2$, and $r$ for each test signal would likely improve classical BEADS performance, but such per-signal tuning is precisely the burden that LBEADS-NET aims to eliminate.
+
+This experiment serves as the reference against which all learned models are compared. It establishes what the classical algorithm achieves when applied ``out of the box'' without per-signal adjustment.
+
+
+% --------------------------------------------------------------------
+\subsection{Experiment 1.1: MSE Only (Naive Unrolling)}
+\label{sec:exp_1_1}
+% --------------------------------------------------------------------
+
+The first learned model is trained with only the reconstruction loss: $\alpha_{\text{mse}} = 1.0$, all other loss weights set to zero. This is the simplest possible training objective, the network learns to minimize the mean squared error (Huber) between its peak estimate $\hat{\xvec}$ and the ground-truth peaks $\xvec$.
+
+This experiment tests a fundamental question: \emph{does algorithm unrolling alone, without careful loss design, suffice for accurate baseline correction?} By providing no structural guidance beyond reconstruction accuracy, the experiment reveals the baseline behavior of the unrolled architecture when the loss function offers no signal about baseline quality, peak sparsity, or non-negativity.
+
+
+% --------------------------------------------------------------------
+\subsection{Experiment 1.2: MSE + Sparsity Priors}
+\label{sec:exp_1_2}
+% --------------------------------------------------------------------
+
+The second learned model adds three sparsity-related loss terms to the reconstruction objective:
+\begin{itemize}
+    \item $\ell_1$ sparsity penalty on peaks ($\alpha_{\ell_1} = 0.01$),
+    \item Total variation penalty on peaks ($\alpha_{\text{tv}} = 0.01$),
+    \item Non-negativity penalty ($\alpha_{\text{neg}} = 0.1$).
+\end{itemize}
+
+These terms encode the prior knowledge that chromatographic peaks are sparse, piecewise-smooth, and non-negative. The experiment tests whether incorporating these physical priors into the loss function improves performance beyond pure reconstruction. A key observation is that sparsity priors can \emph{worsen} leakage in dense-peak regions by over-shrinking overlapping peaks, pushing the surplus energy into the baseline. The low weights ($\alpha_{\ell_1} = \alpha_{\text{tv}} = 0.01$) are chosen to provide mild regularization without aggressive peak shrinkage.
+
+
+% --------------------------------------------------------------------
+\subsection{Experiment 1.3: + Baseline Supervision}
+\label{sec:exp_1_3}
+% --------------------------------------------------------------------
+
+The third learned model adds direct baseline supervision to the Experiment~1.2 configuration:
+\begin{itemize}
+    \item Masked baseline reconstruction ($\alpha_{\text{baseline}} = 1.0$),
+    \item Baseline smoothness ($\alpha_{\text{smooth}} = 0.01$).
+\end{itemize}
+
+The masked baseline reconstruction loss (\refsec{sec:method_loss_baseline}) provides direct gradient signal about the baseline quality in non-peak regions. This is the critical hypothesis of the progressive series: \emph{direct baseline supervision prevents leakage by giving the optimizer information about the baseline that pure peak reconstruction cannot provide}. Without baseline supervision, the optimizer has no gradient signal to discourage the baseline from absorbing peak energy, the reconstruction loss penalizes the peak estimate but not the baseline estimate. The masked baseline loss closes this gap.
+
+
+% --------------------------------------------------------------------
+\subsection{Experiment 1.4: + Orthogonality (v5 Configuration)}
+\label{sec:exp_1_4}
+% --------------------------------------------------------------------
+
+The fourth learned model adds structural separation constraints to the Experiment~1.3 configuration:
+\begin{itemize}
+    \item Peak-baseline orthogonality ($\alpha_{\text{ortho}} = 0.5$),
+    \item Baseline third-derivative penalty ($\alpha_{\text{baseline\_tv}} = 0.1$).
+\end{itemize}
+
+The orthogonality loss (\refsec{sec:method_loss_leakage}) penalizes the element-wise product $|\hat{x}_i| \cdot |\hat{f}_i|$, enforcing that the peak and baseline components are mutually exclusive at each sample point. The baseline third-derivative penalty (\refsec{sec:method_loss_baseline}) catches localized bumps in the baseline that the second-derivative smoothness penalty misses. This configuration corresponds to the v5 development iteration, the model architecture that constitutes the thesis system.
+
+
+% --------------------------------------------------------------------
+\subsection{Experiment 1.5: Full Anti-Leakage Battery (v7 Configuration)}
+\label{sec:exp_1_5}
+% --------------------------------------------------------------------
+
+The fifth learned model activates the full suite of anti-leakage loss terms, starting from a modified base configuration and adding four additional penalties:
+\begin{itemize}
+    \item High-frequency baseline leakage penalty ($\alpha_{\text{leakage}} = 1.0$),
+    \item Asymmetric baseline loss ($\alpha_{\text{asym}} = 1.0$, asymmetry ratio $\alpha = 0.9$),
+    \item Envelope constraint ($\alpha_{\text{envelope}} = 0.5$),
+    \item Frequency separation ($\alpha_{\text{freq}} = 0.05$).
+\end{itemize}
+
+This configuration also adjusts several base weights: the $\ell_1$ and TV penalties are reduced to 0.005, the non-negativity weight is increased to 2.0, the baseline reconstruction weight is increased to 2.0, and the baseline third-derivative penalty is disabled ($\alpha_{\text{baseline\_tv}} = 0.0$). These adjustments reflect the v7 development iteration's finding that strong anti-leakage terms require reduced sparsity penalties to avoid conflicting gradient directions, and stronger non-negativity enforcement to compensate for the reduced sparsity shrinkage.
+
+This experiment tests whether the additional anti-leakage terms, asymmetric baseline penalization, envelope constraints, and frequency-domain separation, improve performance beyond the baseline supervision and orthogonality of Experiment~1.4.
+
+\reftab{tab:progressive_configs} summarizes the loss configurations for all six experiments.
+
+\begin{table}[t]
+    \centering
+    \caption{Loss configurations for the progressive experiment series. Each row shows the active loss terms and their weights. Dashes indicate inactive terms ($\alpha = 0$). Experiment~1.0 uses classical BEADS with no learning.}
+    \label{tab:progressive_configs}
+    \small
+    \begin{tabular}{@{}lcccccc@{}}
+        \toprule
+        \textbf{Loss Term} & \textbf{1.0} & \textbf{1.1} & \textbf{1.2} & \textbf{1.3} & \textbf{1.4} & \textbf{1.5} \\
+         & Classical & MSE & +Sparse & +Baseline & +Ortho & Full v7 \\
+        \midrule
+        Reconstruction       & ,  & 1.0 & 1.0  & 1.0  & 1.0  & 1.0 \\
+        $\ell_1$ sparsity    & ,  & ,  & 0.01 & 0.01 & 0.01 & 0.005 \\
+        Total variation      & ,  & ,  & 0.01 & 0.01 & 0.01 & 0.005 \\
+        Non-negativity       & ,  & ,  & 0.1  & 0.1  & 0.1  & 2.0 \\
+        Baseline recon.      & ,  & ,  & ,   & 1.0  & 1.0  & 2.0 \\
+        Baseline smooth      & ,  & ,  & ,   & 0.01 & 0.01 & 0.01 \\
+        Orthogonality        & ,  & ,  & ,   & ,   & 0.5  & 0.5 \\
+        Baseline 3rd deriv.  & ,  & ,  & ,   & ,   & 0.1  & ,  \\
+        Leakage penalty      & ,  & ,  & ,   & ,   & ,   & 1.0 \\
+        Asymmetric baseline  & ,  & ,  & ,   & ,   & ,   & 1.0 \\
+        Envelope             & ,  & ,  & ,   & ,   & ,   & 0.5 \\
+        Freq.\ separation    & ,  & ,  & ,   & ,   & ,   & 0.05 \\
+        \bottomrule
+    \end{tabular}
+\end{table}
+
+
+% ====================================================================
+\section{Baseline Comparison Methods}
+\label{sec:exp_baselines}
+% ====================================================================
+
+The primary comparison in this thesis is between LBEADS-NET variants (Experiments~1.1--1.5) and the classical BEADS algorithm (Experiment~1.0). This comparison is structured to highlight the central contribution: \emph{generalization without per-signal parameter tuning}.
+
+
+% --------------------------------------------------------------------
+\subsection{Classical BEADS}
+\label{sec:exp_beads_classical}
+% --------------------------------------------------------------------
+
+The classical BEADS algorithm~\cite{ning2014beads} is the natural baseline for LBEADS-NET, since the network's architecture is derived from its iterative optimization structure. The classical algorithm requires specification of six parameters ($f_c$, $d$, $r$, $\lambda_0$, $\lambda_1$, $\lambda_2$) and runs for a fixed number of iterations (30 in our experiments).
+
+In Experiment~1.0, BEADS is applied with published default parameters. The comparison against LBEADS-NET is not primarily about numerical superiority: a carefully tuned classical BEADS configuration for each individual test signal would likely outperform LBEADS-NET on that specific signal. The comparison instead demonstrates the \emph{generalization advantage}: LBEADS-NET applies the same learned parameters to all test signals without modification, whereas classical BEADS requires per-signal tuning to achieve optimal results. The performance of classical BEADS with fixed, non-optimized parameters illustrates the degradation that occurs when tuning is absent, precisely the setting in which LBEADS-NET is designed to operate.
+
+
+% --------------------------------------------------------------------
+\subsection{Additional Classical Methods}
+\label{sec:exp_additional_baselines}
+% --------------------------------------------------------------------
+
+Several additional classical baseline correction methods are available for comparison through the \texttt{pybaselines} library: asymmetrically reweighted Penalized Least Squares (arPLS)~\cite{baek2015arpls}, adaptive iteratively reweighted Penalized Least Squares (airPLS)~\cite{zhang2010airpls}, and the Statistics-sensitive Non-linear Iterative Peak-clipping algorithm (SNIP)~\cite{morhac2008snip}. These methods share the same fundamental limitation as BEADS: each requires one or more hyperparameters that must be tuned per signal or per instrument. A comprehensive comparison with these methods is deferred to future work; the progressive experiments focus on the LBEADS-NET development trajectory, where classical BEADS serves as the most meaningful reference point because it is the algorithm from which the network architecture is derived.
+
+
+% --------------------------------------------------------------------
+\subsection{Framing the Comparison}
+\label{sec:exp_framing}
+% --------------------------------------------------------------------
+
+The experimental design reflects the thesis argument: the value of LBEADS-NET lies not in beating a perfectly tuned classical method on a per-signal basis, but in providing a \emph{tuning-free} method that achieves competitive performance across a distribution of signals. The progressive experiment series demonstrates how systematic loss engineering, from naive reconstruction through structured priors to targeted anti-leakage penalties, builds toward this goal. Results for all six experiments are presented in Chapter~5.

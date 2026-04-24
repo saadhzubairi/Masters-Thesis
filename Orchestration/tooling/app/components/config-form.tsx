@@ -12,11 +12,12 @@ import { LlmConfigDialog } from "./llm-config-dialog"
 import { createRun, listRuns, getRun, getDataConfig } from "@/lib/api"
 import type {
   RunConfig, RunSummary, ModelConfig, FastModelConfig, TrainingConfig,
-  LossConfig, StageConfig, DataConfig, ModelType,
+  LossConfig, StageConfig, DataConfig, ModelType, DeviceType,
 } from "@/lib/types"
 import {
   DEFAULT_MODEL_CONFIG,
   DEFAULT_FAST_MODEL_CONFIG,
+  DEFAULT_V5_MODEL_CONFIG,
   DEFAULT_TRAINING_CONFIG,
   DEFAULT_LOSS_CONFIG,
   DEFAULT_STAGES,
@@ -241,9 +242,11 @@ function ObjectFields({
 export function ConfigForm() {
   const router = useRouter()
   const [modelType, setModelType] = useState<ModelType | null>(null)
+  const [device, setDevice] = useState<DeviceType>("cpu")
   const [name, setName] = useState("")
   const [model, setModel] = useState<ModelConfig>({ ...DEFAULT_MODEL_CONFIG })
   const [modelFast, setModelFast] = useState<FastModelConfig>({ ...DEFAULT_FAST_MODEL_CONFIG })
+  const [modelV5, setModelV5] = useState<FastModelConfig>({ ...DEFAULT_V5_MODEL_CONFIG })
   const [training, setTraining] = useState<TrainingConfig>({ ...DEFAULT_TRAINING_CONFIG })
   const [loss, setLoss] = useState<LossConfig>({ ...DEFAULT_LOSS_CONFIG })
   const [stages, setStages] = useState<StageConfig[]>(structuredClone(DEFAULT_STAGES))
@@ -263,8 +266,10 @@ export function ConfigForm() {
             const cfg = JSON.parse(raw)
             const mt = cfg.model_type || "lbeads"
             setModelType(mt)
+            if (cfg.device) setDevice(cfg.device)
             setModel(cfg.model || DEFAULT_MODEL_CONFIG)
             if (cfg.model_fast) setModelFast(cfg.model_fast)
+            if (cfg.model_fast) setModelV5(cfg.model_fast)
             setTraining(cfg.training || DEFAULT_TRAINING_CONFIG)
             setLoss(cfg.loss || DEFAULT_LOSS_CONFIG)
             setStages(cfg.stages || DEFAULT_STAGES)
@@ -281,8 +286,10 @@ export function ConfigForm() {
       if (run.config) {
         const mt = run.config.model_type || "lbeads"
         setModelType(mt)
+        if (run.config.device) setDevice(run.config.device)
         setModel(run.config.model || DEFAULT_MODEL_CONFIG)
         if (run.config.model_fast) setModelFast(run.config.model_fast)
+        if (run.config.model_fast) setModelV5(run.config.model_fast)
         setTraining(run.config.training || DEFAULT_TRAINING_CONFIG)
         setLoss(run.config.loss || DEFAULT_LOSS_CONFIG)
         setStages(run.config.stages || DEFAULT_STAGES)
@@ -304,8 +311,9 @@ export function ConfigForm() {
       const config: RunConfig = {
         name: name || "Untitled Run",
         model_type: modelType,
+        device,
         model,
-        ...(modelType === "lbeads_fast" ? { model_fast: modelFast } : {}),
+        ...(modelType === "lbeads_fast" ? { model_fast: modelFast } : modelType === "lbeads_v5" ? { model_fast: modelV5 } : {}),
         training, loss, stages, data,
       }
       const { run_id } = await createRun(config)
@@ -318,21 +326,25 @@ export function ConfigForm() {
   }
 
   const isStandard = modelType === "lbeads"
+  const isV5 = modelType === "lbeads_v5"
 
   const llmDialog = (
     <LlmConfigDialog
       getCurrentConfig={() => ({
         name: name || "Untitled Run",
         model_type: modelType || "lbeads",
+        device,
         model,
-        ...(modelType === "lbeads_fast" ? { model_fast: modelFast } : {}),
+        ...(modelType === "lbeads_fast" ? { model_fast: modelFast } : modelType === "lbeads_v5" ? { model_fast: modelV5 } : {}),
         training, loss, stages,
       })}
       onApply={(cfg) => {
         if (cfg.model_type) setModelType(cfg.model_type)
+        if (cfg.device) setDevice(cfg.device)
         if (cfg.name !== undefined) setName(cfg.name)
         if (cfg.model) setModel({ ...DEFAULT_MODEL_CONFIG, ...cfg.model })
         if (cfg.model_fast) setModelFast({ ...DEFAULT_FAST_MODEL_CONFIG, ...cfg.model_fast })
+        if (cfg.model_fast) setModelV5({ ...DEFAULT_V5_MODEL_CONFIG, ...cfg.model_fast })
         if (cfg.training) setTraining({ ...DEFAULT_TRAINING_CONFIG, ...cfg.training })
         if (cfg.loss) setLoss({ ...DEFAULT_LOSS_CONFIG, ...cfg.loss })
         if (cfg.stages?.length) setStages(cfg.stages)
@@ -373,7 +385,7 @@ export function ConfigForm() {
           <div className="border-t pt-6">
             <p className="text-sm font-semibold mb-1">Select Model Type</p>
             <p className="text-xs text-muted-foreground mb-4">Choose the architecture for this training run.</p>
-            <div className="grid grid-cols-2 gap-4 max-w-2xl">
+            <div className="grid grid-cols-3 gap-4 max-w-3xl">
               <button
                 onClick={() => setModelType("lbeads")}
                 className="border bg-white p-5 text-left hover:border-foreground transition-colors group"
@@ -396,13 +408,24 @@ export function ConfigForm() {
                 </p>
                 <p className="text-[10px] text-muted-foreground/60 mt-2 font-mono">lowpass_iterations · init_step_size</p>
               </button>
+              <button
+                onClick={() => setModelType("lbeads_v5")}
+                className="border bg-white p-5 text-left hover:border-foreground transition-colors group"
+              >
+                <p className="text-sm font-bold font-mono group-hover:underline">LBEADS-NET v5</p>
+                <p className="text-xs text-muted-foreground mt-1.5 leading-relaxed">
+                  Proximal gradient (same as Fast) with v5 defaults: 20 layers, smaller lambdas,
+                  single-pass lowpass. Tuned for stable refinement from high-pass init.
+                </p>
+                <p className="text-[10px] text-muted-foreground/60 mt-2 font-mono">lowpass_iterations=1 · 20 layers · smaller λ</p>
+              </button>
             </div>
           </div>
         </>
       ) : (
         <div className="space-y-4">
-          {/* Row 1: Model Type badge + Clone From + Run Name */}
-          <div className="grid grid-cols-[auto_1fr_1fr] gap-4 items-end">
+          {/* Row 1: Model Type badge + Device + Clone From + Run Name */}
+          <div className="grid grid-cols-[auto_auto_1fr_1fr] gap-4 items-end">
             <div>
               <Label className="text-xs font-semibold">Model</Label>
               <button
@@ -410,11 +433,23 @@ export function ConfigForm() {
                 className="mt-1 flex items-center gap-1.5 border px-3 h-9 text-xs font-mono font-bold hover:bg-zinc-50 transition-colors"
                 title="Click to change model type"
               >
-                {isStandard ? "LBEADS-NET" : "LBEADS-NET Fast"}
+                {isStandard ? "LBEADS-NET" : isV5 ? "LBEADS-NET v5" : "LBEADS-NET Fast"}
                 <svg xmlns="http://www.w3.org/2000/svg" width="10" height="10" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round" className="text-muted-foreground">
                   <path d="m6 9 6 6 6-6" />
                 </svg>
               </button>
+            </div>
+            <div>
+              <Label className="text-xs font-semibold">Device</Label>
+              <Select value={device} onValueChange={(v) => setDevice(v as DeviceType)}>
+                <SelectTrigger className="mt-1 h-9 text-xs w-28">
+                  <SelectValue />
+                </SelectTrigger>
+                <SelectContent>
+                  <SelectItem value="cpu" className="text-xs">CPU</SelectItem>
+                  <SelectItem value="mps" className="text-xs">MPS (Apple Silicon)</SelectItem>
+                </SelectContent>
+              </Select>
             </div>
             <div>
               <Label className="text-xs font-semibold">Clone From</Label>
@@ -444,9 +479,11 @@ export function ConfigForm() {
 
           {/* Row 2: Architecture + Training + Init Params */}
           <div className="grid grid-cols-3 gap-4">
-            <Section title={isStandard ? "Model Architecture" : "Model Architecture (Fast)"}>
+            <Section title={isStandard ? "Model Architecture" : isV5 ? "Model Architecture (v5)" : "Model Architecture (Fast)"}>
               {isStandard ? (
                 <ObjectFields obj={model} setObj={setModel} filter={(k) => !k.startsWith("init_")} />
+              ) : isV5 ? (
+                <ObjectFields obj={modelV5} setObj={setModelV5} filter={(k) => !k.startsWith("init_")} />
               ) : (
                 <ObjectFields obj={modelFast} setObj={setModelFast} filter={(k) => !k.startsWith("init_")} />
               )}
@@ -459,6 +496,8 @@ export function ConfigForm() {
             <Section title="Initial Parameters">
               {isStandard ? (
                 <ObjectFields obj={model} setObj={setModel} filter={(k) => k.startsWith("init_")} />
+              ) : isV5 ? (
+                <ObjectFields obj={modelV5} setObj={setModelV5} filter={(k) => k.startsWith("init_")} />
               ) : (
                 <ObjectFields obj={modelFast} setObj={setModelFast} filter={(k) => k.startsWith("init_")} />
               )}

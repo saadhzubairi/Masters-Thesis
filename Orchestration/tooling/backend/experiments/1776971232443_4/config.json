@@ -1,0 +1,130 @@
+{
+  "name": "Ablation A: No Baseline Supervision (on mps) (clone)",
+  "model_type": "lbeads_v5",
+  "device": "mps",
+  "model": {
+    "N": 4096,
+    "d": 1,
+    "fc": 0.006,
+    "num_layers": 5,
+    "solve_cg_iters": 5,
+    "lowpass_cg_iters": 24,
+    "shared_params": false,
+    "init_lam0": 0.002,
+    "init_lam1": 0.3,
+    "init_lam2": 0.3,
+    "init_r": 6,
+    "init_step": 1,
+    "init_output_gain": 1
+  },
+  "model_fast": {
+    "N": 1024,
+    "d": 1,
+    "fc": 0.006,
+    "num_layers": 20,
+    "lowpass_iterations": 1,
+    "lowpass_cg_iters": 4,
+    "init_lam0": 0.01,
+    "init_lam1": 0.5,
+    "init_lam2": 0.5,
+    "init_r": 6,
+    "init_step_size": 0.05
+  },
+  "training": {
+    "learning_rate": 0.001,
+    "batch_size": 2,
+    "num_samples": 500,
+    "noise_level": 0.01,
+    "train_ratio": 0.8,
+    "seed": 42
+  },
+  "loss": {
+    "alpha_mse": 1,
+    "alpha_l1": 0.01,
+    "alpha_tv": 0.01,
+    "alpha_smooth": 0.2,
+    "alpha_neg": 2,
+    "alpha_baseline": 0,
+    "alpha_leakage": 0,
+    "alpha_ortho": 0.2,
+    "alpha_baseline_tv": 0,
+    "peak_mask_rel_threshold": 0.02,
+    "peak_mask_abs_min": 0.0001,
+    "use_huber": false,
+    "huber_delta": 0.1
+  },
+  "stages": [
+    {
+      "name": "A_warmup",
+      "epochs": 10,
+      "loss_config": {
+        "alpha_mse": 1,
+        "alpha_l1": 0,
+        "alpha_tv": 0,
+        "alpha_smooth": 0,
+        "alpha_neg": 0,
+        "alpha_baseline": 0,
+        "alpha_leakage": 0,
+        "alpha_ortho": 0,
+        "alpha_baseline_tv": 0
+      }
+    },
+    {
+      "name": "B_no_baseline_sup",
+      "epochs": 50,
+      "loss_config": {
+        "alpha_mse": 1,
+        "alpha_l1": 0.01,
+        "alpha_tv": 0.01,
+        "alpha_smooth": 0.2,
+        "alpha_neg": 2,
+        "alpha_baseline": 0,
+        "alpha_leakage": 0,
+        "alpha_ortho": 0.2,
+        "alpha_baseline_tv": 0
+      }
+    }
+  ],
+  "data": {
+    "baseline": {
+      "smooth_sigma": 10,
+      "sine_amp": 0.1,
+      "sine_freq_min": 0.5,
+      "sine_freq_max": 2,
+      "baseline_amp_min": 0.08,
+      "baseline_amp_max": 0.35
+    },
+    "peak_layers": [
+      {
+        "num_peaks_min": 20,
+        "num_peaks_max": 30,
+        "amplitude_min": 30,
+        "amplitude_max": 90,
+        "rise_width_min": 1,
+        "rise_width_max": 1,
+        "decay_width_min": 1,
+        "decay_width_max": 1,
+        "plateau_width_min": 4,
+        "plateau_width_max": 13,
+        "peak_shape_mode": "mixed"
+      },
+      {
+        "num_peaks_min": 50,
+        "num_peaks_max": 70,
+        "amplitude_min": 0.2,
+        "amplitude_max": 1,
+        "rise_width_min": 1,
+        "rise_width_max": 1,
+        "decay_width_min": 1,
+        "decay_width_max": 1,
+        "plateau_width_min": 0,
+        "plateau_width_max": 10,
+        "peak_shape_mode": "mixed"
+      }
+    ],
+    "noise": {
+      "noise_level": 0.034
+    }
+  },
+  "run_id": "1776971232443_4"
+}

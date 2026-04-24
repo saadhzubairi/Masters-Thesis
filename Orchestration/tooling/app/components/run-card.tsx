@@ -52,7 +52,7 @@ export function RunCard({ run, onDeleted }: RunCardProps) {
           )}
           <span className="font-semibold text-sm">Run #{run.id.slice(-6)}</span>
           <span className="text-[10px] font-mono px-1.5 py-0.5 border bg-zinc-50 text-muted-foreground">
-            {run.model_type === "lbeads_fast" ? "FAST" : "STD"}
+            {run.model_type === "lbeads_fast" ? "FAST" : run.model_type === "lbeads_v5" ? "V5" : "STD"}
           </span>
           <span className="text-muted-foreground text-sm">{run.name}</span>
         </div>

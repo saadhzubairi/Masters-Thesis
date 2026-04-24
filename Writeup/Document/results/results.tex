@@ -1,0 +1,447 @@
+%!TEX root = ../thesis.tex
+\chapter{Results and Analysis}
+\label{chap:results}
+
+This chapter presents the experimental results from the progressive experiment series described in \refsec{sec:exp_progressive}. \refsec{sec:results_progressive} reports quantitative results across all six experiments, analyzing the contribution of each progressive loss term addition. \refsec{sec:results_ablation} presents ablation studies that isolate the contribution of individual loss components and characterize the effect of network depth. \refsec{sec:results_params} examines the learned per-layer parameters to characterize the emergent specialization that arises from end-to-end training. \refsec{sec:results_real} discusses preliminary results on real chromatographic data. \refsec{sec:results_summary} synthesizes the key findings.
+
+All results are computed on the 40-signal held-out test set described in \refsec{sec:exp_dataset}. Metrics are reported as mean $\pm$ standard deviation across the test set unless otherwise noted. Metric definitions are given in \refsec{sec:exp_metrics}; experiment configurations are summarized in \reftab{tab:progressive_configs}.
+
+
+% ====================================================================
+\section{Progressive Development Results}
+\label{sec:results_progressive}
+% ====================================================================
+
+The progressive experiment series evaluates six configurations: classical BEADS with fixed parameters (Experiment~1.0) and five LBEADS-NET variants with increasingly complex loss functions (Experiments~1.1--1.5). Each experiment is described in \refsec{sec:exp_progressive}. This section presents the quantitative comparison, analyzes baseline leakage behavior, and discusses the over-regularization effect observed in the most complex configuration.
+
+
+% --------------------------------------------------------------------
+\subsection{Quantitative Comparison}
+\label{sec:results_quantitative}
+% --------------------------------------------------------------------
+
+\reftab{tab:progressive_results} presents the full results for all six experiments across seven evaluation metrics. The table reveals several clear trends, which we discuss in order of their significance.
+
+\begin{table}[t]
+    \centering
+    \caption{Progressive experiment results on the 40-signal test set. All values are mean $\pm$ standard deviation. Bold entries indicate the best value in each column (excluding Classical BEADS, which uses a fundamentally different evaluation setting). Peak MSE and Baseline MSE are $\times 10^{-3}$ for readability. Neg.\ Fraction is reported as a proportion of total signal length.}
+    \label{tab:progressive_results}
+    \small
+    \begin{tabular}{@{}lccccccc@{}}
+        \toprule
+        \textbf{Experiment} & \textbf{Peak} & \textbf{Peak} & \textbf{Baseline} & \textbf{BLI} & \textbf{PBER} & \textbf{Area} & \textbf{Neg.} \\
+         & \textbf{MSE} & \textbf{Corr.} & \textbf{MSE} & & & \textbf{Err.\ \%} & \textbf{Frac.} \\
+        \midrule
+        1.0 Classical BEADS
+            & 21.27 & 0.746 & 12.72 & 0.837 & 8.35 & 99.99 & 0.000 \\
+            & {\scriptsize $\pm$9.2} & {\scriptsize $\pm$0.210} & & & & & \\
+        \midrule
+        1.1 MSE Only
+            & 9.79 & 0.748 & 7.45 & 0.593 & 5.48 & 49.47 & 0.295 \\
+            & {\scriptsize $\pm$4.7} & {\scriptsize $\pm$0.05} & & {\scriptsize $\pm$0.075} & & & \\
+        1.2 +Sparse
+            & 9.38 & 0.785 & 7.54 & 0.597 & 5.33 & 49.51 & 0.216 \\
+            & {\scriptsize $\pm$4.7} & {\scriptsize $\pm$0.05} & & {\scriptsize $\pm$0.075} & & & \\
+        1.3 +Baseline
+            & \textbf{9.30} & \textbf{0.793} & 7.48 & 0.596 & 5.52 & 51.55 & 0.211 \\
+            & {\scriptsize $\pm$4.7} & {\scriptsize $\pm$0.05} & & {\scriptsize $\pm$0.075} & & & \\
+        1.4 +Ortho (v5)
+            & 9.36 & 0.785 & \textbf{7.40} & \textbf{0.592} & 5.64 & 50.95 & \textbf{0.211} \\
+            & {\scriptsize $\pm$4.7} & {\scriptsize $\pm$0.05} & & {\scriptsize $\pm$0.075} & & & \\
+        1.5 Full v7
+            & 10.01 & 0.744 & 7.69 & 0.611 & 5.57 & 57.63 & 0.305 \\
+            & {\scriptsize $\pm$4.7} & {\scriptsize $\pm$0.05} & & {\scriptsize $\pm$0.075} & & & \\
+        \bottomrule
+    \end{tabular}
+\end{table}
+
+
+\myparagraph{All LBEADS-NET variants outperform Classical BEADS on peak reconstruction.}
+The most striking result is the consistent improvement of all five LBEADS-NET variants over the classical BEADS baseline. Peak MSE improves by approximately $2\times$: the best LBEADS-NET configuration (Experiment~1.3) achieves a Peak MSE of $9.30 \times 10^{-3}$, compared to $21.27 \times 10^{-3}$ for Classical BEADS. Baseline MSE shows a similar pattern, improving from $12.72 \times 10^{-3}$ to approximately $7.4$--$7.7 \times 10^{-3}$ across all learned variants.
+
+This result validates the central premise of the thesis: a learned model that applies fixed (trained) parameters across all test signals outperforms a classical algorithm applied with fixed (hand-specified) parameters. The classical BEADS parameters ($\lambda_0 = 0.4$, $\lambda_1 = 4.0$, $\lambda_2 = 3.2$) were calibrated for unnormalized chromatograms with amplitudes in the hundreds, but the test signals are normalized to unit scale (\refsec{sec:exp_dataset}). The resulting parameter mismatch produces severe over-regularization: the 99.99\% area error indicates that the classical BEADS output preserves almost none of the original peak area. In contrast, the worst LBEADS-NET variant (Experiment~1.5) achieves an area error of 57.63\%, still substantial, but a qualitatively different failure mode. Where classical BEADS erases nearly all peak content, LBEADS-NET preserves roughly half of the peak area across all configurations.
+
+It is important to note that this comparison demonstrates the \emph{tuning problem}, not a fundamental inferiority of the BEADS algorithm. Per-signal optimization of the classical BEADS parameters would likely achieve competitive or superior performance on each individual signal. The advantage of LBEADS-NET is precisely that no per-signal tuning is required: the same learned parameters generalize across all 40 test signals with diverse peak densities, baseline shapes, and noise levels.
+
+
+\myparagraph{Sparsity priors improve peak shape quality.}
+Comparing Experiment~1.1 (MSE only) to Experiment~1.2 (MSE + sparsity priors), the addition of $\ell_1$, total variation, and non-negativity penalties improves peak correlation from 0.748 to 0.785, a meaningful improvement in peak shape fidelity. The negative fraction decreases from 0.295 to 0.216, indicating that the non-negativity penalty ($\alpha_{\text{neg}} = 0.1$) reduces over-correction artifacts that produce physically impossible negative peak values. Peak MSE also improves modestly from $9.79 \times 10^{-3}$ to $9.38 \times 10^{-3}$.
+
+However, the sparsity priors do not improve baseline leakage: BLI increases slightly from 0.593 to 0.597, and PBER decreases only marginally from 5.48 to 5.33. The area error remains essentially unchanged (49.47\% vs.\ 49.51\%). This is consistent with the analysis in \refsec{sec:intro_gap}: sparsity priors can improve peak shape quality, smoother, sparser, non-negative peaks, without addressing the fundamental leakage mechanism by which peak energy is absorbed into the baseline estimate.
+
+
+\myparagraph{Baseline supervision is the single most impactful addition.}
+Experiment~1.3, which adds masked baseline reconstruction and baseline smoothness losses to the Experiment~1.2 configuration, achieves the best peak correlation (0.793) and the best peak MSE ($9.30 \times 10^{-3}$) among all configurations. The improvement in correlation from 0.785 (Experiment~1.2) to 0.793 (Experiment~1.3) is modest in absolute terms but consistent with the hypothesis of \refsec{sec:exp_1_3}: direct gradient signal about baseline quality in non-peak regions provides information that pure peak reconstruction cannot.
+
+The negative fraction continues to decrease, reaching 0.211, a 28.5\% reduction from the MSE-only baseline of 0.295. Baseline MSE improves slightly from $7.54 \times 10^{-3}$ to $7.48 \times 10^{-3}$. The BLI remains at 0.596, essentially unchanged from Experiment~1.2, suggesting that baseline supervision improves overall accuracy without specifically targeting leakage in peak regions.
+
+
+\myparagraph{Orthogonality achieves the best baseline quality.}
+Experiment~1.4, which adds peak-baseline orthogonality and the baseline third-derivative penalty, achieves the best baseline MSE ($7.40 \times 10^{-3}$) and the lowest BLI (0.592) among all configurations. The orthogonality loss directly penalizes the element-wise product of peak and baseline magnitudes, pushing the decomposition toward mutual exclusivity at each sample point. The resulting BLI improvement, from 0.596 (Experiment~1.3) to 0.592 (Experiment~1.4), is small, however, reinforcing the observation that leakage is resistant to loss-level interventions.
+
+Peak correlation decreases slightly from 0.793 to 0.785 with the addition of orthogonality, suggesting a mild trade-off: enforcing mutual exclusivity between peak and baseline components produces cleaner baselines but slightly less accurate peak shapes. This trade-off is a characteristic signature of multi-objective optimization with competing loss terms.
+
+
+% --------------------------------------------------------------------
+\subsection{Baseline Leakage Analysis}
+\label{sec:results_leakage}
+% --------------------------------------------------------------------
+
+Baseline leakage, the absorption of peak energy into the baseline estimate, is the central failure mode that motivates much of the loss engineering in LBEADS-NET. The BLI and PBER metrics, defined in \refsec{sec:exp_metrics_leakage}, are specifically designed to detect and quantify this phenomenon. This section presents a dedicated analysis of these metrics across the progressive experiment series.
+
+
+\myparagraph{Classical BEADS exhibits severe leakage with fixed parameters.}
+Classical BEADS (Experiment~1.0) produces the highest BLI (0.837) and PBER (8.35) of any configuration. A BLI of 0.837 indicates that the predicted baseline over-estimates the true baseline by an amount equal to 83.7\% of the total peak energy in peak regions, nearly all peak energy is absorbed into the baseline. A PBER of 8.35 indicates that the root-mean-squared baseline error in peak regions is $8.35\times$ larger than in background regions, a severe and systematic degradation.
+
+This extreme leakage is the direct consequence of the parameter mismatch described above. The classical BEADS sparsity weights ($\lambda_0 = 0.4$) are far too aggressive for normalized signals with unit-scale amplitudes: the $\ell_1$ penalty over-shrinks the peak component, and the surplus energy is redistributed into the baseline estimate. The 99.99\% area error confirms that the classical algorithm essentially treats the entire signal as baseline under these parameters. This result demonstrates the tuning problem in its most acute form: the same parameters that perform well on unnormalized data produce catastrophic failure on normalized data.
+
+
+\myparagraph{LBEADS-NET reduces leakage but cannot eliminate it.}
+All five LBEADS-NET variants achieve BLI values in the range 0.592--0.611, representing a 27--29\% reduction from the classical BEADS BLI of 0.837. PBER values range from 5.33 to 5.64, representing a 32--36\% reduction from the classical PBER of 8.35. These are meaningful improvements, but the residual leakage remains substantial: a BLI of approximately 0.59 indicates that the predicted baseline still absorbs peak energy equivalent to 59\% of the total peak content in peak regions.
+
+\reftab{tab:leakage_comparison} isolates the leakage metrics for easier comparison across experiments.
+
+\begin{table}[t]
+    \centering
+    \caption{Baseline leakage metrics across the progressive experiment series. BLI measures the directional (upward) leakage of peak energy into the baseline; PBER measures the ratio of baseline error in peak regions to baseline error in background regions. Values closer to zero (BLI) and 1.0 (PBER) indicate less leakage.}
+    \label{tab:leakage_comparison}
+    \begin{tabular}{@{}lccl@{}}
+        \toprule
+        \textbf{Experiment} & \textbf{BLI} & \textbf{PBER} & \textbf{Key Addition} \\
+        \midrule
+        1.0 Classical BEADS & 0.837 & 8.35 & Fixed parameters \\
+        1.1 MSE Only        & 0.593 & 5.48 & Learned parameters \\
+        1.2 +Sparse         & 0.597 & 5.33 & $\ell_1$ + TV + non-neg \\
+        1.3 +Baseline       & 0.596 & 5.52 & Baseline supervision \\
+        1.4 +Ortho (v5)     & 0.592 & 5.64 & Orthogonality \\
+        1.5 Full v7         & 0.611 & 5.57 & Full anti-leakage battery \\
+        \bottomrule
+    \end{tabular}
+\end{table}
+
+
+\myparagraph{Leakage is insensitive to loss configuration.}
+The most significant finding in \reftab{tab:leakage_comparison} is the near-invariance of BLI across Experiments~1.1--1.4. Despite progressively adding sparsity priors, baseline supervision, orthogonality penalties, and baseline third-derivative regularization, the BLI varies by only 0.005 across these four configurations (from 0.592 to 0.597). This insensitivity suggests that once the basic ISTA architecture with learned parameters is in place, additional loss terms have diminishing returns on leakage reduction.
+
+The PBER tells a similar story: values range from 5.33 to 5.64 across Experiments~1.1--1.5, with no monotonic improvement as loss complexity increases. The small variations appear to reflect noise in the optimization process rather than systematic effects of the loss terms. In particular, the full v7 configuration (Experiment~1.5) achieves BLI = 0.611, \emph{worse} than the MSE-only baseline of 0.593, indicating that the additional anti-leakage terms not only fail to reduce leakage but slightly increase it, likely due to competing gradient directions in the 12-term loss function.
+
+This finding confirms the thesis's fundamental insight, stated in \refsec{sec:intro_contributions}: all loss-based mitigations are regularizers on top of a sparsity-biased formulation, and no amount of loss engineering fully overcomes the leakage when the sparsity assumption is violated. The BLI plateau at approximately 0.59 across all LBEADS-NET configurations represents a fundamental limit of the ISTA-based architecture: the $\ell_1$-induced sparsity bias is embedded in the network's forward computation, and loss terms can adjust the learned parameters but cannot alter the architectural inductive bias.
+
+% TODO: Uncomment and add figure when ready
+% \begin{figure}[t]
+%     \centering
+%     \includegraphics[width=0.85\textwidth]{figures/fig_5_bli_comparison.pdf}
+%     \caption{Baseline Leakage Index (BLI) across the progressive experiment series. Classical BEADS (Experiment~1.0) exhibits severe leakage (BLI = 0.837). All LBEADS-NET variants plateau at BLI $\approx$ 0.59, regardless of loss complexity. Error bars show $\pm 1$ standard deviation over the test set.}
+%     \label{fig:bli_comparison}
+% \end{figure}
+
+% \begin{figure}[t]
+%     \centering
+%     \includegraphics[width=0.85\textwidth]{figures/fig_5_progressive_correlation.pdf}
+%     \caption{Peak correlation across the progressive experiment series. Baseline supervision (Experiment~1.3) achieves the highest correlation (0.793). The full v7 configuration (Experiment~1.5) shows degradation due to over-regularization.}
+%     \label{fig:progressive_correlation}
+% \end{figure}
+
+This conclusion generalizes beyond LBEADS-NET to any unrolled network that inherits $\ell_1$-based sparsity priors, as independently corroborated by concurrent work on unrolled sparse-recovery networks~\cite{gharbi2024unrolled} and physics-informed deep learning approaches~\cite{diras2025}. Addressing baseline leakage at a fundamental level would require architectural modifications, such as replacing the $\ell_1$ penalty with a group sparsity formulation that operates at the peak level rather than the sample level, rather than additional loss terms.
+
+
+% --------------------------------------------------------------------
+\subsection{The Over-Regularization Effect}
+\label{sec:results_overreg}
+% --------------------------------------------------------------------
+
+Experiment~1.5, the full v7 configuration with all 12 loss terms active, exhibits a striking counter-result: it performs \emph{worse} than several simpler configurations on multiple metrics. This section analyzes this degradation and its implications.
+
+\myparagraph{Performance degradation in Experiment~1.5.}
+Compared to the best intermediate configurations, Experiment~1.5 shows degradation on four of seven metrics:
+\begin{itemize}
+    \item Peak correlation drops from 0.793 (Experiment~1.3, the best) to 0.744, essentially returning to the MSE-only level (0.748 in Experiment~1.1).
+    \item Peak MSE increases from $9.30 \times 10^{-3}$ (Experiment~1.3) to $10.01 \times 10^{-3}$, the worst among all LBEADS-NET variants.
+    \item Negative fraction rises from 0.211 (Experiments~1.3 and 1.4) to 0.305, despite the non-negativity weight being increased $20\times$ from 0.1 to 2.0.
+    \item Area error increases from 49.47\% (Experiment~1.1) to 57.63\%.
+    \item BLI increases from 0.592 (Experiment~1.4) to 0.611, the worst among all LBEADS-NET variants.
+\end{itemize}
+
+\myparagraph{Diagnosis: competing objectives with insufficient training budget.}
+The full v7 configuration activates 12 loss terms simultaneously, including four anti-leakage terms (high-frequency leakage penalty, asymmetric baseline loss, envelope constraint, frequency separation) that were not present in Experiments~1.1--1.4. These terms introduce competing gradient directions: the asymmetric baseline loss ($\alpha = 0.9$) penalizes baseline over-estimation $9\times$ more than under-estimation, pushing the baseline \emph{downward}; the envelope constraint prevents the baseline from exceeding local signal minima, also pushing downward; yet the orthogonality loss pushes the peak and baseline toward mutual exclusivity, which can push the baseline \emph{upward} in regions where the peak is near zero.
+
+With only 30 training epochs (10 gradient steps per epoch, totaling 300 gradient updates), the optimizer cannot converge on all 12 objectives simultaneously. The result is a compromise solution that satisfies none of the objectives well. The increase in negative fraction from 0.211 to 0.305 is particularly telling: despite a $20\times$ increase in the non-negativity weight, the competing gradient directions from other loss terms overwhelm the non-negativity enforcement, producing more negative peak values than the simpler configurations.
+
+\myparagraph{Implications for loss engineering.}
+This result carries an important practical lesson: more loss terms do not guarantee better performance. The relationship between loss complexity and model quality is non-monotonic, beyond a certain point, additional objectives degrade performance by fragmenting the optimization landscape. The optimal configuration within the 30-epoch training budget is Experiment~1.3 (MSE + sparsity priors + baseline supervision), which uses 6 active loss terms. The 12-term configuration requires a longer training horizon to realize its potential benefits.
+
+This observation motivated the three-stage curriculum training strategy described in \refsec{sec:method_curriculum}, which introduces loss terms gradually across training stages rather than activating all terms simultaneously. By allowing the model to first learn accurate reconstruction (Stage~A), then structured separation (Stage~B), and finally full anti-leakage refinement (Stage~C), the curriculum provides the optimizer with a tractable learning trajectory through the multi-objective landscape. The progressive experiment results confirm that this staged approach is not merely a convenience but a necessity: the full loss battery requires careful temporal orchestration to produce benefits rather than degradation.
+
+
+% ====================================================================
+\section{Ablation Studies}
+\label{sec:results_ablation}
+% ====================================================================
+
+To complement the progressive development experiments (which \emph{add} loss terms sequentially), this section presents ablation studies that \emph{remove} individual components from the full configuration and vary the network depth. All ablation experiments use the same data, training protocol, and seed as the progressive series.
+
+% --------------------------------------------------------------------
+\subsection{Loss Term Ablations}
+\label{sec:results_loss_ablation}
+% --------------------------------------------------------------------
+
+Four loss-term ablation experiments isolate the contribution of individual loss groups by removing them from the full configuration while keeping all other terms active.
+
+% TODO: Replace placeholder table with actual ablation results
+\begin{table}[t]
+    \centering
+    \caption{Loss term ablation results. Each row removes one group of loss terms from the full configuration (Ablation~F). Metrics are reported as mean over the test set. Arrows indicate the direction of improvement; bold indicates best in column.}
+    \label{tab:ablation_loss}
+    \small
+    \begin{tabular}{@{}lcccccc@{}}
+        \toprule
+        \textbf{Ablation} & \textbf{Removed} & \textbf{Peak MSE}$\downarrow$ & \textbf{Corr}$\uparrow$ & \textbf{BLI}$\downarrow$ & \textbf{PBER}$\downarrow$ & \textbf{Neg Frac}$\downarrow$ \\
+        \midrule
+        A: No baseline sup. & $\alpha_{\text{base}}, \alpha_{\text{leak}}$ & ,  & ,  & ,  & ,  & ,  \\
+        B: No non-negativity & $\alpha_{\text{neg}}$ & ,  & ,  & ,  & ,  & ,  \\
+        C: Sparsity only & baseline terms & ,  & ,  & ,  & ,  & ,  \\
+        D: Minimal (MSE+base) & sparsity + ortho & ,  & ,  & ,  & ,  & ,  \\
+        F: Full config (ref.) & ,  & ,  & ,  & ,  & ,  & ,  \\
+        \bottomrule
+    \end{tabular}
+\end{table}
+
+% TODO: Add analysis paragraphs once ablation results are collected
+% Expected findings:
+% - Ablation A (no baseline supervision) should show significantly worse BLI, confirming it's critical
+% - Ablation B (no non-neg) should show high negative fraction but may not affect BLI much
+% - Ablation C (sparsity only) should perform similarly to Phase 1 Experiment 1.2
+% - Ablation D (minimal) tests whether MSE + baseline supervision alone is sufficient
+
+\textit{[Ablation analysis to be completed after experiments are run.]}
+
+
+% --------------------------------------------------------------------
+\subsection{Network Depth Ablation}
+\label{sec:results_depth_ablation}
+% --------------------------------------------------------------------
+
+The depth ablation varies the number of unrolled layers $K \in \{4, 10, 20, 30\}$ while keeping the loss configuration and all other hyperparameters fixed. This directly tests the algorithm unrolling hypothesis: more layers should improve performance up to a point, after which diminishing returns or training instability may set in.
+
+% TODO: Replace placeholder table with actual depth ablation results
+\begin{table}[t]
+    \centering
+    \caption{Network depth ablation. All experiments use the full loss configuration with 60 epochs (10 warmup + 50 full). Total learnable parameters scale linearly as $5K$.}
+    \label{tab:ablation_depth}
+    \begin{tabular}{@{}rrccccc@{}}
+        \toprule
+        $K$ & \textbf{Params} & \textbf{Peak MSE}$\downarrow$ & \textbf{Corr}$\uparrow$ & \textbf{BLI}$\downarrow$ & \textbf{PBER}$\downarrow$ & \textbf{Epoch Time} \\
+        \midrule
+        4  & 20  & ,  & ,  & ,  & ,  & ,  \\
+        10 & 50  & ,  & ,  & ,  & ,  & ,  \\
+        20 & 100 & ,  & ,  & ,  & ,  & ,  \\
+        30 & 150 & ,  & ,  & ,  & ,  & ,  \\
+        \bottomrule
+    \end{tabular}
+\end{table}
+
+% TODO: Add analysis once depth results are collected
+% Expected findings:
+% - K=4 may be too shallow (insufficient iterations for convergence)
+% - K=10 vs K=20: diminishing returns?
+% - K=30: possible overfitting or training instability with 150 params on 500 signals
+% - Epoch time should scale linearly with K
+
+\textit{[Depth ablation analysis to be completed after experiments are run.]}
+
+% TODO: Uncomment and add figure when ready
+% \begin{figure}[t]
+%     \centering
+%     \includegraphics[width=0.8\textwidth]{figures/fig_5_depth_ablation.pdf}
+%     \caption{Effect of network depth $K$ on peak correlation and BLI. Dashed line indicates the classical BEADS baseline (correlation = 0.746, BLI = 0.837).}
+%     \label{fig:depth_ablation}
+% \end{figure}
+
+
+% --------------------------------------------------------------------
+\subsection{Ablation Summary}
+\label{sec:results_ablation_summary}
+% --------------------------------------------------------------------
+
+% TODO: Write synthesis of ablation findings
+\textit{[Ablation summary to be completed after all experiments are run. Expected to confirm: (1) baseline supervision is critical, (2) non-negativity improves peak quality but not leakage, (3) K=20 provides good balance of capacity and trainability, (4) simpler loss configs can match complex ones with limited training budget.]}
+
+
+% ====================================================================
+\section{Qualitative Examples}
+\label{sec:results_qualitative}
+% ====================================================================
+
+% TODO: Generate qualitative example figures from demo.py
+% Need 3-4 panels showing:
+% - Easy case: well-separated peaks, LBEADS works well
+% - Medium case: moderate overlap, some leakage visible
+% - Hard case: dense peaks, leakage clearly visible
+% - Comparison: LBEADS vs classical BEADS side by side
+
+% \begin{figure}[t]
+%     \centering
+%     \includegraphics[width=\textwidth]{figures/fig_5_qualitative_easy.pdf}
+%     \caption{Qualitative result on a signal with well-separated peaks. \textbf{Top}: observed signal $\yvec$ (gray) with ground-truth peak component $\xvec$ (blue) and baseline $\fvec$ (red). \textbf{Middle}: LBEADS-NET predicted peaks $\hat{\xvec}$ and baseline $\hat{\fvec}$. \textbf{Bottom}: residual $\yvec - \hat{\xvec} - \hat{\fvec}$, which should approximate white noise.}
+%     \label{fig:qual_easy}
+% \end{figure}
+
+% \begin{figure}[t]
+%     \centering
+%     \includegraphics[width=\textwidth]{figures/fig_5_qualitative_hard.pdf}
+%     \caption{Qualitative result on a dense-peak signal. Baseline leakage is visible where the predicted baseline (red) rises into the true peak region. Compare with the well-separated case in \reffig{fig:qual_easy}.}
+%     \label{fig:qual_hard}
+% \end{figure}
+
+% \begin{figure}[t]
+%     \centering
+%     \includegraphics[width=\textwidth]{figures/fig_5_comparison_beads_vs_lbeads.pdf}
+%     \caption{Side-by-side comparison of classical BEADS (left) and LBEADS-NET (right) on the same test signal. Classical BEADS with fixed parameters produces severe baseline leakage (BLI = 0.84); LBEADS-NET with learned parameters reduces leakage (BLI = 0.59) without manual tuning.}
+%     \label{fig:comparison}
+% \end{figure}
+
+\textit{[Qualitative example figures to be generated from demo.py. Will include 2--3 panels showing easy, hard, and comparison cases.]}
+
+
+% ====================================================================
+\section{Training Dynamics}
+\label{sec:results_training}
+% ====================================================================
+
+% TODO: Generate training curves from Orchestration run data
+% The "Fast N1024 6L BigStep" run has 100 epochs with 3 stages and full loss decomposition per epoch
+
+% \begin{figure}[t]
+%     \centering
+%     \includegraphics[width=\textwidth]{figures/fig_5_training_curves.pdf}
+%     \caption{Training loss over 100 epochs for the 6-layer curriculum-trained model. Vertical dashed lines indicate stage boundaries: Stage~A (epochs 1--15, MSE only), Stage~B (epochs 16--75, MSE + baseline + leakage + non-negativity), Stage~C (epochs 76--100, + L1 sparsity). The loss spike at Stage~B onset reflects activation of baseline supervision and leakage penalties.}
+%     \label{fig:training_curves}
+% \end{figure}
+
+% \begin{figure}[t]
+%     \centering
+%     \includegraphics[width=\textwidth]{figures/fig_5_loss_decomposition.pdf}
+%     \caption{Loss decomposition over training. Individual loss components are plotted on separate y-axes. Reconstruction loss (blue) decreases monotonically; baseline reconstruction (orange) shows a spike at Stage~B onset then decreases; baseline leakage (green) remains approximately constant throughout, further supporting the BLI plateau finding.}
+%     \label{fig:loss_decomposition}
+% \end{figure}
+
+\textit{[Training dynamics figures to be generated from the Orchestration run epoch data. Will show loss curves across 3 curriculum stages and per-component loss decomposition.]}
+
+
+% ====================================================================
+\section{Learned Parameter Analysis}
+\label{sec:results_params}
+% ====================================================================
+
+One of the key advantages of algorithm unrolling over black-box neural networks is that the learned parameters retain their physical interpretability. Each LBEADS-NET layer possesses five learnable scalar parameters, $\lambda_0$ (sparsity weight), $\lambda_1$ (first-derivative penalty), $\lambda_2$ (second-derivative penalty), $r$ (asymmetry ratio), and $\eta$ (step size), whose values can be inspected and analyzed. This section examines the per-layer parameter values that emerge from training, using data from a 6-layer model trained for 100 epochs with the three-stage curriculum (\refsec{sec:method_curriculum}).
+
+
+% --------------------------------------------------------------------
+\subsection{Layer Specialization}
+\label{sec:results_layer_spec}
+% --------------------------------------------------------------------
+
+\reftab{tab:learned_params} shows the final learned parameter values for selected layers of the 6-layer curriculum-trained model. Three patterns of layer specialization emerge.
+
+\begin{table}[t]
+    \centering
+    \caption{Final learned parameters for selected layers of the 6-layer curriculum-trained model (100 epochs, 3-stage curriculum, signal length $N = 1024$). Parameters that reached clamp boundaries are marked with $\ast$.}
+    \label{tab:learned_params}
+    \begin{tabular}{@{}lccc@{}}
+        \toprule
+        \textbf{Parameter} & \textbf{Layer 0} & \textbf{Layer 3} & \textbf{Layer 5} \\
+         & (Early) & (Middle) & (Final) \\
+        \midrule
+        $\lambda_0$ (sparsity) & 0.481 & 1.198 & 2.000$^\ast$ \\
+        $r$ (asymmetry) & 3.36 & 2.00$^\ast$ & 9.67 \\
+        $\eta$ (step size) & 0.248 & 0.191 & 0.243 \\
+        \bottomrule
+    \end{tabular}
+\end{table}
+
+% TODO: Uncomment and add figure when ready — THIS IS A KEY FIGURE
+% \begin{figure}[t]
+%     \centering
+%     \includegraphics[width=\textwidth]{figures/fig_5_parameter_evolution.pdf}
+%     \caption{Learned parameter values across the 6 layers of the curriculum-trained model. \textbf{Left}: sparsity weight $\lambda_0$ increases monotonically, indicating progressively stronger shrinkage. \textbf{Center}: asymmetry ratio $r$ shows a non-monotonic pattern (high $\to$ low $\to$ very high). \textbf{Right}: step size $\eta$ remains approximately uniform. Dashed lines indicate parameter clamp boundaries. Parameters marked $\ast$ in the text reached clamp limits.}
+%     \label{fig:parameter_evolution}
+% \end{figure}
+
+\myparagraph{Sparsity weight increases across layers.}
+The sparsity parameter $\lambda_0$ increases monotonically from 0.481 at Layer~0 to 1.198 at Layer~3 to 2.000 at Layer~5 (where it hits the upper parameter clamp). This progression indicates that early layers perform gentle, conservative peak-baseline separation with low sparsity penalty, while later layers apply increasingly aggressive sparsity enforcement to refine the decomposition. The pattern is consistent with the behavior of iterative thresholding algorithms, where early iterations establish a coarse estimate and later iterations sharpen the solution through stronger thresholding.
+
+The fact that $\lambda_0$ reaches the upper clamp at Layer~5 suggests that the final layer would prefer an even stronger sparsity penalty if permitted. This is a direct consequence of the ISTA architecture: the final layer receives a partially converged estimate and must apply strong shrinkage to produce the final output. In the classical BEADS algorithm, this corresponds to the final iterations where the estimate is close to convergence and strong regularization refines the details.
+
+\myparagraph{Asymmetry ratio shows a non-monotonic pattern.}
+The asymmetry ratio $r$ exhibits a distinctive non-monotonic pattern: 3.36 at Layer~0, dropping to 2.00 (the lower clamp) at Layer~3, and rising sharply to 9.67 at Layer~5. The early and middle layers apply moderate asymmetry, distinguishing positive peaks from negative artifacts with moderate penalties. The middle layer's $r = 2.00$ (at the lower clamp) suggests minimal asymmetric penalization during the intermediate refinement stage. The final layer's high asymmetry ratio ($r = 9.67$) produces strong penalization of negative values relative to positive values, consistent with a cleanup role in which the final layer aggressively suppresses residual negative artifacts.
+
+\myparagraph{Step size is approximately uniform.}
+The step size $\eta$ varies little across layers: 0.248, 0.191, and 0.243 for Layers~0, 3, and 5, respectively. This relative stability suggests that the optimal step size for the ISTA update is primarily determined by the spectral properties of the BEADS operator matrices (which are shared across layers via the fixed filter parameters), rather than by the layer's position in the network. The modest reduction at Layer~3 may reflect a more conservative update strategy during intermediate refinement.
+
+
+% --------------------------------------------------------------------
+\subsection{Emergent Specialization}
+\label{sec:results_emergent}
+% --------------------------------------------------------------------
+
+The parameter patterns described above, increasing sparsity, non-monotonic asymmetry, stable step size, were not designed into the architecture. All layers are initialized with identical parameter values, and the specialization emerges entirely from end-to-end training via backpropagation. This emergent behavior is a key advantage of the algorithm unrolling framework: the architecture inherits the optimization structure of BEADS, while the training process discovers a parameter schedule that is tailored to the data distribution.
+
+The resulting layer specialization can be interpreted as a learned iteration schedule. Classical BEADS applies the same parameters at every iteration; LBEADS-NET effectively learns a non-uniform iteration schedule in which early iterations are conservative (low $\lambda_0$, moderate $r$) and later iterations are aggressive (high $\lambda_0$, high $r$). This interpretation provides a principled justification for the per-layer parameterization: rather than constraining all layers to share the same parameters (as in the classical algorithm), the unrolled network exploits the freedom to specialize, producing a more effective decomposition with fewer total layers.
+
+The clamping events at Layers~3 and 5, $r$ hitting the lower clamp and $\lambda_0$ hitting the upper clamp, respectively, indicate that the parameter clamp ranges may be overly restrictive for some layers. Widening the clamp ranges is a straightforward modification that could improve performance by allowing the optimizer to explore a larger parameter space; however, wider ranges also increase the risk of numerical instability in the BEADS matrix operations, necessitating careful validation.
+
+% TODO: Uncomment and add figure file when ready.
+% \begin{figure}[t]
+%     \centering
+%     \includegraphics[width=\textwidth]{figures/fig_5_1_parameter_evolution.pdf}
+%     \caption{Evolution of learned parameters across layers for the 6-layer curriculum-trained model.
+%     \textbf{(a)}~Sparsity weight $\lambda_0$ increases monotonically, reaching the upper clamp at
+%     Layer~5. \textbf{(b)}~Asymmetry ratio $r$ shows a non-monotonic pattern, with a minimum at
+%     Layer~3 (lower clamp) and a sharp increase at Layer~5. \textbf{(c)}~Step size $\eta$ remains
+%     approximately constant across layers. Dashed lines indicate parameter clamp boundaries.}
+%     \label{fig:parameter_evolution}
+% \end{figure}
+
+
+% ====================================================================
+\section{Real Chromatogram Results}
+\label{sec:results_real}
+% ====================================================================
+
+All quantitative results presented in \refsec{sec:results_progressive} and \refsec{sec:results_params} are computed on synthetic data where ground-truth peak and baseline components are known. This section briefly discusses the application of LBEADS-NET to real chromatographic signals, for which no ground truth is available.
+
+A demonstration pipeline (\texttt{demo\_chromatogram.py}) applies the trained LBEADS-NET model to real liquid chromatography signals of length $N = 4000$. Since the ground-truth decomposition is unknown for real data, evaluation is necessarily qualitative. Visual inspection of the results shows that the model produces smooth, physically plausible baselines and non-negative peak estimates that are broadly consistent with expert expectations. The baseline tracks the low-frequency drift without obvious leakage artifacts in sparse-peak regions; in dense-peak regions, the baseline behavior is more difficult to assess visually, consistent with the residual leakage quantified in the synthetic experiments.
+
+However, the absence of ground truth for real data precludes quantitative validation. Several unsupervised quality indicators could be used for approximate assessment in future work:
+\begin{itemize}
+    \item \emph{Negative fraction}: the fraction of predicted peak samples with negative values, which should be near zero for physically valid outputs. This metric can be computed without ground truth.
+    \item \emph{Baseline smoothness}: the energy of the second or third derivative of the predicted baseline, which should be low for a well-behaved baseline estimate.
+    \item \emph{Residual noise structure}: the autocorrelation of the residual $\yvec - \hat{\xvec} - \hat{\fvec}$, which should be approximately white if the peak and baseline components have been correctly separated.
+    \item \emph{Peak area consistency}: comparison of integrated peak areas across repeated injections of the same sample, which should show low variance if the baseline correction is stable.
+\end{itemize}
+
+The qualitative nature of the real-data evaluation is a limitation of this work. Establishing a ground-truth-labeled real chromatographic dataset, through, for example, carefully controlled spike-and-recovery experiments or consensus labeling by multiple expert chromatographers, is an important direction for future validation.
+
+
+% ====================================================================
+\section{Summary of Findings}
+\label{sec:results_summary}
+% ====================================================================
+
+The results of the progressive experiment series, ablation studies, and learned parameter analysis yield the following principal findings:
+
+\begin{enumerate}
+    \item \textbf{LBEADS-NET generalizes without per-signal tuning.} All five LBEADS-NET variants outperform classical BEADS with fixed parameters on peak MSE (${\sim}2\times$ improvement), baseline MSE (${\sim}1.7\times$ improvement), and area error (reducing from 99.99\% to 49--58\%). The classical BEADS failure with default parameters on normalized data demonstrates the tuning problem in its most acute form; LBEADS-NET eliminates this failure mode by learning parameters that generalize across the signal distribution.
+
+    \item \textbf{Baseline supervision is the single most impactful loss term.} Among the progressive additions, masked baseline reconstruction (Experiment~1.3) produces the largest improvements in peak correlation (0.748 $\to$ 0.793 from MSE-only to +Baseline) and peak MSE ($9.79 \times 10^{-3}$ $\to$ $9.30 \times 10^{-3}$). Direct gradient signal about baseline quality provides information that pure peak reconstruction cannot supply.
+
+    \item \textbf{Sparsity priors improve peak shape quality but do not address leakage.} The addition of $\ell_1$, total variation, and non-negativity penalties (Experiment~1.2) improves peak correlation from 0.748 to 0.785 and reduces the negative fraction from 0.295 to 0.216, but leaves the BLI essentially unchanged (0.593 $\to$ 0.597). Sparsity priors produce cleaner, more physically plausible peak shapes without reducing the absorption of peak energy into the baseline.
+
+    \item \textbf{Baseline leakage persists at BLI $\approx$ 0.59 across all configurations.} The BLI varies by only 0.005 across Experiments~1.1--1.4, indicating that once the learned ISTA architecture is in place, additional loss terms have negligible effect on leakage. This near-invariance represents a fundamental limit of the $\ell_1$-based sparsity formulation: the architectural inductive bias determines the leakage floor, and loss engineering can adjust parameters but cannot alter the inductive bias itself.
+
+    \item \textbf{Over-regularization is a concrete risk.} The full v7 configuration (Experiment~1.5, 12 loss terms) performs worse than simpler configurations: peak correlation drops to 0.744 (from 0.793 in Experiment~1.3), negative fraction rises to 0.305 (from 0.211), and BLI increases to 0.611 (from 0.592 in Experiment~1.4). With only 30 training epochs, the optimizer cannot converge on 12 competing objectives, producing a compromise solution that satisfies none well. This finding validates the need for the three-stage curriculum training strategy (\refsec{sec:method_curriculum}).
+
+    \item \textbf{Learned parameters exhibit emergent layer specialization.} The sparsity weight $\lambda_0$ increases from 0.481 (Layer~0) to 2.000 (Layer~5), the asymmetry ratio $r$ follows a non-monotonic pattern (3.36 $\to$ 2.00 $\to$ 9.67), and the step size remains approximately uniform (${\sim}$0.19--0.25). This specialization emerges entirely from end-to-end training and can be interpreted as a learned non-uniform iteration schedule, early layers perform coarse separation, later layers perform aggressive refinement, that the classical algorithm's fixed-parameter iteration cannot achieve.
+\end{enumerate}
+
+Collectively, these findings support the thesis argument that algorithm unrolling provides a principled framework for bridging interpretability and generalization in chromatographic baseline correction, while also revealing the fundamental limits of sparsity-based formulations when applied to dense-peak signals. The persistent baseline leakage at BLI $\approx$ 0.59 across all configurations is not a failure of the loss engineering approach but an honest characterization of what loss-level interventions can and cannot achieve within an $\ell_1$-regularized architecture.

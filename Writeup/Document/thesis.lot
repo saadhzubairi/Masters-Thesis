@@ -1,4 +1,20 @@
 \addvspace {10\p@ }
 \addvspace {10\p@ }
+\contentsline {table}{\numberline {2.1}{\ignorespaces BEADS parameters and their roles.}}{21}{table.2.1}%
+\addvspace {10\p@ }
+\contentsline {table}{\numberline {3.1}{\ignorespaces Learnable parameters per ISTA layer. All parameters are stored in log-space and recovered via exponentiation. Default initial values correspond to the training configuration used in the final model ($K = 20$ layers, 100 total learnable scalars).}}{41}{table.3.1}%
+\contentsline {table}{\numberline {3.2}{\ignorespaces Multi-stage curriculum training configuration. Each stage defines a subset of active loss terms and a corresponding epoch budget. Stages are executed sequentially; parameters are carried forward between stages.}}{58}{table.3.2}%
+\contentsline {table}{\numberline {3.3}{\ignorespaces Summary of the twelve-term composite loss function. Weight ranges reflect values used across development iterations. The ``Stage'' column indicates the earliest curriculum stage in which the term is active (A = peak reconstruction, B = leakage mitigation, C = full refinement). Terms marked ``, '' under ``Failure Mode'' serve as general priors rather than targeting a specific failure.}}{69}{table.3.3}%
+\addvspace {10\p@ }
+\contentsline {table}{\numberline {4.1}{\ignorespaces Synthetic data generation parameters. All ranges denote uniform or log-uniform distributions as described in the text.}}{77}{table.4.1}%
+\contentsline {table}{\numberline {4.2}{\ignorespaces Training hyperparameters. All progressive experiments share this configuration; only the loss function weights differ across experiments.}}{79}{table.4.2}%
+\contentsline {table}{\numberline {4.3}{\ignorespaces Loss configurations for the progressive experiment series. Each row shows the active loss terms and their weights. Dashes indicate inactive terms ($\alpha = 0$). Experiment~1.0 uses classical BEADS with no learning.}}{88}{table.4.3}%
+\addvspace {10\p@ }
+\contentsline {table}{\numberline {5.1}{\ignorespaces Progressive experiment results on the 40-signal test set. All values are mean $\pm $ standard deviation. Bold entries indicate the best value in each column (excluding Classical BEADS, which uses a fundamentally different evaluation setting). Peak MSE and Baseline MSE are $\times 10^{-3}$ for readability. Neg.\ Fraction is reported as a proportion of total signal length.}}{93}{table.5.1}%
+\contentsline {table}{\numberline {5.2}{\ignorespaces Baseline leakage metrics across the progressive experiment series. BLI measures the directional (upward) leakage of peak energy into the baseline; PBER measures the ratio of baseline error in peak regions to baseline error in background regions. Values closer to zero (BLI) and 1.0 (PBER) indicate less leakage.}}{97}{table.5.2}%
+\contentsline {table}{\numberline {5.3}{\ignorespaces Loss term ablation results. Each row removes one group of loss terms from the full configuration (Ablation~F). Metrics are reported as mean over the test set. Arrows indicate the direction of improvement; bold indicates best in column.}}{101}{table.5.3}%
+\contentsline {table}{\numberline {5.4}{\ignorespaces Network depth ablation. All experiments use the full loss configuration with 60 epochs (10 warmup + 50 full). Total learnable parameters scale linearly as $5K$.}}{101}{table.5.4}%
+\contentsline {table}{\numberline {5.5}{\ignorespaces Final learned parameters for selected layers of the 6-layer curriculum-trained model (100 epochs, 3-stage curriculum, signal length $N = 1024$). Parameters that reached clamp boundaries are marked with $\ast $.}}{103}{table.5.5}%
+\addvspace {10\p@ }
 \addvspace {10\p@ }
 \addvspace {10\p@ }

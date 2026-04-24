@@ -64,7 +64,7 @@ def load_best_model(script_dir, N):
 
     Falls back to newest timestamp if metrics are missing.
     """
-    model_files = glob.glob(os.path.join(script_dir, "*.pth"))
+    model_files = glob.glob(os.path.join(glob.escape(script_dir), "*.pth"))
     candidates = []
 
     for path in model_files:

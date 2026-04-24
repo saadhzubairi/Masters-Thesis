@@ -1,5 +1,459 @@
 %!TEX root = ../thesis.tex
-\chapter{Background}
+\chapter{Background and Related Work}
 \label{chap:background}
 
-\lipsum[1-3]
+This chapter provides the technical foundation for the LBEADS-NET architecture developed in Chapter~3. \refsec{sec:bg_signal} reviews the chromatographic signal model and the physical origins of baseline drift. \refsec{sec:bg_classical} presents the classical BEADS algorithm in full mathematical detail, identifies its failure modes in dense-peak regions, and surveys other penalized least squares methods. \refsec{sec:bg_unrolling} introduces the algorithm unrolling framework and its key architectures. Finally, \refsec{sec:bg_neural} reviews neural approaches to baseline correction and positions LBEADS-NET relative to existing methods.
+
+
+%% ===================================================================
+\section{Chromatographic Signal Processing}
+\label{sec:bg_signal}
+%% ===================================================================
+
+\subsection{Signal Model}
+
+As introduced in \refsec{sec:intro_problem}, the observed chromatographic signal is modeled as the three-component additive decomposition
+\begin{equation}
+    \yvec = \xvec + \fvec + \wvec,
+    \tag{\ref{eq:signal_model}}
+\end{equation}
+where $\yvec \in \Rspace^N$ is the measured detector response, $\xvec \in \Rspace^N$ is the peak component containing analyte information, $\fvec \in \Rspace^N$ is the baseline drift, and $\wvec \in \Rspace^N$ is additive measurement noise~\cite{ning2014beads}. The baseline correction problem is to estimate $\fvec$ from $\yvec$ so that the corrected signal $\hat{\xvec} = \yvec - \hat{\fvec}$ faithfully represents the true peak component.
+
+Two structural priors underpin optimization-based approaches to this problem. First, the peak component $\xvec$ is assumed to be \emph{sparse} in some domain: chromatographic peaks occupy a small fraction of the signal length, and their derivatives are concentrated around peak onsets and offsets. Second, the baseline $\fvec$ is assumed to be \emph{smooth}: it varies slowly relative to the peaks, occupying a low-frequency subspace of the signal. These complementary assumptions enable frequency-domain and sparsity-based separation of $\xvec$ and $\fvec$~\cite{ning2014beads}.
+
+\subsection{Physical Causes of Baseline Drift}
+
+Baseline drift arises from multiple instrumental and environmental sources. \emph{Column bleed} results from thermal degradation of the stationary phase, producing volatile fragments that generate a slowly rising detector response. \emph{Detector aging and electronic drift} introduce low-frequency shifts in the detector's zero level over the course of an analytical run. \emph{Temperature gradients} within the chromatographic column alter analyte retention and detector response characteristics. During gradient elution, compositional changes in the \emph{mobile phase} produce systematic shifts in detector background, particularly in UV-Vis and refractive index detection~\cite{ning2014beads, skoog2017fundamentals}.
+
+The drift is generally smooth and low-frequency relative to the chromatographic peaks, but its precise shape is unpredictable: it varies across instruments, columns, analyte systems, and operating conditions. This variability is the fundamental reason that no single fixed set of baseline correction parameters generalizes across experimental setups.
+
+\subsection{Importance of Accurate Baseline Estimation}
+
+Accurate baseline estimation is critical for quantitative chromatographic analysis. The standard method for determining analyte concentration is \emph{peak area integration}: the area between the corrected signal and the zero level is proportional to the mass of analyte present. Any error in the estimated baseline directly propagates to the integrated area. An overestimated baseline reduces computed peak areas, leading to systematic underestimation of analyte concentrations. Conversely, an underestimated baseline inflates peak areas and can produce false positives or concentration overestimates~\cite{ning2014beads, eilers2005baseline}.
+
+Beyond integration accuracy, baseline errors affect the \emph{limit of detection} (LOD), the smallest analyte concentration that can be reliably distinguished from noise. A poorly estimated baseline increases the apparent noise floor, raising the LOD and reducing the sensitivity of the analytical method. In regulated domains such as pharmaceutical quality control, food safety testing, and clinical diagnostics, even small systematic errors in baseline estimation can compromise the reliability of analytical results.
+
+\subsection{Peak Shape Models}
+
+The shape of chromatographic peaks is important for understanding the signal structure that baseline correction methods must accommodate. Under idealized conditions, chromatographic theory predicts Gaussian peak profiles. In practice, however, extra-column effects, including detector dead volume, connecting tubing, and mixing chambers, introduce exponential tailing.
+
+Grushka~\cite{grushka1972emg} defined the \emph{exponentially modified Gaussian} (EMG) peak as the convolution of a Gaussian function with an exponential decay, providing a theoretically justified model for chromatographic peak shapes that accounts for extra-column band broadening. The EMG peak shape is parameterized by the Gaussian standard deviation $\sigma$, the retention time $t_R$, and the exponential time constant $\tau$, where the ratio $\tau/\sigma$ controls the degree of peak asymmetry~\cite{grushka1972emg}. The skewness ranges from 0 (pure Gaussian, $\tau/\sigma = 0$) to 2.0 (pure exponential decay, $\tau/\sigma \to \infty$).
+
+Naish and Hartwell~\cite{naish1988emg} validated the EMG function as a good model for isocratic HPLC peaks by least-squares fitting the full EMG expression to over 100 experimental peaks spanning asymmetry ratios from 1.03 to 1.25. They showed that least-squares fitting of EMG functions to experimental LC peaks produced close agreement across the full peak profile, whereas fitted Gaussian functions produced large errors particularly in the tail region, even for peaks with low skew~\cite{naish1988emg}. The EMG model is widely used as a realistic synthetic peak shape for generating training data in chromatographic signal processing, owing to its theoretical justification and ability to reproduce the asymmetric tailing commonly observed in real chromatograms~\cite{grushka1972emg}.
+
+% TODO: Uncomment when figure is available.
+% \begin{figure}[t]
+%     \centering
+%     \includegraphics[width=\textwidth]{figures/fig_2_1_annotated_chromatogram.pdf}
+%     \caption{Annotated chromatogram illustrating the signal model components.
+%     \textbf{(a)}~The observed signal $\yvec$ with visible baseline drift.
+%     \textbf{(b)}~Decomposition into the peak component $\xvec$ (sparse, non-negative),
+%     the baseline $\fvec$ (smooth, low-frequency), and noise $\wvec$.
+%     \textbf{(c)}~An individual peak showing the asymmetric EMG shape with
+%     parameters $\sigma$, $t_R$, and $\tau$.}
+%     \label{fig:annotated_chromatogram}
+% \end{figure}
+
+
+%% ===================================================================
+\section{Classical Baseline Correction Methods}
+\label{sec:bg_classical}
+%% ===================================================================
+
+%% -------------------------------------------------------------------
+\subsection{BEADS: Baseline Estimation And Denoising using Sparsity}
+\label{sec:bg_beads}
+%% -------------------------------------------------------------------
+
+BEADS, proposed by Ning et al.~\cite{ning2014beads}, formulates baseline correction as a convex optimization problem that jointly estimates the peak signal $\xvec$ and the baseline $\fvec$ by exploiting the sparsity of $\xvec$ and the smoothness of $\fvec$. This section presents the BEADS formulation in full mathematical detail, as it forms the algorithmic foundation that LBEADS-NET unrolls in Chapter~3.
+
+\subsubsection{The BEADS Cost Function}
+
+BEADS models the baseline as a low-pass signal rather than a parametric function such as a polynomial, providing a more generic representation that avoids the limitations of polynomial fitting over long ranges~\cite{ning2014beads}. Let $H$ denote a zero-phase high-pass filter operator. Given the signal model $\yvec = \xvec + \fvec + \wvec$, the high-pass filtered residual $H(\yvec - \xvec)$ removes the low-frequency baseline and retains only the noise component. The BEADS cost function is
+\begin{equation}
+    J(\xvec) = \frac{1}{2} \norm{H(\yvec - \xvec)}_2^2
+    + \lambda_0 \sum_{n=0}^{N-1} \theta(x_n)
+    + \lambda_1 \sum_{n} \phi(\Delta x_n)
+    + \lambda_2 \sum_{n} \phi(\Delta^2 x_n),
+    \label{eq:beads_cost}
+\end{equation}
+where $\Delta$ and $\Delta^2$ denote the first and second difference operators, respectively. The four terms serve distinct purposes:
+
+\begin{enumerate}
+    \item \textbf{Data fidelity}: $\frac{1}{2}\norm{H(\yvec - \xvec)}_2^2$ measures how well the high-pass filtered residual matches zero-mean noise. By filtering through $H$, the smooth baseline component is annihilated, and the fidelity term depends only on the peak estimate and the noise.
+
+    \item \textbf{Asymmetric sparsity penalty}: $\lambda_0 \sum_n \theta(x_n)$ promotes sparsity in $\xvec$ while enforcing approximate non-negativity. The asymmetric penalty function $\theta$ penalizes negative values of $x_n$ more heavily than positive values via a parameter $r > 1$:
+    \begin{equation}
+        \theta(x) = \begin{cases}
+            x, & x > \epsilon_0, \\
+            -r\, x, & x < -\epsilon_0, \\
+            \frac{1+r}{4\epsilon_0} x^2 + \frac{1-r}{2} x + \frac{\epsilon_0(1+r)}{4}, & |x| \leq \epsilon_0,
+        \end{cases}
+        \label{eq:theta}
+    \end{equation}
+    where $\epsilon_0$ is a small constant that smooths the transition at zero. For positive peaks, $\theta$ behaves as an $\ell_1$ penalty; for negative values, the penalty is amplified by the factor $r$, discouraging artifacts below zero.
+
+    \item \textbf{First-order smoothness}: $\lambda_1 \sum_n \phi(\Delta x_n)$ penalizes the first differences of $\xvec$, promoting piecewise-constant behavior.
+
+    \item \textbf{Second-order smoothness}: $\lambda_2 \sum_n \phi(\Delta^2 x_n)$ penalizes the second differences of $\xvec$, promoting piecewise-linear behavior.
+\end{enumerate}
+
+The penalty function $\phi$ is a smoothed approximation of the absolute value to ensure differentiability. BEADS uses the differentiable penalty
+\begin{equation}
+    \phi(z) = |z| - \epsilon_1 \log(|z| + \epsilon_1),
+    \label{eq:phi}
+\end{equation}
+where $\epsilon_1$ is a small positive constant. This avoids the numerical issues that arise from the non-differentiable $\ell_1$ norm at zero~\cite{ning2014beads}.
+
+\subsubsection{High-Pass Filter Construction}
+\label{sec:bg_hpf}
+
+The high-pass filter $H$ is constructed as a zero-phase Butterworth filter in banded matrix form. The construction proceeds as follows. Let $d$ denote the filter degree (the filter order is $2d$), and let $f_c$ denote the normalized cutoff frequency ($0 < f_c < 0.5$). Define the difference kernel
+\begin{equation}
+    b_1[n] = [1,\; -1] \underbrace{* [-1,\; 2,\; -1] * \cdots * [-1,\; 2,\; -1]}_{d-1 \text{ times}},
+    \label{eq:b1_conv}
+\end{equation}
+where $*$ denotes convolution. The numerator coefficients are then
+\begin{equation}
+    \mathbf{b} = b_1 * [-1,\; 1],
+    \label{eq:b_coeffs}
+\end{equation}
+yielding a vector of length $2d+1$. The denominator coefficients incorporate the Butterworth pole placement. Define the frequency-dependent parameter
+\begin{equation}
+    t = \left( \frac{1 - \cos(\omega_c)}{1 + \cos(\omega_c)} \right)^d, \quad \omega_c = 2\pi f_c.
+    \label{eq:t_param}
+\end{equation}
+The low-pass component is obtained by repeated convolution:
+\begin{equation}
+    \mathbf{a}_{\text{lp}} = \underbrace{[1,\; 2,\; 1] * [1,\; 2,\; 1] * \cdots * [1,\; 2,\; 1]}_{d \text{ times}},
+    \label{eq:a_lp}
+\end{equation}
+and the combined filter coefficients are
+\begin{equation}
+    \mathbf{a} = \mathbf{b} + t \cdot \mathbf{a}_{\text{lp}}.
+    \label{eq:a_coeffs}
+\end{equation}
+
+The banded matrices $A$ and $B$ are $N \times N$ Toeplitz matrices with the coefficients $\mathbf{a}$ and $\mathbf{b}$ placed along diagonals $-d, \ldots, d$:
+\begin{equation}
+    A = \text{BandedToeplitz}(\mathbf{a}), \quad B = \text{BandedToeplitz}(\mathbf{b}).
+    \label{eq:AB_matrices}
+\end{equation}
+The high-pass filter operator is then
+\begin{equation}
+    H = B A^{-1},
+    \label{eq:H_operator}
+\end{equation}
+so that for any vector $\mathbf{v}$, the high-pass filtered output is $H\mathbf{v} = B(A^{-1}\mathbf{v})$~\cite{ning2014beads}. The banded structure of $A$ ensures that the linear system $A\mathbf{z} = \mathbf{v}$ can be solved in $O(N)$ time. BEADS leverages this banded structure to achieve computational efficiency and low memory usage, enabling application to long data series~\cite{ning2014beads}.
+
+\subsubsection{Majorization-Minimization Algorithm}
+
+The cost function in \refeq{eq:beads_cost} is minimized using a majorization-minimization (MM) iterative scheme that is guaranteed to converge regardless of initialization~\cite{ning2014beads}. The key idea is to replace the non-quadratic penalties $\phi$ and $\theta$ with quadratic upper bounds at each iteration, reducing the update to a banded linear system solve.
+
+Define the first- and second-order difference matrices $D_1 \in \Rspace^{(N-1) \times N}$ and $D_2 \in \Rspace^{(N-2) \times N}$:
+\begin{equation}
+    (D_1)_{i,j} = \begin{cases} -1, & j = i, \\ 1, & j = i+1, \\ 0, & \text{otherwise}, \end{cases}
+    \quad
+    (D_2)_{i,j} = \begin{cases} 1, & j = i, \\ -2, & j = i+1, \\ 1, & j = i+2, \\ 0, & \text{otherwise}. \end{cases}
+    \label{eq:diff_matrices}
+\end{equation}
+Let $D = [D_1^\top, D_2^\top]^\top$ denote the stacked difference matrix of size $(2N-3) \times N$. Define the weight vector $\mathbf{w} = [\lambda_1 \mathbf{1}_{N-1}^\top,\; \lambda_2 \mathbf{1}_{N-2}^\top]^\top$.
+
+At iteration $k$, the algorithm computes diagonal reweighting matrices from the current estimate $\xvec^{(k)}$:
+
+\myparagraph{Smoothness reweighting.}
+\begin{equation}
+    \Lambda^{(k)} = \text{diag}\!\big(\mathbf{w} \odot \psi(D\xvec^{(k)})\big),
+    \quad \text{where } \psi(z) = \frac{1}{|z| + \epsilon_1}.
+    \label{eq:lambda_reweight}
+\end{equation}
+
+\myparagraph{Sparsity reweighting.}
+\begin{equation}
+    \gamma_n^{(k)} = \begin{cases}
+        \dfrac{(1+r)}{4\,|x_n^{(k)}|}, & |x_n^{(k)}| > \epsilon_0, \\[6pt]
+        \dfrac{(1+r)}{4\,\epsilon_0}, & |x_n^{(k)}| \leq \epsilon_0,
+    \end{cases}
+    \quad \Gamma^{(k)} = \text{diag}(\gamma^{(k)}).
+    \label{eq:gamma_reweight}
+\end{equation}
+
+The majorized problem yields the linear system
+\begin{equation}
+    \big(B^\top B + A^\top M^{(k)} A\big) \mathbf{z} = \mathbf{d},
+    \label{eq:beads_linear_system}
+\end{equation}
+where
+\begin{equation}
+    M^{(k)} = 2\lambda_0 \Gamma^{(k)} + D^\top \Lambda^{(k)} D,
+    \label{eq:M_matrix}
+\end{equation}
+and the right-hand side is
+\begin{equation}
+    \mathbf{d} = B^\top B (A^{-1} \yvec) - \lambda_0 A^\top \mathbf{b}_r,
+    \quad \mathbf{b}_r = \frac{1-r}{2}\mathbf{1}_N.
+    \label{eq:rhs_vector}
+\end{equation}
+Note that $\mathbf{d}$ is constant across iterations and can be precomputed. The peak estimate is then updated as
+\begin{equation}
+    \xvec^{(k+1)} = A \mathbf{z}^{(k)},
+    \label{eq:x_update}
+\end{equation}
+where $\mathbf{z}^{(k)}$ is the solution of \refeq{eq:beads_linear_system}. After convergence (typically approximately 20 iterations~\cite{ning2014beads}), the baseline is recovered as
+\begin{equation}
+    \hat{\fvec} = \yvec - \hat{\xvec} - H(\yvec - \hat{\xvec}).
+    \label{eq:baseline_recovery}
+\end{equation}
+
+\refalg{alg:beads} summarizes the complete BEADS algorithm.
+
+\begin{algorithm}[t]
+\caption{Classical BEADS Algorithm}
+\label{alg:beads}
+\begin{algorithmic}[1]
+\REQUIRE Observed signal $\yvec \in \Rspace^N$; parameters $d$, $f_c$, $r$, $\lambda_0$, $\lambda_1$, $\lambda_2$; number of iterations $K$
+\ENSURE Peak estimate $\hat{\xvec}$, baseline estimate $\hat{\fvec}$
+\STATE Construct banded matrices $A$, $B$ from $d$ and $f_c$ \hfill (\refeq{eq:b1_conv}--\refeq{eq:AB_matrices})
+\STATE Build difference matrices $D_1$, $D_2$; stack $D = [D_1; D_2]$
+\STATE Compute weight vector $\mathbf{w} = [\lambda_1 \mathbf{1}_{N-1};\; \lambda_2 \mathbf{1}_{N-2}]$
+\STATE Precompute $\mathbf{d} = B^\top B (A^{-1} \yvec) - \lambda_0 A^\top \big(\frac{1-r}{2}\mathbf{1}_N\big)$
+\STATE Initialize $\xvec^{(0)} \leftarrow \yvec$
+\FOR{$k = 0, 1, \ldots, K-1$}
+    \STATE $\Lambda^{(k)} \leftarrow \text{diag}\!\big(\mathbf{w} \odot \psi(D\xvec^{(k)})\big)$ \hfill (smoothness weights)
+    \STATE Compute $\Gamma^{(k)}$ from $\xvec^{(k)}$ \hfill (sparsity weights, \refeq{eq:gamma_reweight})
+    \STATE $M^{(k)} \leftarrow 2\lambda_0 \Gamma^{(k)} + D^\top \Lambda^{(k)} D$
+    \STATE Solve $(B^\top B + A^\top M^{(k)} A)\,\mathbf{z} = \mathbf{d}$ \hfill (banded linear system)
+    \STATE $\xvec^{(k+1)} \leftarrow A\mathbf{z}$
+\ENDFOR
+\STATE $\hat{\xvec} \leftarrow \xvec^{(K)}$
+\STATE $\hat{\fvec} \leftarrow \yvec - \hat{\xvec} - H(\yvec - \hat{\xvec})$ \hfill (baseline via low-pass residual)
+\RETURN $\hat{\xvec}$, $\hat{\fvec}$
+\end{algorithmic}
+\end{algorithm}
+
+\subsubsection{Parameters and Their Roles}
+
+BEADS requires careful specification of six parameters. \reftab{tab:beads_params} summarizes each parameter, its role, and typical considerations for tuning.
+
+\begin{table}[t]
+\centering
+\caption{BEADS parameters and their roles.}
+\label{tab:beads_params}
+\begin{tabular}{@{}llp{7.5cm}@{}}
+\toprule
+\textbf{Parameter} & \textbf{Symbol} & \textbf{Role} \\
+\midrule
+Sparsity weight & $\lambda_0$ & Controls the strength of the asymmetric sparsity penalty on $\xvec$. Larger values enforce sparser peak estimates. \\
+First-order weight & $\lambda_1$ & Penalizes the first differences of $\xvec$, promoting piecewise-constant signals. \\
+Second-order weight & $\lambda_2$ & Penalizes the second differences of $\xvec$, promoting piecewise-linear signals. \\
+Asymmetry ratio & $r$ & Controls the ratio of negative-to-positive penalty in $\theta$. Larger $r$ more strongly suppresses negative signal values. \\
+Filter cutoff & $f_c$ & Normalized cutoff frequency of the Butterworth high-pass filter. Determines the boundary between ``peak'' and ``baseline'' frequency content. \\
+Filter degree & $d$ & Degree of the Butterworth filter (order $= 2d$). Higher $d$ produces a sharper frequency transition. \\
+\bottomrule
+\end{tabular}
+\end{table}
+
+Ning et al.\ noted that the regularization parameters $\lambda_i$ should be chosen inversely proportional to the $\ell_1$ norm of the $i$-th derivative of the signal, and a proportionality constant should be tuned according to the noise variance~\cite{ning2014beads}. In practice, no single parameter configuration generalizes well across instruments, analytes, column conditions, or noise levels. Analysts must tune these parameters for each experimental setup, a tedious and expert-dependent process that undermines the method's practical utility for high-throughput applications~\cite{ning2014beads}.
+
+\subsubsection{Failure Modes in Dense-Peak Regions}
+\label{sec:bg_beads_failures}
+
+While BEADS performs well when the sparsity assumption holds, \emph{i.e.}, when peaks are well-separated and occupy a small fraction of the signal, it exhibits systematic failure in dense-peak regions. Three root causes drive these failures:
+
+\myparagraph{Failure Mode~1: Sparsity Assumption Violation.}
+The $\ell_1$~penalty $\lambda_0 \sum_n \theta(x_n)$ assumes that most entries of~$\xvec$ are zero.
+In dense-peak regions, common in metabolomics, complex mixture analysis, and gradient elution chromatography, peaks overlap and occupy a large fraction of the signal. The penalty over-shrinks the aggregate peak energy, and the surplus is absorbed into the baseline estimate~$\hat{\fvec}$, which rises to compensate. We term this phenomenon \emph{baseline leakage}: the estimated baseline rises into the true peak region, systematically overestimating the baseline and underestimating peak areas.
+
+\myparagraph{Failure Mode 2: Low-Pass Filter Bandwidth Mismatch.}
+The Butterworth filter cutoff $f_c$ defines a hard boundary between frequencies assigned to the baseline and those assigned to the peaks. When broad peaks have significant spectral energy near or below $f_c$, the high-pass filter removes part of the peak energy, attributing it to the baseline. Conversely, if $f_c$ is set too low to preserve broad peaks, rapidly varying baseline features are not removed. No single $f_c$ simultaneously accommodates narrow peaks, broad peaks, and the baseline in the same signal.
+
+\myparagraph{Failure Mode 3: Spatially Uniform Regularization.}
+The weights $\lambda_0$, $\lambda_1$, and $\lambda_2$ are constant across all signal positions. A sparse region with well-separated peaks requires strong regularization to enforce sparsity, while a dense region requires weaker regularization to preserve the aggregate peak signal. Uniform weights cannot adapt to local signal density, leading to over-regularization in dense regions and under-regularization in sparse regions within the same signal.
+
+These three failure modes are not independent: they compound in dense-peak signals, making BEADS unreliable precisely in the analytically challenging scenarios where accurate baseline correction is most needed. This observation motivates the development of LBEADS-NET, which learns per-layer parameters through end-to-end training rather than relying on a single fixed parameter set.
+
+% TODO: Uncomment when figure is available.
+% \begin{figure}[t]
+%     \centering
+%     \includegraphics[width=\textwidth]{figures/fig_2_2_beads_leakage.pdf}
+%     \caption{Illustration of baseline leakage in BEADS on a dense-peak chromatogram.
+%     \textbf{(a)}~The observed signal with ground-truth baseline shown as a dashed line.
+%     \textbf{(b)}~BEADS estimate with well-tuned parameters: the estimated baseline
+%     rises into the dense-peak region, overestimating the true baseline.
+%     \textbf{(c)}~The leakage error $\hat{f}_n - f_n$ is largest where peaks are densely packed.}
+%     \label{fig:beads_leakage}
+% \end{figure}
+
+
+%% -------------------------------------------------------------------
+\subsection{Other Classical Methods}
+\label{sec:bg_other_classical}
+%% -------------------------------------------------------------------
+
+Several other methods for baseline estimation predate or complement BEADS. Understanding their strengths and limitations clarifies why BEADS is the most suitable candidate for algorithm unrolling.
+
+\subsubsection{Asymmetric Least Squares (AsLS)}
+
+Eilers~\cite{eilers2003smoother} introduced the Whittaker smoother to the analytical chemistry community as a penalized least squares method that balances fidelity to data against roughness of the fitted curve, controlled by a single smoothing parameter $\lambda$. The Whittaker smoother solves the linear system $(I + \lambda D^\top D)\mathbf{z} = \yvec$, where $D$ is a difference matrix of order $d$ and $\lambda$ controls the trade-off between data fidelity and smoothness~\cite{eilers2003smoother}. Eilers showed that incorporating a diagonal weight matrix $W$ into the penalized least squares framework yields the system $(W + \lambda D^\top D)\mathbf{z} = W\yvec$, enabling asymmetric fitting~\cite{eilers2003smoother}.
+
+Eilers and Boelens~\cite{eilers2005baseline} extended this framework with asymmetric weights for baseline estimation (AsLS), assigning different penalties to positive and negative residuals. Points above the current estimate are given lower weight (presumed to be peaks), while points below receive higher weight (presumed to be baseline). This iterative reweighting procedure produces a smooth curve that preferentially fits below the signal peaks.
+
+\subsubsection{airPLS}
+
+Zhang et al.~\cite{zhang2010airpls} proposed the airPLS (adaptive iteratively reweighted penalized least squares) algorithm, which adaptively reweights the penalized least squares baseline estimation by setting weights to zero where the signal exceeds the current baseline estimate and using exponential weights proportional to the residual magnitude where the signal is below the estimate~\cite{zhang2010airpls}. The airPLS algorithm eliminates the need for user-specified asymmetry parameters, requiring only a single smoothness parameter $\lambda$~\cite{zhang2010airpls}. Zhang et al.\ demonstrated that the airPLS algorithm converges in only a few iterations (typically 3 to 6) due to its exponential reweighting strategy~\cite{zhang2010airpls}.
+
+\subsubsection{arPLS}
+
+Baek et al.~\cite{baek2015arpls} proposed the arPLS (asymmetrically reweighted penalized least squares) method, which uses a generalized logistic function to assign weights that give similar importance to signals slightly above and below the estimated baseline, thereby avoiding the baseline underestimation problem of earlier methods~\cite{baek2015arpls}. The arPLS weighting scheme uses the mean and standard deviation of negative residuals to parameterize a generalized logistic function that smoothly transitions weights from one (baseline region) to zero (peak region)~\cite{baek2015arpls}. Baek et al.\ showed that arPLS is relatively robust to the choice of the smoothness parameter $\lambda$, maintaining low RMSE over a range spanning more than two orders of magnitude~\cite{baek2015arpls}.
+
+Baek et al.\ showed that AsLS and airPLS methods systematically underestimate the baseline in non-peak regions because they assign zero or near-zero weight to all signals above the fitted baseline, causing downward bias and peak height overestimation~\cite{baek2015arpls}. The arPLS method addresses this by providing a smooth transition in the weighting function.
+
+\subsubsection{SNIP}
+
+Ryan et al.~\cite{ryan1988snip} proposed the Statistics-sensitive Non-linear Iterative Peak-clipping (SNIP) algorithm, which estimates the background of a spectrum by iteratively replacing each channel value with the lesser of itself or the mean of two symmetrically placed neighbors~\cite{ryan1988snip}. SNIP compresses the dynamic range using a double log transformation prior to peak clipping, which reduces the required number of iterations from approximately 700 to approximately 24~\cite{ryan1988snip}. SNIP is an early and influential iterative baseline estimation method for spectral data, originally developed for PIXE X-ray spectra but subsequently adopted in other spectroscopy and signal processing domains~\cite{ryan1988snip}. Unlike the penalized least squares family, SNIP does not use an optimization framework and does not produce a smooth baseline in the penalized-regression sense.
+
+\subsubsection{Why BEADS is the Best Unrolling Candidate}
+
+Among the classical methods surveyed above, BEADS is uniquely suited for algorithm unrolling for several reasons:
+
+\begin{enumerate}
+    \item \textbf{Explicit iterative structure.} BEADS is formulated as a majorization-minimization algorithm with clearly defined per-iteration update equations. Each iteration involves a linear system solve, a reweighting step, and an implicit proximal operation, operations that map naturally to neural network layers.
+
+    \item \textbf{Learnable scalar parameters.} The six BEADS parameters ($\lambda_0$, $\lambda_1$, $\lambda_2$, $r$, $f_c$, $d$) are scalar quantities with clear physical interpretations. Making them learnable per-layer requires only $O(K)$ parameters for $K$ layers, preserving the interpretability that generic deep networks sacrifice.
+
+    \item \textbf{Joint estimation.} BEADS jointly estimates $\xvec$ and $\fvec$ through its optimization structure, unlike PLS methods that estimate only the baseline. This joint formulation carries through to the unrolled network.
+
+    \item \textbf{Structural priors.} The asymmetric penalty, the sparsity prior, and the Butterworth filter encode domain-specific knowledge about chromatographic signals. An unrolled network inherits these inductive biases, requiring less training data than a black-box architecture.
+\end{enumerate}
+
+\subsubsection{BEADS vs.\ arPLS Failure Mode Contrast}
+
+An important contrast between BEADS and arPLS illuminates the nature of the baseline leakage problem. The arPLS method makes no sparsity assumption on the peak signal: it assumes only that the baseline lies below the signal. In dense-peak regions, arPLS tends to produce an \emph{elevated} baseline that follows the lower envelope of the dense peaks, a failure mode we term \emph{baseline elevation}. The estimated baseline is too high because the method has no mechanism to distinguish between the true baseline and the bottom of densely packed peaks.
+
+BEADS, by contrast, fails in the opposite direction via \emph{baseline leakage}: the sparsity penalty forces the peak estimate to be sparser than the true signal, and the excess energy is absorbed into the baseline. The baseline rises not because it follows the peak envelope (as in arPLS), but because the optimization attributes dense-peak energy to the baseline component when the $\ell_1$ penalty over-shrinks.
+
+This distinction is important for the thesis narrative: when BEADS is unrolled into LBEADS-NET, the sparsity-induced leakage mechanism is inherited by the network architecture. Mitigating this failure mode is therefore a central challenge in the design and training of LBEADS-NET, addressed in detail in Chapter~3.
+
+
+%% ===================================================================
+\section{Algorithm Unrolling}
+\label{sec:bg_unrolling}
+%% ===================================================================
+
+\subsection{Core Idea}
+
+Algorithm unrolling (or unfolding) provides a concrete and systematic connection between iterative algorithms used in signal processing and deep neural network architectures~\cite{monga2021unrolling}. The central idea is to map each iteration of an iterative optimization algorithm to one layer of a deep network. Concatenating $K$ such layers forms a neural network where passing through the network is equivalent to executing the iterative algorithm $K$ times~\cite{monga2021unrolling}. Algorithm parameters such as regularization coefficients and step sizes transfer to learnable network parameters and can be optimized through end-to-end training with backpropagation~\cite{monga2021unrolling}.
+
+Consider a generic iterative algorithm that updates a solution estimate $\xvec^{(k+1)} = \mathcal{T}(\xvec^{(k)}; \boldsymbol{\theta})$, where $\boldsymbol{\theta}$ denotes the algorithm's parameters. In classical use, $\boldsymbol{\theta}$ is fixed across all iterations and tuned manually. Algorithm unrolling introduces two modifications:
+
+\begin{enumerate}
+    \item \textbf{Truncation}: The iteration is run for a fixed number $K$ of steps, producing a $K$-layer feed-forward network rather than iterating to convergence.
+    \item \textbf{Parameter untying}: Each layer $k$ receives its own parameters $\boldsymbol{\theta}^{(k)}$, allowing the network to learn iteration-specific behavior. The unrolled update becomes
+    \begin{equation}
+        \xvec^{(k+1)} = \mathcal{T}(\xvec^{(k)}; \boldsymbol{\theta}^{(k)}), \quad k = 0, 1, \ldots, K-1.
+        \label{eq:unrolled_update}
+    \end{equation}
+\end{enumerate}
+
+The entire network is trained end-to-end by minimizing a task-specific loss $\mathcal{L}(\xvec^{(K)}, \xvec^*)$ with respect to $\{\boldsymbol{\theta}^{(k)}\}_{k=0}^{K-1}$, where $\xvec^*$ is the ground-truth signal. Layer-specific (untied) parameters allow a departure from the original iterative algorithm, enhancing representation capacity and boosting performance, though the networks may not completely inherit convergence guarantees of the original algorithm~\cite{monga2021unrolling}.
+
+\subsection{LISTA: The Founding Work}
+
+Gregor and LeCun~\cite{gregor2010lista} introduced LISTA (Learned ISTA), the foundational algorithm unrolling method that unfolds a fixed number of ISTA iterations into a feed-forward neural network with learned parameters, achieving roughly 20 times faster convergence than FISTA for approximate sparse coding~\cite{gregor2010lista}. LISTA replaces the matrices $W_e$ and $S$ in ISTA, which are normally computed from the dictionary and sparsity parameters, with learned matrices optimized end-to-end via backpropagation to minimize the squared error between predicted and optimal sparse codes~\cite{gregor2010lista}.
+
+The ISTA update for sparse coding takes the form
+\begin{equation}
+    \xvec^{(k+1)} = h_{\alpha}\!\big(W_e \yvec + S \xvec^{(k)}\big),
+    \label{eq:ista_update}
+\end{equation}
+where $h_\alpha$ is the soft-thresholding operator with threshold $\alpha$, $W_e$ is a filter matrix, and $S$ is a mutual inhibition matrix. In LISTA, $W_e$, $S$, and $\alpha$ are all learned from data. Gregor and LeCun established the paradigm of algorithm unrolling, where an iterative optimization algorithm is truncated to a fixed depth and its parameters are learned end-to-end, trading generality for speed on a specific data distribution~\cite{gregor2010lista}.
+
+The significance of LISTA extends beyond its specific application to sparse coding. It demonstrated that learning the iteration parameters dramatically improves per-iteration efficiency: LISTA with a single iteration achieved prediction error of 1.50 for 100-unit codes, compared to 21.0 for FISTA with one iteration~\cite{gregor2010lista}. This result showed that it takes 18 iterations of FISTA to reach the same error as 1 iteration of LISTA~\cite{gregor2010lista}, establishing that learned parameters can compensate for truncation.
+
+\subsection{Why Algorithm Unrolling Works}
+
+Algorithm unrolling derives its effectiveness from three properties that distinguish it from both classical iterative methods and generic deep networks:
+
+\myparagraph{Interpretability.} The trained unrolled network can be naturally interpreted as a parameter-optimized algorithm, effectively overcoming the lack of interpretability in most conventional neural networks~\cite{monga2021unrolling}. Each layer corresponds to a well-understood algorithmic step, and the learned parameters retain their physical meaning.
+
+\myparagraph{Parameter efficiency.} Unrolled networks are highly parameter efficient compared to generic deep networks because they encode domain knowledge through unrolling, requiring less training data and generalizing better especially under limited training data regimes~\cite{monga2021unrolling}. Rather than learning arbitrary transformations, the network learns only the parameters of a known-good algorithm.
+
+\myparagraph{Inductive bias.} Unrolled networks naturally inherit prior structures and domain knowledge rather than learning them from intensive training data, and consequently tend to generalize better than generic networks~\cite{monga2021unrolling}. The architectural constraints imposed by the algorithm structure act as a strong regularizer, preventing the network from overfitting to spurious patterns.
+
+From a functional approximation perspective, unrolled networks occupy an intermediate position between generic neural networks and iterative algorithms, offering relatively low bias and variance simultaneously~\cite{monga2021unrolling}.
+
+\subsection{Key Architectures}
+\label{sec:bg_unrolling_architectures}
+
+Following LISTA, a rich family of unrolled architectures has been developed. We briefly survey the most relevant ones.
+
+\myparagraph{ALISTA} (Liu et al., 2019~\cite{liu2019alista}). ALISTA computes the weight matrix in LISTA analytically via a data-free coherence minimization problem, leaving only layer-wise step sizes and thresholds to be learned from data~\cite{liu2019alista}. This reduces the number of learnable parameters from $O(KNM + K)$ in LISTA to $O(K)$~\cite{liu2019alista}. ALISTA demonstrated that learning only scalar parameters per layer achieves performance comparable to full LISTA models that learn entire weight matrices~\cite{liu2019alista}. This result is particularly relevant to LBEADS-NET, which similarly learns only scalar parameters per layer.
+
+\myparagraph{ISTA-Net and ISTA-Net+} (Zhang and Ghanem, 2018~\cite{zhang2018istanet}). ISTA-Net maps the iterative update steps of ISTA into a fixed number of network phases for image compressive sensing~\cite{zhang2018istanet}. Zhang and Ghanem replaced the hand-crafted linear sparsifying transform with a learnable nonlinear transform composed of two convolutional operators separated by a ReLU, and introduced a corresponding learned inverse transform~\cite{zhang2018istanet}. ISTA-Net+ operates in the residual domain by explicitly extracting high-frequency residual components, introducing skip connections analogous to ResNet~\cite{zhang2018istanet}. ISTA-Net can be viewed as a significant extension of LISTA from the sparse coding problem to general compressive sensing reconstruction~\cite{zhang2018istanet}.
+
+\myparagraph{ISTA-Net++} (You et al., 2021~\cite{you2021istanetpp}). ISTA-Net++ introduces a dynamic unfolding strategy that handles multiple compressive sensing ratios through a single trained model by incorporating a condition module that transmits ratio-dependent step size and noise level parameters to each unfolded stage~\cite{you2021istanetpp}. ISTA-Net++ uses a dynamic proximal mapping module consisting of residual blocks, replacing the hand-crafted proximal operator with a learned nonlinear mapping~\cite{you2021istanetpp}.
+
+\myparagraph{Hybrid ISTA} (Zheng et al., 2022~\cite{zheng2022hybridista}). Hybrid ISTA incorporates free-form deep neural networks into ISTA-based unfolded algorithms while maintaining theoretical convergence guarantees~\cite{zheng2022hybridista}. It addresses a fundamental tension in algorithm unrolling: existing convergence-provable methods restrict network architectures via partial weight coupling, while flexible methods lack convergence guarantees~\cite{zheng2022hybridista}. Hybrid ISTA integrates classical ISTA with free-form DNNs using a balancing parameter, ensuring convergence equivalent to ISTA in the worst case~\cite{zheng2022hybridista}.
+
+\myparagraph{ADMM-Net} (Yang et al., 2016~\cite{yang2016admmnet}). ADMM-Net unrolls the Alternating Direction Method of Multipliers for compressive sensing MRI, mapping each ADMM iteration to a stage with reconstruction, shrinkage, and multiplier update operations~\cite{yang2016admmnet}. ADMM-Net replaces the hand-crafted shrinkage function with a learnable piecewise linear function parameterized by control points~\cite{yang2016admmnet}. ADMM-Net is an early and influential example of algorithm unrolling that naturally combines the merits of model-based approaches with deep learning~\cite{yang2016admmnet}.
+
+\myparagraph{Unrolled Optimization with Deep Priors (ODP)} (Diamond et al., 2018~\cite{diamond2018odp}). Diamond et al.\ proposed a general framework that factors each unrolled iteration into a data step, which encodes prior knowledge of the forward model, and a CNN prior step, which learns statistical priors end-to-end~\cite{diamond2018odp}. Diamond et al.\ showed that incorporating the forward model in the data step is critical: for deblurring and compressed sensing MRI, ODP networks with data steps substantially outperformed pure residual networks without data steps~\cite{diamond2018odp}.
+
+\myparagraph{DeMUN} (Chen et al., 2025~\cite{chen2025demun}). The Deep Memory Unrolled Network leverages the history of all gradients from previous iterations and generalizes a wide range of existing unrolled algorithms as special cases~\cite{chen2025demun}. Chen et al.\ found that training with an intermediate loss function that penalizes reconstruction error at every layer uniformly outperforms training with a last-layer-only loss~\cite{chen2025demun}. They also found that the number of unrolled iterations has a significantly greater impact on performance than the depth of the neural network used within each iteration~\cite{chen2025demun}.
+
+\subsection{Algorithm Unrolling for Analytical Chemistry}
+
+Despite the breadth of algorithm unrolling in imaging and compressed sensing, its application to analytical chemistry signal processing remains limited. Gharbi et al.~\cite{gharbi2024unrolled} designed and compared three deep unrolled architectures, unrolled primal-dual (U-PD), unrolled ISTA (U-ISTA), and unrolled half-quadratic (U-HQ), for sparse signal recovery in chromatography~\cite{gharbi2024unrolled}. Gharbi et al.\ noted that 1D signal restoration, as it occurs in analytical chemistry, remains scarcely studied in the deep unrolling literature compared to image processing applications~\cite{gharbi2024unrolled}.
+
+In their architectures, algorithm hyperparameters such as step sizes and regularization weights are untied across layers and learned end-to-end via backpropagation~\cite{gharbi2024unrolled}. Gharbi et al.\ reported that U-HQ, using a smoothed hybrid penalty mixing Fair and Cauchy potentials, better recovered non-null signal baselines and peak intensities without bias effect compared to $\ell_1$-based unrolled methods~\cite{gharbi2024unrolled}. This finding is significant for LBEADS-NET: it confirms that the $\ell_1$-induced bias observed in classical BEADS persists in unrolled sparse-recovery architectures, independently corroborating the baseline leakage phenomenon.
+
+In a related study, Gharbi et al.~\cite{gharbi2023unrolled_sparse} presented a comprehensive comparative study of the same three architectures applied to mass spectrometry data, finding that deep unrolling provides three key benefits over iterative optimization: interpretability, computation speed, and efficiency through supervised task-oriented tuning~\cite{gharbi2023unrolled_sparse}. They reported that the best-performing iterative method did not necessarily yield the best unrolled architecture, confirming that the relationship between iterative and unrolled performance is not straightforward~\cite{gharbi2023unrolled_sparse}.
+
+\subsection{Applying Algorithm Unrolling to BEADS}
+
+The BEADS algorithm is a natural candidate for unrolling. Each MM iteration (\refalg{alg:beads}, lines 6--11) performs a sequence of deterministic operations, reweighting, matrix assembly, linear system solve, and signal update, that can be mapped to a differentiable neural network layer. The learnable parameters ($\lambda_0$, $\lambda_1$, $\lambda_2$, $r$) are scalars with physical interpretations, enabling an extremely parameter-efficient architecture: with $K$ layers and 5 parameters per layer (adding a learnable step size), the total parameter count is $5K$, orders of magnitude fewer than generic deep networks.
+
+However, two challenges arise. First, the MM update involves solving a banded linear system (\refeq{eq:beads_linear_system}), which requires either a differentiable linear solver or an alternative formulation. Second, the reweighting steps (\refeq{eq:lambda_reweight}--\refeq{eq:gamma_reweight}) involve division by $|\xvec|$, which can produce large gradients near zero. Chapter~3 addresses both challenges: the ISTA-style reformulation replaces the linear system solve with a gradient-descent-plus-proximal-operator step, and the log-space parameterization ($\lambda = \exp(\log \lambda)$) ensures positivity without gradient issues.
+
+
+%% ===================================================================
+\section{Neural Approaches to Baseline Correction}
+\label{sec:bg_neural}
+%% ===================================================================
+
+\subsection{Deep Learning Methods}
+\label{sec:bg_neural_dl}
+
+Recent work has applied deep learning to baseline correction, demonstrating that neural networks can learn the signal-to-baseline mapping directly from training data, eliminating per-signal parameter tuning.
+
+\myparagraph{Convolutional autoencoders} (Kensert et al., 2021~\cite{kensert2021deep}). Kensert et al.\ trained a 1D convolutional autoencoder on 190,000 synthetic chromatograms, achieving effective baseline removal without per-signal parameter tuning~\cite{kensert2021deep}. This was among the first demonstrations that deep learning can replace classical baseline correction in chromatographic analysis. The model learns an implicit mapping from the corrupted signal to the corrected signal, with the encoder-decoder architecture serving as a nonlinear denoising filter.
+
+\myparagraph{CAE+} (Han et al., 2024~\cite{han2024caeplus}). Han et al.\ proposed a unified preprocessing pipeline for Raman spectroscopy consisting of a convolutional denoising autoencoder for noise reduction followed by a convolutional autoencoder with a comparison function for baseline correction~\cite{han2024caeplus}. The comparison function exploits the prior knowledge that baseline values are typically lower than signal values at each point~\cite{han2024caeplus}. Han et al.\ achieved peak preservation rates between 0.85 and 0.96 with their denoising model~\cite{han2024caeplus}. However, as with all supervised approaches, the models are trained on synthetic data, and their performance on real spectra depends on the fidelity of the simulation.
+
+\myparagraph{ResUNet} (Chen et al., 2022~\cite{chen2022resunet}). Chen et al.\ proposed ResUNet, a deep-learning baseline-correction model combining ResNet and UNet architectures that directly maps a raw spectrum to its corrected form~\cite{chen2022resunet}. The model contains approximately 2.35 million trainable parameters and was trained on 210,000 synthetically generated spectra~\cite{chen2022resunet}. Chen et al.\ demonstrated that deep-learning-based baseline-correction methods are significantly better than penalized-least-squares methods such as arPLS in terms of RMSE, and that the deep-learning approach eliminates the need for per-spectrum parameter tuning~\cite{chen2022resunet}.
+
+\myparagraph{RSPSSL} (Hu et al., 2024~\cite{hu2024rspssl}). Hu et al.\ proposed RSPSSL, a self-supervised learning scheme for Raman spectral preprocessing that performs both denoising and baseline correction without requiring experimentally obtained ideal reference spectra~\cite{hu2024rspssl}. Hu et al.\ noted that the performance of supervised deep learning approaches for spectral preprocessing is limited by the impossibility of experimentally obtaining ideal noise-free and baseline-free reference spectra~\cite{hu2024rspssl}. Their scheme achieved an 88\% reduction in RMSE compared to established preprocessing techniques on experimental Raman data~\cite{hu2024rspssl}, and demonstrated generalization across different devices, laboratories, and excitation wavelengths without retraining~\cite{hu2024rspssl}.
+
+\subsection{Physics-Informed Hybrid Approaches}
+\label{sec:bg_neural_hybrid}
+
+An alternative to end-to-end deep learning is the \emph{hybrid} approach, in which a machine learning model predicts the parameters of a classical algorithm rather than directly estimating the baseline. This preserves the interpretability and physical guarantees of the classical solver while automating parameter selection.
+
+\myparagraph{DIRAS+} (Aradhye et al., 2025~\cite{aradhye2025diras}). Aradhye et al.\ developed DIRAS+, a hybrid framework that uses a CNN autoencoder plus XGBoost regressor to predict the optimal smoothing parameter $\lambda$ for the DIRAS solver, achieving tuning-level baseline-correction accuracy without per-spectrum adjustment~\cite{aradhye2025diras}. The DIRAS+ hybrid approach confines the machine-learning model's role to predicting a single scalar parameter, while the physics-based DIRAS solver handles the actual baseline estimation, ensuring physically consistent results~\cite{aradhye2025diras}. Aradhye et al.\ argued that end-to-end deep learning models for baseline correction are limited by substantial data requirements, lack of interpretability, and poor generalization to spectral conditions not seen in training~\cite{aradhye2025diras}.
+
+\myparagraph{OP-airPLS} (Cui et al., 2025~\cite{cui2025opairpls}). Cui et al.\ developed ML-airPLS, a PCA-Random Forest model that predicts optimal airPLS parameters directly from input spectra, achieving a roughly 2100$\times$ speedup over iterative grid search optimization~\cite{cui2025opairpls}. However, Cui et al.\ found that direct application of their model to experimental spectra without denoising yielded consistently negative improvement values, demonstrating that models trained on noise-free synthetic data may fail to generalize to noisy real-world spectra~\cite{cui2025opairpls}. This finding highlights a key limitation of the external parameter prediction approach: the prediction model and the classical solver are trained separately, and errors in parameter prediction propagate directly to baseline estimation quality.
+
+\subsection{Positioning LBEADS-NET}
+\label{sec:bg_positioning}
+
+The methods reviewed in this section fall into three categories, each with distinct trade-offs:
+
+\begin{enumerate}
+    \item \textbf{Black-box neural networks} (Kensert et al., Chen et al., Han et al., Hu et al.). These methods learn the signal-to-baseline mapping end-to-end, achieving strong generalization when sufficient training data is available. However, the learned mapping is encoded in millions of opaque parameters, offering no insight into the decomposition process. One cannot inspect what regularization strategy the network has learned, verify that it respects physical constraints, or diagnose why it fails on a particular signal.
+
+    \item \textbf{Physics-informed hybrid approaches} (DIRAS+, OP-airPLS). These methods use machine learning to predict the parameters of a classical algorithm, preserving interpretability while automating parameter selection. However, the ML model and the classical solver are decoupled: the ML model is not trained through the solver, so it cannot learn to compensate for the solver's systematic errors. The ML model predicts parameters externally, without feedback from the solver's output quality.
+
+    \item \textbf{Algorithm unrolling} (LBEADS-NET). The algorithm structure \emph{is} the network architecture. Each layer corresponds to one iteration of BEADS, and the learnable parameters ($\lambda_0$, $\lambda_1$, $\lambda_2$, $r$, step size) are trained end-to-end through the solver. This means the loss function's gradients flow through the entire optimization pipeline, enabling the network to learn parameters that compensate for the solver's systematic biases, including baseline leakage. The architecture inherits the inductive biases of BEADS (sparsity, smoothness, asymmetry, frequency-domain separation) while gaining the adaptivity of data-driven learning.
+\end{enumerate}
+
+LBEADS-NET thus occupies a unique position in the landscape of baseline correction methods: it is neither a black-box neural network that learns an arbitrary mapping, nor an external parameter predictor that is decoupled from the solver. It is a \emph{structurally interpretable} network whose architecture directly encodes the BEADS optimization, with parameters learned to optimize baseline correction performance on the training distribution. This positioning, and the challenges it entails, particularly the inherited baseline leakage problem, is the subject of Chapter~3.

@@ -53,6 +53,12 @@ export async function retryRun(id: string): Promise<{ run_id: string }> {
   return res.json()
 }
 
+export async function runDemos(id: string): Promise<{ demo: string[] | null; demo_chromatogram: string[] | null; errors: { source: string; message: string }[] }> {
+  const res = await fetch(`${API_BASE}/runs/${id}/demos`, { method: "POST" })
+  if (!res.ok) throw new Error(await res.text())
+  return res.json()
+}
+
 export async function softDeleteRun(id: string): Promise<void> {
   const res = await fetch(`${API_BASE}/runs/${id}/delete`, { method: "POST" })
   if (!res.ok) throw new Error(await res.text())

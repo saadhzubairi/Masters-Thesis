@@ -364,7 +364,7 @@ def run_chromatogram_demo(checkpoint_path: str, output_dir: str, N: int = 4096,
     loaded_layers = int(cfg.get('num_layers', 10))
     infer_layers = min(loaded_layers, 10)
 
-    if model_type == 'lbeads_fast':
+    if model_type in ('lbeads_fast', 'lbeads_v5'):
         model = LBEADS_NET_Fast(
             N=cfg.get('N', N),
             d=cfg.get('d', 1),

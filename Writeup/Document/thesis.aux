@@ -5,8 +5,8 @@
 \@writefile{toc}{\contentsline {section}{Vita}{iii}{section*.1}\protected@file@percent }
 \@writefile{toc}{\contentsline {section}{Acknowledgements}{iv}{section*.2}\protected@file@percent }
 \@writefile{toc}{\contentsline {section}{Abstract}{vi}{section*.3}\protected@file@percent }
-\@writefile{toc}{\contentsline {section}{List of Figures}{viii}{chapter*.5}\protected@file@percent }
-\@writefile{toc}{\contentsline {section}{List of Tables}{ix}{chapter*.6}\protected@file@percent }
+\@writefile{toc}{\contentsline {section}{List of Figures}{xi}{chapter*.5}\protected@file@percent }
+\@writefile{toc}{\contentsline {section}{List of Tables}{xiv}{chapter*.6}\protected@file@percent }
 \citation{skoog2017fundamentals}
 \citation{ning2014beads}
 \@writefile{toc}{\contentsline {chapter}{\numberline {1}Introduction}{1}{chapter.1}\protected@file@percent }
@@ -47,20 +47,461 @@
 \citation{gregor2010lista}
 \@writefile{toc}{\contentsline {section}{\numberline {1.4}Thesis Outline}{8}{section.1.4}\protected@file@percent }
 \newlabel{sec:intro_outline}{{1.4}{8}{Thesis Outline}{section.1.4}{}}
-\@writefile{toc}{\contentsline {chapter}{\numberline {2}Background}{10}{chapter.2}\protected@file@percent }
+\@writefile{toc}{\contentsline {chapter}{\numberline {2}Background and Related Work}{10}{chapter.2}\protected@file@percent }
 \@writefile{lof}{\addvspace {10\p@ }}
 \@writefile{lot}{\addvspace {10\p@ }}
-\newlabel{chap:background}{{2}{10}{Background}{chapter.2}{}}
-\@writefile{toc}{\contentsline {chapter}{\numberline {3}Conclusions and Future Work}{12}{chapter.3}\protected@file@percent }
+\newlabel{chap:background}{{2}{10}{Background and Related Work}{chapter.2}{}}
+\citation{ning2014beads}
+\citation{ning2014beads}
+\citation{ning2014beads,skoog2017fundamentals}
+\@writefile{toc}{\contentsline {section}{\numberline {2.1}Chromatographic Signal Processing}{11}{section.2.1}\protected@file@percent }
+\newlabel{sec:bg_signal}{{2.1}{11}{Chromatographic Signal Processing}{section.2.1}{}}
+\@writefile{toc}{\contentsline {subsection}{\numberline {2.1.1}Signal Model}{11}{subsection.2.1.1}\protected@file@percent }
+\@writefile{toc}{\contentsline {subsection}{\numberline {2.1.2}Physical Causes of Baseline Drift}{11}{subsection.2.1.2}\protected@file@percent }
+\citation{ning2014beads,eilers2005baseline}
+\@writefile{toc}{\contentsline {subsection}{\numberline {2.1.3}Importance of Accurate Baseline Estimation}{12}{subsection.2.1.3}\protected@file@percent }
+\citation{grushka1972emg}
+\citation{grushka1972emg}
+\citation{naish1988emg}
+\citation{naish1988emg}
+\citation{grushka1972emg}
+\@writefile{toc}{\contentsline {subsection}{\numberline {2.1.4}Peak Shape Models}{13}{subsection.2.1.4}\protected@file@percent }
+\citation{ning2014beads}
+\citation{ning2014beads}
+\@writefile{toc}{\contentsline {section}{\numberline {2.2}Classical Baseline Correction Methods}{14}{section.2.2}\protected@file@percent }
+\newlabel{sec:bg_classical}{{2.2}{14}{Classical Baseline Correction Methods}{section.2.2}{}}
+\@writefile{toc}{\contentsline {subsection}{\numberline {2.2.1}BEADS: Baseline Estimation And Denoising using Sparsity}{14}{subsection.2.2.1}\protected@file@percent }
+\newlabel{sec:bg_beads}{{2.2.1}{14}{BEADS: Baseline Estimation And Denoising using Sparsity}{subsection.2.2.1}{}}
+\@writefile{toc}{\contentsline {subsubsection}{\numberline {2.2.1.1}The BEADS Cost Function}{14}{subsubsection.2.2.1.1}\protected@file@percent }
+\newlabel{eq:beads_cost}{{2.1}{14}{The BEADS Cost Function}{equation.2.1}{}}
+\citation{ning2014beads}
+\newlabel{eq:theta}{{2.2}{15}{The BEADS Cost Function}{equation.2.2}{}}
+\newlabel{eq:phi}{{2.3}{15}{The BEADS Cost Function}{equation.2.3}{}}
+\@writefile{toc}{\contentsline {subsubsection}{\numberline {2.2.1.2}High-Pass Filter Construction}{16}{subsubsection.2.2.1.2}\protected@file@percent }
+\newlabel{sec:bg_hpf}{{2.2.1.2}{16}{High-Pass Filter Construction}{subsubsection.2.2.1.2}{}}
+\newlabel{eq:b1_conv}{{2.4}{16}{High-Pass Filter Construction}{equation.2.4}{}}
+\newlabel{eq:b_coeffs}{{2.5}{16}{High-Pass Filter Construction}{equation.2.5}{}}
+\newlabel{eq:t_param}{{2.6}{16}{High-Pass Filter Construction}{equation.2.6}{}}
+\newlabel{eq:a_lp}{{2.7}{16}{High-Pass Filter Construction}{equation.2.7}{}}
+\citation{ning2014beads}
+\citation{ning2014beads}
+\citation{ning2014beads}
+\newlabel{eq:a_coeffs}{{2.8}{17}{High-Pass Filter Construction}{equation.2.8}{}}
+\newlabel{eq:AB_matrices}{{2.9}{17}{High-Pass Filter Construction}{equation.2.9}{}}
+\newlabel{eq:H_operator}{{2.10}{17}{High-Pass Filter Construction}{equation.2.10}{}}
+\@writefile{toc}{\contentsline {subsubsection}{\numberline {2.2.1.3}Majorization-Minimization Algorithm}{17}{subsubsection.2.2.1.3}\protected@file@percent }
+\newlabel{eq:diff_matrices}{{2.11}{18}{Majorization-Minimization Algorithm}{equation.2.11}{}}
+\newlabel{eq:lambda_reweight}{{2.12}{18}{Majorization-Minimization Algorithm}{equation.2.12}{}}
+\newlabel{eq:gamma_reweight}{{2.13}{18}{Majorization-Minimization Algorithm}{equation.2.13}{}}
+\newlabel{eq:beads_linear_system}{{2.14}{18}{Majorization-Minimization Algorithm}{equation.2.14}{}}
+\newlabel{eq:M_matrix}{{2.15}{18}{Majorization-Minimization Algorithm}{equation.2.15}{}}
+\citation{ning2014beads}
+\citation{ning2014beads}
+\citation{ning2014beads}
+\newlabel{eq:rhs_vector}{{2.16}{19}{Majorization-Minimization Algorithm}{equation.2.16}{}}
+\newlabel{eq:x_update}{{2.17}{19}{Majorization-Minimization Algorithm}{equation.2.17}{}}
+\newlabel{eq:baseline_recovery}{{2.18}{19}{Majorization-Minimization Algorithm}{equation.2.18}{}}
+\@writefile{toc}{\contentsline {subsubsection}{\numberline {2.2.1.4}Parameters and Their Roles}{19}{subsubsection.2.2.1.4}\protected@file@percent }
+\@writefile{lop}{\contentsline {algorithm}{\numberline {1}{\ignorespaces Classical BEADS Algorithm}}{20}{algorithm.1}\protected@file@percent }
+\newlabel{alg:beads}{{1}{20}{Majorization-Minimization Algorithm}{algorithm.1}{}}
+\@writefile{toc}{\contentsline {subsubsection}{\numberline {2.2.1.5}Failure Modes in Dense-Peak Regions}{20}{subsubsection.2.2.1.5}\protected@file@percent }
+\newlabel{sec:bg_beads_failures}{{2.2.1.5}{20}{Failure Modes in Dense-Peak Regions}{subsubsection.2.2.1.5}{}}
+\@writefile{lot}{\contentsline {table}{\numberline {2.1}{\ignorespaces BEADS parameters and their roles.}}{21}{table.2.1}\protected@file@percent }
+\newlabel{tab:beads_params}{{2.1}{21}{BEADS parameters and their roles}{table.2.1}{}}
+\citation{eilers2003smoother}
+\citation{eilers2003smoother}
+\citation{eilers2003smoother}
+\citation{eilers2005baseline}
+\@writefile{toc}{\contentsline {subsection}{\numberline {2.2.2}Other Classical Methods}{22}{subsection.2.2.2}\protected@file@percent }
+\newlabel{sec:bg_other_classical}{{2.2.2}{22}{Other Classical Methods}{subsection.2.2.2}{}}
+\@writefile{toc}{\contentsline {subsubsection}{\numberline {2.2.2.1}Asymmetric Least Squares (AsLS)}{22}{subsubsection.2.2.2.1}\protected@file@percent }
+\citation{zhang2010airpls}
+\citation{zhang2010airpls}
+\citation{zhang2010airpls}
+\citation{zhang2010airpls}
+\citation{baek2015arpls}
+\citation{baek2015arpls}
+\citation{baek2015arpls}
+\citation{baek2015arpls}
+\citation{baek2015arpls}
+\@writefile{toc}{\contentsline {subsubsection}{\numberline {2.2.2.2}airPLS}{23}{subsubsection.2.2.2.2}\protected@file@percent }
+\@writefile{toc}{\contentsline {subsubsection}{\numberline {2.2.2.3}arPLS}{23}{subsubsection.2.2.2.3}\protected@file@percent }
+\citation{ryan1988snip}
+\citation{ryan1988snip}
+\citation{ryan1988snip}
+\citation{ryan1988snip}
+\@writefile{toc}{\contentsline {subsubsection}{\numberline {2.2.2.4}SNIP}{24}{subsubsection.2.2.2.4}\protected@file@percent }
+\@writefile{toc}{\contentsline {subsubsection}{\numberline {2.2.2.5}Why BEADS is the Best Unrolling Candidate}{24}{subsubsection.2.2.2.5}\protected@file@percent }
+\@writefile{toc}{\contentsline {subsubsection}{\numberline {2.2.2.6}BEADS vs.\ arPLS Failure Mode Contrast}{25}{subsubsection.2.2.2.6}\protected@file@percent }
+\citation{monga2021unrolling}
+\citation{monga2021unrolling}
+\citation{monga2021unrolling}
+\@writefile{toc}{\contentsline {section}{\numberline {2.3}Algorithm Unrolling}{26}{section.2.3}\protected@file@percent }
+\newlabel{sec:bg_unrolling}{{2.3}{26}{Algorithm Unrolling}{section.2.3}{}}
+\@writefile{toc}{\contentsline {subsection}{\numberline {2.3.1}Core Idea}{26}{subsection.2.3.1}\protected@file@percent }
+\citation{monga2021unrolling}
+\citation{gregor2010lista}
+\citation{gregor2010lista}
+\citation{gregor2010lista}
+\citation{gregor2010lista}
+\newlabel{eq:unrolled_update}{{2.19}{27}{Core Idea}{equation.2.19}{}}
+\@writefile{toc}{\contentsline {subsection}{\numberline {2.3.2}LISTA: The Founding Work}{27}{subsection.2.3.2}\protected@file@percent }
+\newlabel{eq:ista_update}{{2.20}{27}{LISTA: The Founding Work}{equation.2.20}{}}
+\citation{gregor2010lista}
+\citation{gregor2010lista}
+\citation{monga2021unrolling}
+\citation{monga2021unrolling}
+\citation{monga2021unrolling}
+\@writefile{toc}{\contentsline {subsection}{\numberline {2.3.3}Why Algorithm Unrolling Works}{28}{subsection.2.3.3}\protected@file@percent }
+\citation{monga2021unrolling}
+\citation{liu2019alista}
+\citation{liu2019alista}
+\citation{liu2019alista}
+\citation{liu2019alista}
+\citation{zhang2018istanet}
+\citation{zhang2018istanet}
+\citation{zhang2018istanet}
+\citation{zhang2018istanet}
+\citation{zhang2018istanet}
+\@writefile{toc}{\contentsline {subsection}{\numberline {2.3.4}Key Architectures}{29}{subsection.2.3.4}\protected@file@percent }
+\newlabel{sec:bg_unrolling_architectures}{{2.3.4}{29}{Key Architectures}{subsection.2.3.4}{}}
+\citation{you2021istanetpp}
+\citation{you2021istanetpp}
+\citation{you2021istanetpp}
+\citation{zheng2022hybridista}
+\citation{zheng2022hybridista}
+\citation{zheng2022hybridista}
+\citation{zheng2022hybridista}
+\citation{yang2016admmnet}
+\citation{yang2016admmnet}
+\citation{yang2016admmnet}
+\citation{yang2016admmnet}
+\citation{diamond2018odp}
+\citation{diamond2018odp}
+\citation{diamond2018odp}
+\citation{chen2025demun}
+\citation{chen2025demun}
+\citation{chen2025demun}
+\citation{chen2025demun}
+\citation{gharbi2024unrolled}
+\citation{gharbi2024unrolled}
+\citation{gharbi2024unrolled}
+\citation{gharbi2024unrolled}
+\citation{gharbi2024unrolled}
+\@writefile{toc}{\contentsline {subsection}{\numberline {2.3.5}Algorithm Unrolling for Analytical Chemistry}{31}{subsection.2.3.5}\protected@file@percent }
+\citation{gharbi2023unrolled_sparse}
+\citation{gharbi2023unrolled_sparse}
+\citation{gharbi2023unrolled_sparse}
+\@writefile{toc}{\contentsline {subsection}{\numberline {2.3.6}Applying Algorithm Unrolling to BEADS}{32}{subsection.2.3.6}\protected@file@percent }
+\citation{kensert2021deep}
+\citation{kensert2021deep}
+\citation{han2024caeplus}
+\citation{han2024caeplus}
+\citation{han2024caeplus}
+\citation{han2024caeplus}
+\@writefile{toc}{\contentsline {section}{\numberline {2.4}Neural Approaches to Baseline Correction}{33}{section.2.4}\protected@file@percent }
+\newlabel{sec:bg_neural}{{2.4}{33}{Neural Approaches to Baseline Correction}{section.2.4}{}}
+\@writefile{toc}{\contentsline {subsection}{\numberline {2.4.1}Deep Learning Methods}{33}{subsection.2.4.1}\protected@file@percent }
+\newlabel{sec:bg_neural_dl}{{2.4.1}{33}{Deep Learning Methods}{subsection.2.4.1}{}}
+\citation{chen2022resunet}
+\citation{chen2022resunet}
+\citation{chen2022resunet}
+\citation{chen2022resunet}
+\citation{hu2024rspssl}
+\citation{hu2024rspssl}
+\citation{hu2024rspssl}
+\citation{hu2024rspssl}
+\citation{hu2024rspssl}
+\citation{aradhye2025diras}
+\citation{aradhye2025diras}
+\citation{aradhye2025diras}
+\citation{aradhye2025diras}
+\@writefile{toc}{\contentsline {subsection}{\numberline {2.4.2}Physics-Informed Hybrid Approaches}{34}{subsection.2.4.2}\protected@file@percent }
+\newlabel{sec:bg_neural_hybrid}{{2.4.2}{34}{Physics-Informed Hybrid Approaches}{subsection.2.4.2}{}}
+\citation{cui2025opairpls}
+\citation{cui2025opairpls}
+\citation{cui2025opairpls}
+\@writefile{toc}{\contentsline {subsection}{\numberline {2.4.3}Positioning LBEADS-NET}{35}{subsection.2.4.3}\protected@file@percent }
+\newlabel{sec:bg_positioning}{{2.4.3}{35}{Positioning LBEADS-NET}{subsection.2.4.3}{}}
+\@writefile{toc}{\contentsline {chapter}{\numberline {3}Proposed Method: LBEADS-NET}{38}{chapter.3}\protected@file@percent }
 \@writefile{lof}{\addvspace {10\p@ }}
 \@writefile{lot}{\addvspace {10\p@ }}
-\newlabel{chap:conclusions}{{3}{12}{Conclusions and Future Work}{chapter.3}{}}
+\newlabel{chap:method}{{3}{38}{Proposed Method: LBEADS-NET}{chapter.3}{}}
+\@writefile{toc}{\contentsline {section}{\numberline {3.1}Problem Formulation}{39}{section.3.1}\protected@file@percent }
+\newlabel{sec:method_formulation}{{3.1}{39}{Problem Formulation}{section.3.1}{}}
+\newlabel{eq:lbeads_mapping}{{3.2}{39}{Problem Formulation}{equation.3.2}{}}
+\citation{daubechies2004ista,beck2009fista}
+\@writefile{toc}{\contentsline {section}{\numberline {3.2}From BEADS to BEADSLayer , the ISTA Reformulation}{40}{section.3.2}\protected@file@percent }
+\newlabel{sec:method_beadslayer}{{3.2}{40}{From BEADS to BEADSLayer , the ISTA Reformulation}{section.3.2}{}}
+\@writefile{lot}{\contentsline {table}{\numberline {3.1}{\ignorespaces Learnable parameters per ISTA layer. All parameters are stored in log-space and recovered via exponentiation. Default initial values correspond to the training configuration used in the final model ($K = 20$ layers, 100 total learnable scalars).}}{41}{table.3.1}\protected@file@percent }
+\newlabel{tab:beadslayer_params}{{3.1}{41}{Learnable parameters per ISTA layer. All parameters are stored in log-space and recovered via exponentiation. Default initial values correspond to the training configuration used in the final model ($K = 20$ layers, 100 total learnable scalars)}{table.3.1}{}}
+\@writefile{toc}{\contentsline {subsection}{\numberline {3.2.1}Learnable Parameters}{41}{subsection.3.2.1}\protected@file@percent }
+\newlabel{sec:method_params}{{3.2.1}{41}{Learnable Parameters}{subsection.3.2.1}{}}
+\newlabel{eq:log_space_param}{{3.3}{41}{Learnable Parameters}{equation.3.3}{}}
+\@writefile{toc}{\contentsline {subsection}{\numberline {3.2.2}Butterworth Filter Construction}{42}{subsection.3.2.2}\protected@file@percent }
+\newlabel{sec:method_filters}{{3.2.2}{42}{Butterworth Filter Construction}{subsection.3.2.2}{}}
+\@writefile{toc}{\contentsline {subsection}{\numberline {3.2.3}Difference Operators}{44}{subsection.3.2.3}\protected@file@percent }
+\newlabel{sec:method_diff_ops}{{3.2.3}{44}{Difference Operators}{subsection.3.2.3}{}}
+\newlabel{eq:diff1}{{3.7}{44}{Difference Operators}{equation.3.7}{}}
+\newlabel{eq:diff2}{{3.8}{44}{Difference Operators}{equation.3.8}{}}
+\newlabel{eq:diff1_T}{{3.9}{44}{Difference Operators}{equation.3.9}{}}
+\newlabel{eq:diff2_T}{{3.10}{44}{Difference Operators}{equation.3.10}{}}
+\@writefile{toc}{\contentsline {subsection}{\numberline {3.2.4}The ISTA Layer Forward Pass}{45}{subsection.3.2.4}\protected@file@percent }
+\newlabel{sec:method_forward}{{3.2.4}{45}{The ISTA Layer Forward Pass}{subsection.3.2.4}{}}
+\newlabel{eq:data_grad}{{3.11}{45}{The ISTA Layer Forward Pass}{equation.3.11}{}}
+\newlabel{eq:smoothness_grads}{{3.12}{45}{The ISTA Layer Forward Pass}{equation.3.12}{}}
+\newlabel{eq:grad_step}{{3.13}{46}{The ISTA Layer Forward Pass}{equation.3.13}{}}
+\newlabel{eq:asym_threshold}{{3.14}{46}{The ISTA Layer Forward Pass}{equation.3.14}{}}
+\@writefile{lop}{\contentsline {algorithm}{\numberline {2}{\ignorespaces ISTA Layer Forward Pass}}{47}{algorithm.2}\protected@file@percent }
+\newlabel{alg:beadslayer}{{2}{47}{The ISTA Layer Forward Pass}{algorithm.2}{}}
+\@writefile{toc}{\contentsline {section}{\numberline {3.3}Why ISTA Over Conjugate Gradient}{47}{section.3.3}\protected@file@percent }
+\newlabel{sec:method_ista}{{3.3}{47}{Why ISTA Over Conjugate Gradient}{section.3.3}{}}
+\@writefile{toc}{\contentsline {subsection}{\numberline {3.3.1}The CG Variant}{48}{subsection.3.3.1}\protected@file@percent }
+\newlabel{sec:method_cg_variant}{{3.3.1}{48}{The CG Variant}{subsection.3.3.1}{}}
+\newlabel{eq:linear_system}{{3.15}{48}{The CG Variant}{equation.3.15}{}}
+\@writefile{toc}{\contentsline {subsection}{\numberline {3.3.2}The Gradient Flow Problem}{48}{subsection.3.3.2}\protected@file@percent }
+\newlabel{sec:method_cg_problem}{{3.3.2}{48}{The Gradient Flow Problem}{subsection.3.3.2}{}}
+\@writefile{toc}{\contentsline {subsection}{\numberline {3.3.3}Gradient Flow in the ISTA Variant}{49}{subsection.3.3.3}\protected@file@percent }
+\newlabel{sec:method_gradient_flow}{{3.3.3}{49}{Gradient Flow in the ISTA Variant}{subsection.3.3.3}{}}
+\@writefile{toc}{\contentsline {section}{\numberline {3.4}Full $K$-Layer Pipeline}{50}{section.3.4}\protected@file@percent }
+\newlabel{sec:method_pipeline}{{3.4}{50}{Full $K$-Layer Pipeline}{section.3.4}{}}
+\@writefile{toc}{\contentsline {subsection}{\numberline {3.4.1}Architecture Overview}{51}{subsection.3.4.1}\protected@file@percent }
+\newlabel{sec:method_architecture}{{3.4.1}{51}{Architecture Overview}{subsection.3.4.1}{}}
+\@writefile{toc}{\contentsline {subsection}{\numberline {3.4.2}Initialization}{51}{subsection.3.4.2}\protected@file@percent }
+\newlabel{sec:method_initialization}{{3.4.2}{51}{Initialization}{subsection.3.4.2}{}}
+\newlabel{eq:init_highpass}{{3.17}{51}{Initialization}{equation.3.17}{}}
+\@writefile{toc}{\contentsline {subsection}{\numberline {3.4.3}Layer Chaining}{52}{subsection.3.4.3}\protected@file@percent }
+\newlabel{sec:method_chaining}{{3.4.3}{52}{Layer Chaining}{subsection.3.4.3}{}}
+\@writefile{toc}{\contentsline {subsection}{\numberline {3.4.4}Final Output Computation}{53}{subsection.3.4.4}\protected@file@percent }
+\newlabel{sec:method_output}{{3.4.4}{53}{Final Output Computation}{subsection.3.4.4}{}}
+\newlabel{eq:baseline_output}{{3.21}{53}{Final Output Computation}{equation.3.21}{}}
+\@writefile{toc}{\contentsline {section}{\numberline {3.5}Non-Learnable Cutoff Frequency and the Autograd Boundary}{54}{section.3.5}\protected@file@percent }
+\newlabel{sec:method_fc}{{3.5}{54}{Non-Learnable Cutoff Frequency and the Autograd Boundary}{section.3.5}{}}
+\citation{hacohen2019curriculum}
+\citation{hacohen2019curriculum}
+\@writefile{toc}{\contentsline {section}{\numberline {3.6}Multi-Stage Curriculum Training}{56}{section.3.6}\protected@file@percent }
+\newlabel{sec:method_curriculum}{{3.6}{56}{Multi-Stage Curriculum Training}{section.3.6}{}}
+\@writefile{toc}{\contentsline {subsection}{\numberline {3.6.1}Stage A: Peak Reconstruction}{56}{subsection.3.6.1}\protected@file@percent }
+\newlabel{sec:method_stage_a}{{3.6.1}{56}{Stage A: Peak Reconstruction}{subsection.3.6.1}{}}
+\@writefile{toc}{\contentsline {subsection}{\numberline {3.6.2}Stage B: Baseline Leakage Mitigation}{57}{subsection.3.6.2}\protected@file@percent }
+\newlabel{sec:method_stage_b}{{3.6.2}{57}{Stage B: Baseline Leakage Mitigation}{subsection.3.6.2}{}}
+\@writefile{lot}{\contentsline {table}{\numberline {3.2}{\ignorespaces Multi-stage curriculum training configuration. Each stage defines a subset of active loss terms and a corresponding epoch budget. Stages are executed sequentially; parameters are carried forward between stages.}}{58}{table.3.2}\protected@file@percent }
+\newlabel{tab:curriculum_stages}{{3.2}{58}{Multi-stage curriculum training configuration. Each stage defines a subset of active loss terms and a corresponding epoch budget. Stages are executed sequentially; parameters are carried forward between stages}{table.3.2}{}}
+\@writefile{toc}{\contentsline {subsection}{\numberline {3.6.3}Stage C: Full Refinement}{58}{subsection.3.6.3}\protected@file@percent }
+\newlabel{sec:method_stage_c}{{3.6.3}{58}{Stage C: Full Refinement}{subsection.3.6.3}{}}
+\@writefile{toc}{\contentsline {subsection}{\numberline {3.6.4}Intermediate Supervision}{58}{subsection.3.6.4}\protected@file@percent }
+\newlabel{sec:method_intermediate}{{3.6.4}{58}{Intermediate Supervision}{subsection.3.6.4}{}}
+\citation{chen2025demun}
+\@writefile{toc}{\contentsline {section}{\numberline {3.7}Composite Loss Function}{59}{section.3.7}\protected@file@percent }
+\newlabel{sec:method_loss}{{3.7}{59}{Composite Loss Function}{section.3.7}{}}
+\citation{huber1964robust}
+\newlabel{eq:total_loss}{{3.22}{60}{Composite Loss Function}{equation.3.22}{}}
+\@writefile{toc}{\contentsline {subsection}{\numberline {3.7.1}Reconstruction Fidelity}{60}{subsection.3.7.1}\protected@file@percent }
+\newlabel{sec:method_loss_recon}{{3.7.1}{60}{Reconstruction Fidelity}{subsection.3.7.1}{}}
+\newlabel{eq:huber_loss}{{3.23}{60}{Reconstruction Fidelity}{equation.3.23}{}}
+\@writefile{toc}{\contentsline {subsection}{\numberline {3.7.2}Sparsity Priors on Peaks}{61}{subsection.3.7.2}\protected@file@percent }
+\newlabel{sec:method_loss_sparsity}{{3.7.2}{61}{Sparsity Priors on Peaks}{subsection.3.7.2}{}}
+\newlabel{eq:l1_loss}{{3.24}{61}{Sparsity Priors on Peaks}{equation.3.24}{}}
+\newlabel{eq:tv_loss}{{3.25}{61}{Sparsity Priors on Peaks}{equation.3.25}{}}
+\newlabel{eq:neg_loss}{{3.26}{62}{Sparsity Priors on Peaks}{equation.3.26}{}}
+\@writefile{toc}{\contentsline {subsection}{\numberline {3.7.3}Baseline Supervision}{62}{subsection.3.7.3}\protected@file@percent }
+\newlabel{sec:method_loss_baseline}{{3.7.3}{62}{Baseline Supervision}{subsection.3.7.3}{}}
+\newlabel{eq:peak_threshold}{{3.27}{63}{Baseline Supervision}{equation.3.27}{}}
+\newlabel{eq:peak_mask}{{3.28}{63}{Baseline Supervision}{equation.3.28}{}}
+\newlabel{eq:baseline_loss}{{3.29}{63}{Baseline Supervision}{equation.3.29}{}}
+\newlabel{eq:smooth_loss}{{3.30}{63}{Baseline Supervision}{equation.3.30}{}}
+\newlabel{eq:baseline_tv_loss}{{3.31}{64}{Baseline Supervision}{equation.3.31}{}}
+\@writefile{toc}{\contentsline {subsection}{\numberline {3.7.4}Leakage-Specific Penalties}{64}{subsection.3.7.4}\protected@file@percent }
+\newlabel{sec:method_loss_leakage}{{3.7.4}{64}{Leakage-Specific Penalties}{subsection.3.7.4}{}}
+\newlabel{eq:leakage_loss}{{3.32}{64}{Leakage-Specific Penalties}{equation.3.32}{}}
+\citation{ding2006orthonmf,pompili2014onmf}
+\newlabel{eq:ortho_loss}{{3.33}{65}{Leakage-Specific Penalties}{equation.3.33}{}}
+\newlabel{eq:ortho_weights}{{3.34}{65}{Leakage-Specific Penalties}{equation.3.34}{}}
+\citation{eilers2005baseline}
+\citation{baek2015arpls}
+\newlabel{eq:asym_loss}{{3.35}{66}{Leakage-Specific Penalties}{equation.3.35}{}}
+\newlabel{eq:envelope_loss}{{3.36}{67}{Leakage-Specific Penalties}{equation.3.36}{}}
+\newlabel{eq:soft_local_min}{{3.37}{67}{Leakage-Specific Penalties}{equation.3.37}{}}
+\newlabel{eq:freq_loss}{{3.38}{67}{Leakage-Specific Penalties}{equation.3.38}{}}
+\@writefile{toc}{\contentsline {subsection}{\numberline {3.7.5}Summary of Loss Terms}{68}{subsection.3.7.5}\protected@file@percent }
+\newlabel{sec:method_loss_summary}{{3.7.5}{68}{Summary of Loss Terms}{subsection.3.7.5}{}}
+\@writefile{lot}{\contentsline {table}{\numberline {3.3}{\ignorespaces Summary of the twelve-term composite loss function. Weight ranges reflect values used across development iterations. The ``Stage'' column indicates the earliest curriculum stage in which the term is active (A = peak reconstruction, B = leakage mitigation, C = full refinement). Terms marked ``, '' under ``Failure Mode'' serve as general priors rather than targeting a specific failure.}}{69}{table.3.3}\protected@file@percent }
+\newlabel{tab:loss_terms}{{3.3}{69}{Summary of the twelve-term composite loss function. Weight ranges reflect values used across development iterations. The ``Stage'' column indicates the earliest curriculum stage in which the term is active (A = peak reconstruction, B = leakage mitigation, C = full refinement). Terms marked ``, '' under ``Failure Mode'' serve as general priors rather than targeting a specific failure}{table.3.3}{}}
+\@writefile{toc}{\contentsline {section}{\numberline {3.8}Hybrid Inference Pipeline}{69}{section.3.8}\protected@file@percent }
+\newlabel{sec:method_hybrid}{{3.8}{69}{Hybrid Inference Pipeline}{section.3.8}{}}
+\@writefile{toc}{\contentsline {subsection}{\numberline {3.8.1}Post-Processing with Low-Pass Refinement}{70}{subsection.3.8.1}\protected@file@percent }
+\newlabel{sec:method_postprocess}{{3.8.1}{70}{Post-Processing with Low-Pass Refinement}{subsection.3.8.1}{}}
+\newlabel{eq:noise_estimate}{{3.39}{70}{Post-Processing with Low-Pass Refinement}{equation.3.39}{}}
+\newlabel{eq:clean_peaks}{{3.40}{70}{Post-Processing with Low-Pass Refinement}{equation.3.40}{}}
+\newlabel{eq:refined_baseline}{{3.41}{70}{Post-Processing with Low-Pass Refinement}{equation.3.41}{}}
+\@writefile{toc}{\contentsline {subsection}{\numberline {3.8.2}Classical BEADS Refinement}{71}{subsection.3.8.2}\protected@file@percent }
+\newlabel{sec:method_classical_refinement}{{3.8.2}{71}{Classical BEADS Refinement}{subsection.3.8.2}{}}
+\@writefile{toc}{\contentsline {chapter}{\numberline {4}Experimental Setup}{72}{chapter.4}\protected@file@percent }
+\@writefile{lof}{\addvspace {10\p@ }}
+\@writefile{lot}{\addvspace {10\p@ }}
+\newlabel{chap:experiments}{{4}{72}{Experimental Setup}{chapter.4}{}}
+\@writefile{toc}{\contentsline {section}{\numberline {4.1}Synthetic Data Generation}{72}{section.4.1}\protected@file@percent }
+\newlabel{sec:exp_data}{{4.1}{72}{Synthetic Data Generation}{section.4.1}{}}
+\@writefile{toc}{\contentsline {subsection}{\numberline {4.1.1}Peak Generation}{73}{subsection.4.1.1}\protected@file@percent }
+\newlabel{sec:exp_peaks}{{4.1.1}{73}{Peak Generation}{subsection.4.1.1}{}}
+\newlabel{eq:bigaussian_peak}{{4.1}{73}{Peak Generation}{equation.4.1}{}}
+\@writefile{toc}{\contentsline {subsection}{\numberline {4.1.2}Baseline Generation}{74}{subsection.4.1.2}\protected@file@percent }
+\newlabel{sec:exp_baseline}{{4.1.2}{74}{Baseline Generation}{subsection.4.1.2}{}}
+\@writefile{toc}{\contentsline {subsection}{\numberline {4.1.3}Noise and Signal Assembly}{75}{subsection.4.1.3}\protected@file@percent }
+\newlabel{sec:exp_noise}{{4.1.3}{75}{Noise and Signal Assembly}{subsection.4.1.3}{}}
+\@writefile{toc}{\contentsline {subsection}{\numberline {4.1.4}Dataset and Normalization}{75}{subsection.4.1.4}\protected@file@percent }
+\newlabel{sec:exp_dataset}{{4.1.4}{75}{Dataset and Normalization}{subsection.4.1.4}{}}
+\newlabel{eq:normalization}{{4.3}{76}{Dataset and Normalization}{equation.4.3}{}}
+\@writefile{toc}{\contentsline {section}{\numberline {4.2}Training Protocol}{76}{section.4.2}\protected@file@percent }
+\newlabel{sec:exp_training}{{4.2}{76}{Training Protocol}{section.4.2}{}}
+\@writefile{toc}{\contentsline {subsection}{\numberline {4.2.1}Architecture Configuration}{76}{subsection.4.2.1}\protected@file@percent }
+\newlabel{sec:exp_architecture}{{4.2.1}{76}{Architecture Configuration}{subsection.4.2.1}{}}
+\@writefile{lot}{\contentsline {table}{\numberline {4.1}{\ignorespaces Synthetic data generation parameters. All ranges denote uniform or log-uniform distributions as described in the text.}}{77}{table.4.1}\protected@file@percent }
+\newlabel{tab:data_params}{{4.1}{77}{Synthetic data generation parameters. All ranges denote uniform or log-uniform distributions as described in the text}{table.4.1}{}}
+\citation{kingma2015adam}
+\@writefile{toc}{\contentsline {subsection}{\numberline {4.2.2}Optimizer and Schedule}{78}{subsection.4.2.2}\protected@file@percent }
+\newlabel{sec:exp_optimizer}{{4.2.2}{78}{Optimizer and Schedule}{subsection.4.2.2}{}}
+\@writefile{lot}{\contentsline {table}{\numberline {4.2}{\ignorespaces Training hyperparameters. All progressive experiments share this configuration; only the loss function weights differ across experiments.}}{79}{table.4.2}\protected@file@percent }
+\newlabel{tab:training_params}{{4.2}{79}{Training hyperparameters. All progressive experiments share this configuration; only the loss function weights differ across experiments}{table.4.2}{}}
+\@writefile{toc}{\contentsline {section}{\numberline {4.3}Evaluation Metrics}{80}{section.4.3}\protected@file@percent }
+\newlabel{sec:exp_metrics}{{4.3}{80}{Evaluation Metrics}{section.4.3}{}}
+\@writefile{toc}{\contentsline {subsection}{\numberline {4.3.1}Peak Reconstruction}{80}{subsection.4.3.1}\protected@file@percent }
+\newlabel{sec:exp_metrics_peak}{{4.3.1}{80}{Peak Reconstruction}{subsection.4.3.1}{}}
+\newlabel{eq:peak_mse}{{4.4}{80}{Peak Reconstruction}{equation.4.4}{}}
+\newlabel{eq:peak_mae}{{4.5}{80}{Peak Reconstruction}{equation.4.5}{}}
+\newlabel{eq:peak_corr}{{4.6}{80}{Peak Reconstruction}{equation.4.6}{}}
+\@writefile{toc}{\contentsline {subsection}{\numberline {4.3.2}Baseline Accuracy}{81}{subsection.4.3.2}\protected@file@percent }
+\newlabel{sec:exp_metrics_baseline}{{4.3.2}{81}{Baseline Accuracy}{subsection.4.3.2}{}}
+\newlabel{eq:baseline_mse}{{4.7}{81}{Baseline Accuracy}{equation.4.7}{}}
+\newlabel{eq:baseline_mae}{{4.8}{81}{Baseline Accuracy}{equation.4.8}{}}
+\@writefile{toc}{\contentsline {subsection}{\numberline {4.3.3}Quantification Fidelity}{81}{subsection.4.3.3}\protected@file@percent }
+\newlabel{sec:exp_metrics_quant}{{4.3.3}{81}{Quantification Fidelity}{subsection.4.3.3}{}}
+\newlabel{eq:area_error}{{4.9}{81}{Quantification Fidelity}{equation.4.9}{}}
+\@writefile{toc}{\contentsline {subsection}{\numberline {4.3.4}Leakage Detection}{81}{subsection.4.3.4}\protected@file@percent }
+\newlabel{sec:exp_metrics_leakage}{{4.3.4}{81}{Leakage Detection}{subsection.4.3.4}{}}
+\newlabel{eq:eval_peak_mask}{{4.10}{82}{Leakage Detection}{equation.4.10}{}}
+\newlabel{eq:bli}{{4.11}{82}{Leakage Detection}{equation.4.11}{}}
+\newlabel{eq:pber}{{4.13}{83}{Leakage Detection}{equation.4.13}{}}
+\@writefile{toc}{\contentsline {subsection}{\numberline {4.3.5}Peak Quality}{83}{subsection.4.3.5}\protected@file@percent }
+\newlabel{sec:exp_metrics_quality}{{4.3.5}{83}{Peak Quality}{subsection.4.3.5}{}}
+\newlabel{eq:neg_fraction}{{4.14}{83}{Peak Quality}{equation.4.14}{}}
+\citation{ning2014beads}
+\@writefile{toc}{\contentsline {section}{\numberline {4.4}Progressive Experiment Design}{84}{section.4.4}\protected@file@percent }
+\newlabel{sec:exp_progressive}{{4.4}{84}{Progressive Experiment Design}{section.4.4}{}}
+\@writefile{toc}{\contentsline {subsection}{\numberline {4.4.1}Experiment 1.0: Classical BEADS Baseline}{84}{subsection.4.4.1}\protected@file@percent }
+\newlabel{sec:exp_1_0}{{4.4.1}{84}{Experiment 1.0: Classical BEADS Baseline}{subsection.4.4.1}{}}
+\@writefile{toc}{\contentsline {subsection}{\numberline {4.4.2}Experiment 1.1: MSE Only (Naive Unrolling)}{85}{subsection.4.4.2}\protected@file@percent }
+\newlabel{sec:exp_1_1}{{4.4.2}{85}{Experiment 1.1: MSE Only (Naive Unrolling)}{subsection.4.4.2}{}}
+\@writefile{toc}{\contentsline {subsection}{\numberline {4.4.3}Experiment 1.2: MSE + Sparsity Priors}{85}{subsection.4.4.3}\protected@file@percent }
+\newlabel{sec:exp_1_2}{{4.4.3}{85}{Experiment 1.2: MSE + Sparsity Priors}{subsection.4.4.3}{}}
+\@writefile{toc}{\contentsline {subsection}{\numberline {4.4.4}Experiment 1.3: + Baseline Supervision}{86}{subsection.4.4.4}\protected@file@percent }
+\newlabel{sec:exp_1_3}{{4.4.4}{86}{Experiment 1.3: + Baseline Supervision}{subsection.4.4.4}{}}
+\@writefile{toc}{\contentsline {subsection}{\numberline {4.4.5}Experiment 1.4: + Orthogonality (v5 Configuration)}{87}{subsection.4.4.5}\protected@file@percent }
+\newlabel{sec:exp_1_4}{{4.4.5}{87}{Experiment 1.4: + Orthogonality (v5 Configuration)}{subsection.4.4.5}{}}
+\@writefile{toc}{\contentsline {subsection}{\numberline {4.4.6}Experiment 1.5: Full Anti-Leakage Battery (v7 Configuration)}{87}{subsection.4.4.6}\protected@file@percent }
+\newlabel{sec:exp_1_5}{{4.4.6}{87}{Experiment 1.5: Full Anti-Leakage Battery (v7 Configuration)}{subsection.4.4.6}{}}
+\@writefile{lot}{\contentsline {table}{\numberline {4.3}{\ignorespaces Loss configurations for the progressive experiment series. Each row shows the active loss terms and their weights. Dashes indicate inactive terms ($\alpha = 0$). Experiment~1.0 uses classical BEADS with no learning.}}{88}{table.4.3}\protected@file@percent }
+\newlabel{tab:progressive_configs}{{4.3}{88}{Loss configurations for the progressive experiment series. Each row shows the active loss terms and their weights. Dashes indicate inactive terms ($\alpha = 0$). Experiment~1.0 uses classical BEADS with no learning}{table.4.3}{}}
+\citation{ning2014beads}
+\citation{baek2015arpls}
+\citation{zhang2010airpls}
+\citation{morhac2008snip}
+\@writefile{toc}{\contentsline {section}{\numberline {4.5}Baseline Comparison Methods}{89}{section.4.5}\protected@file@percent }
+\newlabel{sec:exp_baselines}{{4.5}{89}{Baseline Comparison Methods}{section.4.5}{}}
+\@writefile{toc}{\contentsline {subsection}{\numberline {4.5.1}Classical BEADS}{89}{subsection.4.5.1}\protected@file@percent }
+\newlabel{sec:exp_beads_classical}{{4.5.1}{89}{Classical BEADS}{subsection.4.5.1}{}}
+\@writefile{toc}{\contentsline {subsection}{\numberline {4.5.2}Additional Classical Methods}{90}{subsection.4.5.2}\protected@file@percent }
+\newlabel{sec:exp_additional_baselines}{{4.5.2}{90}{Additional Classical Methods}{subsection.4.5.2}{}}
+\@writefile{toc}{\contentsline {subsection}{\numberline {4.5.3}Framing the Comparison}{90}{subsection.4.5.3}\protected@file@percent }
+\newlabel{sec:exp_framing}{{4.5.3}{90}{Framing the Comparison}{subsection.4.5.3}{}}
+\@writefile{toc}{\contentsline {chapter}{\numberline {5}Results and Analysis}{91}{chapter.5}\protected@file@percent }
+\@writefile{lof}{\addvspace {10\p@ }}
+\@writefile{lot}{\addvspace {10\p@ }}
+\newlabel{chap:results}{{5}{91}{Results and Analysis}{chapter.5}{}}
+\@writefile{toc}{\contentsline {section}{\numberline {5.1}Progressive Development Results}{92}{section.5.1}\protected@file@percent }
+\newlabel{sec:results_progressive}{{5.1}{92}{Progressive Development Results}{section.5.1}{}}
+\@writefile{toc}{\contentsline {subsection}{\numberline {5.1.1}Quantitative Comparison}{92}{subsection.5.1.1}\protected@file@percent }
+\newlabel{sec:results_quantitative}{{5.1.1}{92}{Quantitative Comparison}{subsection.5.1.1}{}}
+\@writefile{lot}{\contentsline {table}{\numberline {5.1}{\ignorespaces Progressive experiment results on the 40-signal test set. All values are mean $\pm $ standard deviation. Bold entries indicate the best value in each column (excluding Classical BEADS, which uses a fundamentally different evaluation setting). Peak MSE and Baseline MSE are $\times 10^{-3}$ for readability. Neg.\ Fraction is reported as a proportion of total signal length.}}{93}{table.5.1}\protected@file@percent }
+\newlabel{tab:progressive_results}{{5.1}{93}{Progressive experiment results on the 40-signal test set. All values are mean $\pm $ standard deviation. Bold entries indicate the best value in each column (excluding Classical BEADS, which uses a fundamentally different evaluation setting). Peak MSE and Baseline MSE are $\times 10^{-3}$ for readability. Neg.\ Fraction is reported as a proportion of total signal length}{table.5.1}{}}
+\@writefile{toc}{\contentsline {subsection}{\numberline {5.1.2}Baseline Leakage Analysis}{95}{subsection.5.1.2}\protected@file@percent }
+\newlabel{sec:results_leakage}{{5.1.2}{95}{Baseline Leakage Analysis}{subsection.5.1.2}{}}
+\@writefile{lot}{\contentsline {table}{\numberline {5.2}{\ignorespaces Baseline leakage metrics across the progressive experiment series. BLI measures the directional (upward) leakage of peak energy into the baseline; PBER measures the ratio of baseline error in peak regions to baseline error in background regions. Values closer to zero (BLI) and 1.0 (PBER) indicate less leakage.}}{97}{table.5.2}\protected@file@percent }
+\newlabel{tab:leakage_comparison}{{5.2}{97}{Baseline leakage metrics across the progressive experiment series. BLI measures the directional (upward) leakage of peak energy into the baseline; PBER measures the ratio of baseline error in peak regions to baseline error in background regions. Values closer to zero (BLI) and 1.0 (PBER) indicate less leakage}{table.5.2}{}}
+\citation{gharbi2024unrolled}
+\citation{diras2025}
+\@writefile{toc}{\contentsline {subsection}{\numberline {5.1.3}The Over-Regularization Effect}{98}{subsection.5.1.3}\protected@file@percent }
+\newlabel{sec:results_overreg}{{5.1.3}{98}{The Over-Regularization Effect}{subsection.5.1.3}{}}
+\@writefile{toc}{\contentsline {section}{\numberline {5.2}Ablation Studies}{100}{section.5.2}\protected@file@percent }
+\newlabel{sec:results_ablation}{{5.2}{100}{Ablation Studies}{section.5.2}{}}
+\@writefile{toc}{\contentsline {subsection}{\numberline {5.2.1}Loss Term Ablations}{100}{subsection.5.2.1}\protected@file@percent }
+\newlabel{sec:results_loss_ablation}{{5.2.1}{100}{Loss Term Ablations}{subsection.5.2.1}{}}
+\@writefile{lot}{\contentsline {table}{\numberline {5.3}{\ignorespaces Loss term ablation results. Each row removes one group of loss terms from the full configuration (Ablation~F). Metrics are reported as mean over the test set. Arrows indicate the direction of improvement; bold indicates best in column.}}{101}{table.5.3}\protected@file@percent }
+\newlabel{tab:ablation_loss}{{5.3}{101}{Loss term ablation results. Each row removes one group of loss terms from the full configuration (Ablation~F). Metrics are reported as mean over the test set. Arrows indicate the direction of improvement; bold indicates best in column}{table.5.3}{}}
+\@writefile{lot}{\contentsline {table}{\numberline {5.4}{\ignorespaces Network depth ablation. All experiments use the full loss configuration with 60 epochs (10 warmup + 50 full). Total learnable parameters scale linearly as $5K$.}}{101}{table.5.4}\protected@file@percent }
+\newlabel{tab:ablation_depth}{{5.4}{101}{Network depth ablation. All experiments use the full loss configuration with 60 epochs (10 warmup + 50 full). Total learnable parameters scale linearly as $5K$}{table.5.4}{}}
+\@writefile{toc}{\contentsline {subsection}{\numberline {5.2.2}Network Depth Ablation}{101}{subsection.5.2.2}\protected@file@percent }
+\newlabel{sec:results_depth_ablation}{{5.2.2}{101}{Network Depth Ablation}{subsection.5.2.2}{}}
+\@writefile{toc}{\contentsline {subsection}{\numberline {5.2.3}Ablation Summary}{101}{subsection.5.2.3}\protected@file@percent }
+\newlabel{sec:results_ablation_summary}{{5.2.3}{101}{Ablation Summary}{subsection.5.2.3}{}}
+\@writefile{toc}{\contentsline {section}{\numberline {5.3}Qualitative Examples}{102}{section.5.3}\protected@file@percent }
+\newlabel{sec:results_qualitative}{{5.3}{102}{Qualitative Examples}{section.5.3}{}}
+\@writefile{toc}{\contentsline {section}{\numberline {5.4}Training Dynamics}{102}{section.5.4}\protected@file@percent }
+\newlabel{sec:results_training}{{5.4}{102}{Training Dynamics}{section.5.4}{}}
+\@writefile{toc}{\contentsline {section}{\numberline {5.5}Learned Parameter Analysis}{102}{section.5.5}\protected@file@percent }
+\newlabel{sec:results_params}{{5.5}{102}{Learned Parameter Analysis}{section.5.5}{}}
+\@writefile{toc}{\contentsline {subsection}{\numberline {5.5.1}Layer Specialization}{102}{subsection.5.5.1}\protected@file@percent }
+\newlabel{sec:results_layer_spec}{{5.5.1}{102}{Layer Specialization}{subsection.5.5.1}{}}
+\@writefile{lot}{\contentsline {table}{\numberline {5.5}{\ignorespaces Final learned parameters for selected layers of the 6-layer curriculum-trained model (100 epochs, 3-stage curriculum, signal length $N = 1024$). Parameters that reached clamp boundaries are marked with $\ast $.}}{103}{table.5.5}\protected@file@percent }
+\newlabel{tab:learned_params}{{5.5}{103}{Final learned parameters for selected layers of the 6-layer curriculum-trained model (100 epochs, 3-stage curriculum, signal length $N = 1024$). Parameters that reached clamp boundaries are marked with $\ast $}{table.5.5}{}}
+\@writefile{toc}{\contentsline {subsection}{\numberline {5.5.2}Emergent Specialization}{104}{subsection.5.5.2}\protected@file@percent }
+\newlabel{sec:results_emergent}{{5.5.2}{104}{Emergent Specialization}{subsection.5.5.2}{}}
+\@writefile{toc}{\contentsline {section}{\numberline {5.6}Real Chromatogram Results}{105}{section.5.6}\protected@file@percent }
+\newlabel{sec:results_real}{{5.6}{105}{Real Chromatogram Results}{section.5.6}{}}
+\@writefile{toc}{\contentsline {section}{\numberline {5.7}Summary of Findings}{106}{section.5.7}\protected@file@percent }
+\newlabel{sec:results_summary}{{5.7}{106}{Summary of Findings}{section.5.7}{}}
+\@writefile{toc}{\contentsline {chapter}{\numberline {6}Discussion and Limitations}{110}{chapter.6}\protected@file@percent }
+\@writefile{lof}{\addvspace {10\p@ }}
+\@writefile{lot}{\addvspace {10\p@ }}
+\newlabel{chap:discussion}{{6}{110}{Discussion and Limitations}{chapter.6}{}}
+\@writefile{toc}{\contentsline {section}{\numberline {6.1}Baseline Leakage , Diagnosis and Mitigation}{111}{section.6.1}\protected@file@percent }
+\newlabel{sec:disc_leakage}{{6.1}{111}{Baseline Leakage , Diagnosis and Mitigation}{section.6.1}{}}
+\@writefile{toc}{\contentsline {subsection}{\numberline {6.1.1}Root Cause Analysis}{111}{subsection.6.1.1}\protected@file@percent }
+\newlabel{sec:disc_leakage_root}{{6.1.1}{111}{Root Cause Analysis}{subsection.6.1.1}{}}
+\citation{gharbi2024unrolled}
+\citation{diras2025}
+\@writefile{toc}{\contentsline {subsection}{\numberline {6.1.2}The Mitigation Journey}{113}{subsection.6.1.2}\protected@file@percent }
+\newlabel{sec:disc_leakage_journey}{{6.1.2}{113}{The Mitigation Journey}{subsection.6.1.2}{}}
+\@writefile{toc}{\contentsline {subsection}{\numberline {6.1.3}Fundamental Limits of Sparsity-Based Decomposition}{116}{subsection.6.1.3}\protected@file@percent }
+\newlabel{sec:disc_leakage_fundamental}{{6.1.3}{116}{Fundamental Limits of Sparsity-Based Decomposition}{subsection.6.1.3}{}}
+\citation{gharbi2024unrolled}
+\@writefile{toc}{\contentsline {section}{\numberline {6.2}Training/Inference Length Mismatch}{119}{section.6.2}\protected@file@percent }
+\newlabel{sec:disc_length}{{6.2}{119}{Training/Inference Length Mismatch}{section.6.2}{}}
+\@writefile{toc}{\contentsline {section}{\numberline {6.3}The Conjugate Gradient Variant's Failure}{121}{section.6.3}\protected@file@percent }
+\newlabel{sec:disc_cg}{{6.3}{121}{The Conjugate Gradient Variant's Failure}{section.6.3}{}}
+\@writefile{toc}{\contentsline {subsection}{\numberline {6.3.1}Backpropagation Depth and Gradient Vanishing}{121}{subsection.6.3.1}\protected@file@percent }
+\newlabel{sec:disc_cg_depth}{{6.3.1}{121}{Backpropagation Depth and Gradient Vanishing}{subsection.6.3.1}{}}
+\@writefile{toc}{\contentsline {subsection}{\numberline {6.3.2}CG Convergence and Differentiability}{122}{subsection.6.3.2}\protected@file@percent }
+\newlabel{sec:disc_cg_convergence}{{6.3.2}{122}{CG Convergence and Differentiability}{subsection.6.3.2}{}}
+\@writefile{toc}{\contentsline {subsection}{\numberline {6.3.3}Design Principle for Algorithm Unrolling}{123}{subsection.6.3.3}\protected@file@percent }
+\newlabel{sec:disc_cg_principle}{{6.3.3}{123}{Design Principle for Algorithm Unrolling}{subsection.6.3.3}{}}
+\citation{chen2025demun}
+\@writefile{toc}{\contentsline {section}{\numberline {6.4}Non-Learnable Cutoff Frequency and the Autograd Boundary}{124}{section.6.4}\protected@file@percent }
+\newlabel{sec:disc_fc}{{6.4}{124}{Non-Learnable Cutoff Frequency and the Autograd Boundary}{section.6.4}{}}
+\@writefile{toc}{\contentsline {section}{\numberline {6.5}Softplus Approximation , Train/Inference Gap}{127}{section.6.5}\protected@file@percent }
+\newlabel{sec:disc_softplus}{{6.5}{127}{Softplus Approximation , Train/Inference Gap}{section.6.5}{}}
+\@writefile{toc}{\contentsline {section}{\numberline {6.6}The Over-Regularization Problem}{128}{section.6.6}\protected@file@percent }
+\newlabel{sec:disc_overreg}{{6.6}{128}{The Over-Regularization Problem}{section.6.6}{}}
+\@writefile{toc}{\contentsline {chapter}{\numberline {7}Conclusions and Future Work}{131}{chapter.7}\protected@file@percent }
+\@writefile{lof}{\addvspace {10\p@ }}
+\@writefile{lot}{\addvspace {10\p@ }}
+\newlabel{chap:conclusions}{{7}{131}{Conclusions and Future Work}{chapter.7}{}}
 \bibstyle{IEEEtran}
-\bibdata{thesis,introduction/introduction,background/background,conclusions/conclusions}
-\@writefile{toc}{\contentsline {chapter}{\numberline {A}APPENDIX TITLE}{13}{appendix.A}\protected@file@percent }
+\bibdata{thesis,introduction/introduction,background/background,method/method,experiments/experiments,results/results,discussion/discussion,conclusions/conclusions}
+\@writefile{toc}{\contentsline {chapter}{\numberline {A}APPENDIX TITLE}{132}{appendix.A}\protected@file@percent }
 \@writefile{lof}{\addvspace {10\p@ }}
 \@writefile{lot}{\addvspace {10\p@ }}
-\newlabel{chap:append}{{A}{13}{APPENDIX TITLE}{appendix.A}{}}
+\newlabel{chap:append}{{A}{132}{APPENDIX TITLE}{appendix.A}{}}
 \bibcite{skoog2017fundamentals}{{1}{}{{}}{{}}}
 \bibcite{ning2014beads}{{2}{}{{}}{{}}}
 \bibcite{eilers2005baseline}{{3}{}{{}}{{}}}
@@ -77,5 +518,27 @@
 \bibcite{monga2021unrolling}{{14}{}{{}}{{}}}
 \bibcite{zhang2018istanet}{{15}{}{{}}{{}}}
 \bibcite{yang2018admm}{{16}{}{{}}{{}}}
+\bibcite{grushka1972emg}{{17}{}{{}}{{}}}
+\bibcite{naish1988emg}{{18}{}{{}}{{}}}
+\bibcite{eilers2003smoother}{{19}{}{{}}{{}}}
+\bibcite{ryan1988snip}{{20}{}{{}}{{}}}
+\bibcite{liu2019alista}{{21}{}{{}}{{}}}
+\bibcite{you2021istanetpp}{{22}{}{{}}{{}}}
+\bibcite{zheng2022hybridista}{{23}{}{{}}{{}}}
+\bibcite{yang2016admmnet}{{24}{}{{}}{{}}}
+\bibcite{diamond2018odp}{{25}{}{{}}{{}}}
+\bibcite{chen2025demun}{{26}{}{{}}{{}}}
+\bibcite{gharbi2023unrolled_sparse}{{27}{}{{}}{{}}}
+\bibcite{han2024caeplus}{{28}{}{{}}{{}}}
+\bibcite{chen2022resunet}{{29}{}{{}}{{}}}
+\bibcite{aradhye2025diras}{{30}{}{{}}{{}}}
+\bibcite{cui2025opairpls}{{31}{}{{}}{{}}}
+\bibcite{daubechies2004ista}{{32}{}{{}}{{}}}
+\bibcite{beck2009fista}{{33}{}{{}}{{}}}
+\bibcite{hacohen2019curriculum}{{34}{}{{}}{{}}}
+\bibcite{huber1964robust}{{35}{}{{}}{{}}}
+\bibcite{ding2006orthonmf}{{36}{}{{}}{{}}}
+\bibcite{pompili2014onmf}{{37}{}{{}}{{}}}
+\bibcite{kingma2015adam}{{38}{}{{}}{{}}}
 \providecommand\NAT@force@numbers{}\NAT@force@numbers
-\gdef \@abspage@last{26}
+\gdef \@abspage@last{153}

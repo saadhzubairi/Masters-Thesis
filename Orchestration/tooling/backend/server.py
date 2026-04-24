@@ -102,6 +102,7 @@ DEFAULT_DATA_CONFIG = {
 class RunConfig(BaseModel):
     name: str
     model_type: str = "lbeads"
+    device: str = "cpu"
     model: dict
     model_fast: Optional[dict] = None
     training: dict
@@ -229,6 +230,65 @@ async def retry_run(run_id: str):
         raise HTTPException(status_code=503, detail=str(e))
 
     return {"run_id": new_run_id}
+
+
+@app.post("/runs/{run_id}/demos")
+async def run_demos(run_id: str):
+    details = store.get_run(run_id)
+    if not details:
+        raise HTTPException(status_code=404, detail="Run not found")
+
+    run_dir = os.path.join(EXPERIMENTS_DIR, run_id)
+    checkpoint_path = os.path.join(run_dir, "checkpoint.pth")
+    if not os.path.exists(checkpoint_path):
+        raise HTTPException(status_code=400, detail="No checkpoint found — training may not have completed")
+
+    config = details["config"]
+
+    # Clear old demo errors before re-running
+    metrics_path = os.path.join(run_dir, "metrics.json")
+    if os.path.exists(metrics_path):
+        with open(metrics_path) as f:
+            metrics = json.load(f)
+        metrics.pop("errors", None)
+        with open(metrics_path, "w") as f:
+            json.dump(metrics, f)
+
+    import sys
+    sys.path.insert(0, os.path.join(os.path.dirname(__file__), "models"))
+    from demo import run_demo
+    from demo_chromatogram import run_chromatogram_demo
+
+    results = {"demo": None, "demo_chromatogram": None, "errors": []}
+
+    # Determine N from the right config section
+    model_type = config.get("model_type", "lbeads")
+    if model_type in ("lbeads_fast", "lbeads_v5"):
+        N = config.get("model_fast", config.get("model", {})).get("N", 4096)
+    else:
+        N = config.get("model", {}).get("N", 4096)
+
+    try:
+        demo_dir = os.path.join(run_dir, "demo")
+        outputs = run_demo(checkpoint_path, demo_dir, N=N, data_config=config.get("data"))
+        results["demo"] = outputs
+    except Exception as e:
+        results["errors"].append({"source": "demo.py", "message": str(e)})
+        store.append_error(run_id, {"source": "demo.py", "message": str(e)})
+
+    try:
+        chrom_dir = os.path.join(run_dir, "demo_chrom")
+        outputs = run_chromatogram_demo(checkpoint_path, chrom_dir, N=N, data_config=config.get("data"))
+        results["demo_chromatogram"] = outputs
+    except Exception as e:
+        results["errors"].append({"source": "demo_chromatogram.py", "message": str(e)})
+        store.append_error(run_id, {"source": "demo_chromatogram.py", "message": str(e)})
+
+    # If training had completed but demos failed, update status to complete now
+    if not results["errors"] and details.get("status") == "failed":
+        store.update_status(run_id, "complete")
+
+    return _sanitize(results)
 
 
 @app.post("/runs/{run_id}/delete")

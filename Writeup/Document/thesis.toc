@@ -1,8 +1,8 @@
 \contentsline {section}{Vita}{iii}{section*.1}%
 \contentsline {section}{Acknowledgements}{iv}{section*.2}%
 \contentsline {section}{Abstract}{vi}{section*.3}%
-\contentsline {section}{List of Figures}{viii}{chapter*.5}%
-\contentsline {section}{List of Tables}{ix}{chapter*.6}%
+\contentsline {section}{List of Figures}{xi}{chapter*.5}%
+\contentsline {section}{List of Tables}{xiv}{chapter*.6}%
 \contentsline {chapter}{\numberline {1}Introduction}{1}{chapter.1}%
 \contentsline {section}{\numberline {1.1}The Problem: Baseline Drift in Chromatography}{1}{section.1.1}%
 \contentsline {section}{\numberline {1.2}Limitations of Existing Approaches}{3}{section.1.2}%
@@ -11,6 +11,122 @@
 \contentsline {subsection}{\numberline {1.2.3}The Gap}{5}{subsection.1.2.3}%
 \contentsline {section}{\numberline {1.3}Contributions: LBEADS-NET}{6}{section.1.3}%
 \contentsline {section}{\numberline {1.4}Thesis Outline}{8}{section.1.4}%
-\contentsline {chapter}{\numberline {2}Background}{10}{chapter.2}%
-\contentsline {chapter}{\numberline {3}Conclusions and Future Work}{12}{chapter.3}%
-\contentsline {chapter}{\numberline {A}APPENDIX TITLE}{13}{appendix.A}%
+\contentsline {chapter}{\numberline {2}Background and Related Work}{10}{chapter.2}%
+\contentsline {section}{\numberline {2.1}Chromatographic Signal Processing}{11}{section.2.1}%
+\contentsline {subsection}{\numberline {2.1.1}Signal Model}{11}{subsection.2.1.1}%
+\contentsline {subsection}{\numberline {2.1.2}Physical Causes of Baseline Drift}{11}{subsection.2.1.2}%
+\contentsline {subsection}{\numberline {2.1.3}Importance of Accurate Baseline Estimation}{12}{subsection.2.1.3}%
+\contentsline {subsection}{\numberline {2.1.4}Peak Shape Models}{13}{subsection.2.1.4}%
+\contentsline {section}{\numberline {2.2}Classical Baseline Correction Methods}{14}{section.2.2}%
+\contentsline {subsection}{\numberline {2.2.1}BEADS: Baseline Estimation And Denoising using Sparsity}{14}{subsection.2.2.1}%
+\contentsline {subsubsection}{\numberline {2.2.1.1}The BEADS Cost Function}{14}{subsubsection.2.2.1.1}%
+\contentsline {subsubsection}{\numberline {2.2.1.2}High-Pass Filter Construction}{16}{subsubsection.2.2.1.2}%
+\contentsline {subsubsection}{\numberline {2.2.1.3}Majorization-Minimization Algorithm}{17}{subsubsection.2.2.1.3}%
+\contentsline {subsubsection}{\numberline {2.2.1.4}Parameters and Their Roles}{19}{subsubsection.2.2.1.4}%
+\contentsline {subsubsection}{\numberline {2.2.1.5}Failure Modes in Dense-Peak Regions}{20}{subsubsection.2.2.1.5}%
+\contentsline {subsection}{\numberline {2.2.2}Other Classical Methods}{22}{subsection.2.2.2}%
+\contentsline {subsubsection}{\numberline {2.2.2.1}Asymmetric Least Squares (AsLS)}{22}{subsubsection.2.2.2.1}%
+\contentsline {subsubsection}{\numberline {2.2.2.2}airPLS}{23}{subsubsection.2.2.2.2}%
+\contentsline {subsubsection}{\numberline {2.2.2.3}arPLS}{23}{subsubsection.2.2.2.3}%
+\contentsline {subsubsection}{\numberline {2.2.2.4}SNIP}{24}{subsubsection.2.2.2.4}%
+\contentsline {subsubsection}{\numberline {2.2.2.5}Why BEADS is the Best Unrolling Candidate}{24}{subsubsection.2.2.2.5}%
+\contentsline {subsubsection}{\numberline {2.2.2.6}BEADS vs.\ arPLS Failure Mode Contrast}{25}{subsubsection.2.2.2.6}%
+\contentsline {section}{\numberline {2.3}Algorithm Unrolling}{26}{section.2.3}%
+\contentsline {subsection}{\numberline {2.3.1}Core Idea}{26}{subsection.2.3.1}%
+\contentsline {subsection}{\numberline {2.3.2}LISTA: The Founding Work}{27}{subsection.2.3.2}%
+\contentsline {subsection}{\numberline {2.3.3}Why Algorithm Unrolling Works}{28}{subsection.2.3.3}%
+\contentsline {subsection}{\numberline {2.3.4}Key Architectures}{29}{subsection.2.3.4}%
+\contentsline {subsection}{\numberline {2.3.5}Algorithm Unrolling for Analytical Chemistry}{31}{subsection.2.3.5}%
+\contentsline {subsection}{\numberline {2.3.6}Applying Algorithm Unrolling to BEADS}{32}{subsection.2.3.6}%
+\contentsline {section}{\numberline {2.4}Neural Approaches to Baseline Correction}{33}{section.2.4}%
+\contentsline {subsection}{\numberline {2.4.1}Deep Learning Methods}{33}{subsection.2.4.1}%
+\contentsline {subsection}{\numberline {2.4.2}Physics-Informed Hybrid Approaches}{34}{subsection.2.4.2}%
+\contentsline {subsection}{\numberline {2.4.3}Positioning LBEADS-NET}{35}{subsection.2.4.3}%
+\contentsline {chapter}{\numberline {3}Proposed Method: LBEADS-NET}{38}{chapter.3}%
+\contentsline {section}{\numberline {3.1}Problem Formulation}{39}{section.3.1}%
+\contentsline {section}{\numberline {3.2}From BEADS to BEADSLayer , the ISTA Reformulation}{40}{section.3.2}%
+\contentsline {subsection}{\numberline {3.2.1}Learnable Parameters}{41}{subsection.3.2.1}%
+\contentsline {subsection}{\numberline {3.2.2}Butterworth Filter Construction}{42}{subsection.3.2.2}%
+\contentsline {subsection}{\numberline {3.2.3}Difference Operators}{44}{subsection.3.2.3}%
+\contentsline {subsection}{\numberline {3.2.4}The ISTA Layer Forward Pass}{45}{subsection.3.2.4}%
+\contentsline {section}{\numberline {3.3}Why ISTA Over Conjugate Gradient}{47}{section.3.3}%
+\contentsline {subsection}{\numberline {3.3.1}The CG Variant}{48}{subsection.3.3.1}%
+\contentsline {subsection}{\numberline {3.3.2}The Gradient Flow Problem}{48}{subsection.3.3.2}%
+\contentsline {subsection}{\numberline {3.3.3}Gradient Flow in the ISTA Variant}{49}{subsection.3.3.3}%
+\contentsline {section}{\numberline {3.4}Full $K$-Layer Pipeline}{50}{section.3.4}%
+\contentsline {subsection}{\numberline {3.4.1}Architecture Overview}{51}{subsection.3.4.1}%
+\contentsline {subsection}{\numberline {3.4.2}Initialization}{51}{subsection.3.4.2}%
+\contentsline {subsection}{\numberline {3.4.3}Layer Chaining}{52}{subsection.3.4.3}%
+\contentsline {subsection}{\numberline {3.4.4}Final Output Computation}{53}{subsection.3.4.4}%
+\contentsline {section}{\numberline {3.5}Non-Learnable Cutoff Frequency and the Autograd Boundary}{54}{section.3.5}%
+\contentsline {section}{\numberline {3.6}Multi-Stage Curriculum Training}{56}{section.3.6}%
+\contentsline {subsection}{\numberline {3.6.1}Stage A: Peak Reconstruction}{56}{subsection.3.6.1}%
+\contentsline {subsection}{\numberline {3.6.2}Stage B: Baseline Leakage Mitigation}{57}{subsection.3.6.2}%
+\contentsline {subsection}{\numberline {3.6.3}Stage C: Full Refinement}{58}{subsection.3.6.3}%
+\contentsline {subsection}{\numberline {3.6.4}Intermediate Supervision}{58}{subsection.3.6.4}%
+\contentsline {section}{\numberline {3.7}Composite Loss Function}{59}{section.3.7}%
+\contentsline {subsection}{\numberline {3.7.1}Reconstruction Fidelity}{60}{subsection.3.7.1}%
+\contentsline {subsection}{\numberline {3.7.2}Sparsity Priors on Peaks}{61}{subsection.3.7.2}%
+\contentsline {subsection}{\numberline {3.7.3}Baseline Supervision}{62}{subsection.3.7.3}%
+\contentsline {subsection}{\numberline {3.7.4}Leakage-Specific Penalties}{64}{subsection.3.7.4}%
+\contentsline {subsection}{\numberline {3.7.5}Summary of Loss Terms}{68}{subsection.3.7.5}%
+\contentsline {section}{\numberline {3.8}Hybrid Inference Pipeline}{69}{section.3.8}%
+\contentsline {subsection}{\numberline {3.8.1}Post-Processing with Low-Pass Refinement}{70}{subsection.3.8.1}%
+\contentsline {subsection}{\numberline {3.8.2}Classical BEADS Refinement}{71}{subsection.3.8.2}%
+\contentsline {chapter}{\numberline {4}Experimental Setup}{72}{chapter.4}%
+\contentsline {section}{\numberline {4.1}Synthetic Data Generation}{72}{section.4.1}%
+\contentsline {subsection}{\numberline {4.1.1}Peak Generation}{73}{subsection.4.1.1}%
+\contentsline {subsection}{\numberline {4.1.2}Baseline Generation}{74}{subsection.4.1.2}%
+\contentsline {subsection}{\numberline {4.1.3}Noise and Signal Assembly}{75}{subsection.4.1.3}%
+\contentsline {subsection}{\numberline {4.1.4}Dataset and Normalization}{75}{subsection.4.1.4}%
+\contentsline {section}{\numberline {4.2}Training Protocol}{76}{section.4.2}%
+\contentsline {subsection}{\numberline {4.2.1}Architecture Configuration}{76}{subsection.4.2.1}%
+\contentsline {subsection}{\numberline {4.2.2}Optimizer and Schedule}{78}{subsection.4.2.2}%
+\contentsline {section}{\numberline {4.3}Evaluation Metrics}{80}{section.4.3}%
+\contentsline {subsection}{\numberline {4.3.1}Peak Reconstruction}{80}{subsection.4.3.1}%
+\contentsline {subsection}{\numberline {4.3.2}Baseline Accuracy}{81}{subsection.4.3.2}%
+\contentsline {subsection}{\numberline {4.3.3}Quantification Fidelity}{81}{subsection.4.3.3}%
+\contentsline {subsection}{\numberline {4.3.4}Leakage Detection}{81}{subsection.4.3.4}%
+\contentsline {subsection}{\numberline {4.3.5}Peak Quality}{83}{subsection.4.3.5}%
+\contentsline {section}{\numberline {4.4}Progressive Experiment Design}{84}{section.4.4}%
+\contentsline {subsection}{\numberline {4.4.1}Experiment 1.0: Classical BEADS Baseline}{84}{subsection.4.4.1}%
+\contentsline {subsection}{\numberline {4.4.2}Experiment 1.1: MSE Only (Naive Unrolling)}{85}{subsection.4.4.2}%
+\contentsline {subsection}{\numberline {4.4.3}Experiment 1.2: MSE + Sparsity Priors}{85}{subsection.4.4.3}%
+\contentsline {subsection}{\numberline {4.4.4}Experiment 1.3: + Baseline Supervision}{86}{subsection.4.4.4}%
+\contentsline {subsection}{\numberline {4.4.5}Experiment 1.4: + Orthogonality (v5 Configuration)}{87}{subsection.4.4.5}%
+\contentsline {subsection}{\numberline {4.4.6}Experiment 1.5: Full Anti-Leakage Battery (v7 Configuration)}{87}{subsection.4.4.6}%
+\contentsline {section}{\numberline {4.5}Baseline Comparison Methods}{89}{section.4.5}%
+\contentsline {subsection}{\numberline {4.5.1}Classical BEADS}{89}{subsection.4.5.1}%
+\contentsline {subsection}{\numberline {4.5.2}Additional Classical Methods}{90}{subsection.4.5.2}%
+\contentsline {subsection}{\numberline {4.5.3}Framing the Comparison}{90}{subsection.4.5.3}%
+\contentsline {chapter}{\numberline {5}Results and Analysis}{91}{chapter.5}%
+\contentsline {section}{\numberline {5.1}Progressive Development Results}{92}{section.5.1}%
+\contentsline {subsection}{\numberline {5.1.1}Quantitative Comparison}{92}{subsection.5.1.1}%
+\contentsline {subsection}{\numberline {5.1.2}Baseline Leakage Analysis}{95}{subsection.5.1.2}%
+\contentsline {subsection}{\numberline {5.1.3}The Over-Regularization Effect}{98}{subsection.5.1.3}%
+\contentsline {section}{\numberline {5.2}Ablation Studies}{100}{section.5.2}%
+\contentsline {subsection}{\numberline {5.2.1}Loss Term Ablations}{100}{subsection.5.2.1}%
+\contentsline {subsection}{\numberline {5.2.2}Network Depth Ablation}{101}{subsection.5.2.2}%
+\contentsline {subsection}{\numberline {5.2.3}Ablation Summary}{101}{subsection.5.2.3}%
+\contentsline {section}{\numberline {5.3}Qualitative Examples}{102}{section.5.3}%
+\contentsline {section}{\numberline {5.4}Training Dynamics}{102}{section.5.4}%
+\contentsline {section}{\numberline {5.5}Learned Parameter Analysis}{102}{section.5.5}%
+\contentsline {subsection}{\numberline {5.5.1}Layer Specialization}{102}{subsection.5.5.1}%
+\contentsline {subsection}{\numberline {5.5.2}Emergent Specialization}{104}{subsection.5.5.2}%
+\contentsline {section}{\numberline {5.6}Real Chromatogram Results}{105}{section.5.6}%
+\contentsline {section}{\numberline {5.7}Summary of Findings}{106}{section.5.7}%
+\contentsline {chapter}{\numberline {6}Discussion and Limitations}{110}{chapter.6}%
+\contentsline {section}{\numberline {6.1}Baseline Leakage , Diagnosis and Mitigation}{111}{section.6.1}%
+\contentsline {subsection}{\numberline {6.1.1}Root Cause Analysis}{111}{subsection.6.1.1}%
+\contentsline {subsection}{\numberline {6.1.2}The Mitigation Journey}{113}{subsection.6.1.2}%
+\contentsline {subsection}{\numberline {6.1.3}Fundamental Limits of Sparsity-Based Decomposition}{116}{subsection.6.1.3}%
+\contentsline {section}{\numberline {6.2}Training/Inference Length Mismatch}{119}{section.6.2}%
+\contentsline {section}{\numberline {6.3}The Conjugate Gradient Variant's Failure}{121}{section.6.3}%
+\contentsline {subsection}{\numberline {6.3.1}Backpropagation Depth and Gradient Vanishing}{121}{subsection.6.3.1}%
+\contentsline {subsection}{\numberline {6.3.2}CG Convergence and Differentiability}{122}{subsection.6.3.2}%
+\contentsline {subsection}{\numberline {6.3.3}Design Principle for Algorithm Unrolling}{123}{subsection.6.3.3}%
+\contentsline {section}{\numberline {6.4}Non-Learnable Cutoff Frequency and the Autograd Boundary}{124}{section.6.4}%
+\contentsline {section}{\numberline {6.5}Softplus Approximation , Train/Inference Gap}{127}{section.6.5}%
+\contentsline {section}{\numberline {6.6}The Over-Regularization Problem}{128}{section.6.6}%
+\contentsline {chapter}{\numberline {7}Conclusions and Future Work}{131}{chapter.7}%
+\contentsline {chapter}{\numberline {A}APPENDIX TITLE}{132}{appendix.A}%

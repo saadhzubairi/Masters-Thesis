@@ -26,11 +26,14 @@ export interface DataConfig {
   noise: { noise_level: number }
 }
 
-export type ModelType = "lbeads" | "lbeads_fast"
+export type ModelType = "lbeads" | "lbeads_fast" | "lbeads_v5"
+
+export type DeviceType = "cpu" | "mps"
 
 export interface RunConfig {
   name: string
   model_type: ModelType
+  device?: DeviceType
   model: ModelConfig
   model_fast?: FastModelConfig
   training: TrainingConfig
@@ -180,6 +183,20 @@ export const DEFAULT_FAST_MODEL_CONFIG: FastModelConfig = {
   init_lam2: 3.2,
   init_r: 6.0,
   init_step_size: 0.1,
+}
+
+export const DEFAULT_V5_MODEL_CONFIG: FastModelConfig = {
+  N: 4096,
+  d: 1,
+  fc: 0.006,
+  num_layers: 20,
+  lowpass_iterations: 1,
+  lowpass_cg_iters: 12,
+  init_lam0: 0.01,
+  init_lam1: 0.5,
+  init_lam2: 0.5,
+  init_r: 6.0,
+  init_step_size: 0.05,
 }
 
 export const DEFAULT_TRAINING_CONFIG: TrainingConfig = {

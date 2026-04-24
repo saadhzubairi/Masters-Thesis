@@ -1,0 +1,2242 @@
+%% defense_questions.tex
+%% Thesis Defense Preparation: Potential Questions & Answer Strategies
+%% LBEADS-NET -- Saad Zubairi, NYU Tandon, Advisor: Prof. Ivan Selesnick
+%% Generated 2026-04-23
+%% ============================================================================
+
+\documentclass[11pt, letterpaper]{article}
+
+% ── Geometry ─────────────────────────────────────────────────────────────────
+\usepackage[margin=1in]{geometry}
+
+% ── Fonts & encoding ────────────────────────────────────────────────────────
+\usepackage[T1]{fontenc}
+\usepackage{lmodern}
+\usepackage{microtype}
+
+% ── Colours & boxes ─────────────────────────────────────────────────────────
+\usepackage[dvipsnames,svgnames,x11names]{xcolor}
+\usepackage[most]{tcolorbox}
+
+% ── Lists ───────────────────────────────────────────────────────────────────
+\usepackage{enumitem}
+
+% ── Hyperlinks & ToC ───────────────────────────────────────────────────────
+\usepackage[bookmarks,hidelinks,
+            colorlinks=true,
+            linkcolor=NavyBlue,
+            urlcolor=RoyalBlue]{hyperref}
+
+% ── Math ────────────────────────────────────────────────────────────────────
+\usepackage{amsmath,amssymb}
+
+% ── Misc ────────────────────────────────────────────────────────────────────
+\usepackage{booktabs}
+\usepackage{titlesec}
+
+% ============================================================================
+% Colour palette
+% ============================================================================
+\definecolor{QBoxFrame}{HTML}{2B6CB0}   % steel-blue frame for questions
+\definecolor{QBoxBG}{HTML}{EBF4FA}      % very light blue fill
+\definecolor{ABoxFrame}{HTML}{276749}   % forest-green frame for answers
+\definecolor{ABoxBG}{HTML}{F0FFF4}      % very light green fill
+\definecolor{WarnFrame}{HTML}{C53030}   % red frame for warnings
+\definecolor{WarnBG}{HTML}{FFF5F5}      % very light red fill
+\definecolor{SectionBlue}{HTML}{1A365D} % dark navy for section headings
+
+% ============================================================================
+% tcolorbox styles
+% ============================================================================
+\newtcolorbox{questionbox}[1][]{%
+  enhanced,
+  colback=QBoxBG,
+  colframe=QBoxFrame,
+  coltitle=white,
+  fonttitle=\bfseries\sffamily,
+  left=4pt, right=4pt, top=4pt, bottom=4pt,
+  boxrule=1pt,
+  attach boxed title to top left={yshift=-2mm, xshift=4mm},
+  boxed title style={colback=QBoxFrame, colframe=QBoxFrame,
+                     sharp corners, size=small},
+  sharp corners=south,
+  title={#1}
+}
+
+\newtcolorbox{answerbox}{%
+  enhanced,
+  colback=ABoxBG,
+  colframe=ABoxFrame,
+  left=4pt, right=4pt, top=4pt, bottom=4pt,
+  boxrule=0.8pt,
+  fontupper=\small,
+  sharp corners=south,
+  title={\sffamily\bfseries Answer Strategy},
+  coltitle=white,
+  attach boxed title to top left={yshift=-2mm, xshift=4mm},
+  boxed title style={colback=ABoxFrame, colframe=ABoxFrame,
+                     sharp corners, size=small}
+}
+
+\newtcolorbox{warnbox}[1][]{%
+  enhanced,
+  colback=WarnBG,
+  colframe=WarnFrame,
+  coltitle=white,
+  fonttitle=\bfseries\sffamily,
+  left=4pt, right=4pt, top=4pt, bottom=4pt,
+  boxrule=1pt,
+  attach boxed title to top left={yshift=-2mm, xshift=4mm},
+  boxed title style={colback=WarnFrame, colframe=WarnFrame,
+                     sharp corners, size=small},
+  sharp corners=south,
+  title={#1}
+}
+
+% ============================================================================
+% Section formatting
+% ============================================================================
+\titleformat{\section}
+  {\Large\bfseries\sffamily\color{SectionBlue}}
+  {\thesection}{1em}{}[\vspace{2pt}\titlerule]
+\titleformat{\subsection}
+  {\large\bfseries\sffamily\color{SectionBlue!80!black}}
+  {\thesubsection}{1em}{}
+
+% ============================================================================
+% Question counter
+% ============================================================================
+\newcounter{qcounter}
+\newcommand{\question}[1]{%
+  \stepcounter{qcounter}%
+  \begin{questionbox}[Q\theqcounter]%
+    \itshape #1%
+  \end{questionbox}%
+}
+
+% ============================================================================
+% Title
+% ============================================================================
+\title{%
+  \vspace{-1cm}
+  {\sffamily\LARGE Thesis Defense Preparation}\\[6pt]
+  {\sffamily\Large Potential Questions \& Answer Strategies}\\[12pt]
+  {\normalfont\large
+   \textbf{LBEADS-NET}: Algorithm Unrolling for Learned Baseline\\
+   Estimation and Denoising in Chromatographic Signals}
+}
+\author{%
+  Saad Zubairi\\
+  \small MS Electrical Engineering, NYU Tandon School of Engineering\\
+  \small Advisor: Professor Ivan Selesnick
+}
+\date{April 2026}
+
+% ============================================================================
+\begin{document}
+\maketitle
+\thispagestyle{empty}
+
+\vspace{1em}
+\begin{center}
+\fbox{\parbox{0.85\textwidth}{\centering\small\sffamily
+This document contains \textbf{65 anticipated defense questions} organized into
+eleven categories, each with a suggested answer strategy and references to
+specific thesis sections, tables, and equations.  Section~11 contains the
+\textbf{killer questions}---the hardest, most uncomfortable challenges.
+A final section catalogues known inconsistencies to fix.}}
+\end{center}
+
+\newpage
+\tableofcontents
+\newpage
+
+% ============================================================================
+%  1. FOUNDATIONAL / "WHY THIS PROBLEM"
+% ============================================================================
+\section{Foundational / ``Why This Problem'' Questions}
+
+\setcounter{qcounter}{0}
+
+% ── Q1 ──────────────────────────────────────────────────────────────────────
+\question{Why chromatographic baseline correction specifically?  Why not
+apply algorithm unrolling to general signal denoising, where the
+impact would be broader?}
+
+\begin{answerbox}
+\textbf{Key points:}
+\begin{itemize}[nosep]
+  \item Chromatography has a \emph{domain-specific structure} that generic
+        denoisers ignore: the signal decomposes into exactly three additive
+        components---baseline ($\mathbf{b}$), peaks ($\mathbf{p}$), and
+        noise ($\boldsymbol{\varepsilon}$)---with distinct spectral and
+        sparsity priors (Sec.~2.1).
+  \item BEADS already encodes those priors via asymmetric penalty and
+        highpass filtering.  Unrolling preserves the interpretable
+        structure while letting each layer adapt.
+  \item Regulatory context matters: pharmaceutical QC (USP~$\langle 621\rangle$)
+        and metabolomics both require \emph{auditable} preprocessing, which
+        favours interpretable, model-based architectures over black-box nets.
+  \item General denoising is well-served by DnCNN / U-Net variants;
+        baseline estimation is an under-explored niche where
+        model-based deep learning is a natural fit.
+\end{itemize}
+\textbf{Thesis references:} Sec.~1.1 (motivation), Sec.~2.1 (chromatographic model), Sec.~2.3.3 (BEADS formulation).
+\end{answerbox}
+
+% ── Q2 ──────────────────────────────────────────────────────────────────────
+\question{What is wrong with just using arPLS or airPLS?  They are simpler,
+they do not need training data, and they are already widely adopted
+in chemometrics.  Convince me that the added complexity of unrolling
+is worth it.}
+
+\begin{answerbox}
+\textbf{Key points:}
+\begin{itemize}[nosep]
+  \item arPLS/airPLS are iteratively-reweighted penalized least-squares
+        methods.  They require manual selection of the smoothness
+        parameter $\lambda$ and the asymmetry weight $p$, which are
+        signal-dependent (Sec.~2.3.1--2.3.2).
+  \item They perform \emph{only} baseline estimation---they do not
+        simultaneously denoise.  BEADS and LBEADS-NET jointly estimate
+        baseline and denoise.
+  \item The core contribution is not ``better numbers than arPLS'' but
+        \emph{demonstrating the unrolling paradigm} in this domain and
+        exposing the fundamental $\ell_1$ leakage limitation.
+  \item Concede honestly: on well-tuned, non-dense-peak data, arPLS
+        will often suffice.  LBEADS-NET is interesting as a research
+        vehicle for understanding leakage.
+\end{itemize}
+\textbf{Thesis references:} Table~2.1 (baseline methods comparison), Sec.~2.3.1--2.3.2 (arPLS, airPLS).
+\end{answerbox}
+
+% ── Q3 ──────────────────────────────────────────────────────────────────────
+\question{Why does baseline drift matter quantitatively?  What error
+magnitudes are we talking about in real instruments, and how does
+that translate to, say, drug concentration accuracy?}
+
+\begin{answerbox}
+\textbf{Key points:}
+\begin{itemize}[nosep]
+  \item Column bleed, solvent gradients, and detector drift produce
+        baseline offsets of 1--10\% of the tallest peak height in HPLC
+        (Sec.~2.1.2).
+  \item In pharmaceutical QC, area-percent quantitation is the norm.
+        A 2\% baseline offset can shift a peak area by 5--15\%, which
+        exceeds the typical $\pm$2\% USP acceptance criterion.
+  \item Metabolomics (hundreds of analytes per run) amplifies the
+        problem: even small per-peak errors compound across the profile.
+  \item Acknowledge: we do not empirically quantify this in the thesis
+        because we work with synthetic data.  Cite the chromatography
+        literature for representative magnitudes.
+\end{itemize}
+\textbf{Thesis references:} Sec.~2.1.2 (baseline sources), Sec.~1.1 (quantitative motivation).
+\end{answerbox}
+
+% ── Q4 ──────────────────────────────────────────────────────────────────────
+\question{Who actually uses this in practice---pharmaceutical QC,
+metabolomics, environmental labs?  Have you talked to anyone who
+processes real chromatograms and asked whether they need this?}
+
+\begin{answerbox}
+\textbf{Key points:}
+\begin{itemize}[nosep]
+  \item Be honest: this is a methods thesis, not a deployment study.
+        No practitioner interviews were conducted.
+  \item Frame the contribution as \emph{foundational analysis}: we
+        unrolled BEADS, exposed the $\ell_1$ leakage limit, and
+        documented the failure modes.  That knowledge benefits future
+        applied work.
+  \item Note that Professor Selesnick co-authored the original BEADS
+        algorithm, so this work sits in a signal-processing research
+        lineage rather than a product-development one.
+  \item Mention potential users: Agilent OpenLab, Waters Empower,
+        Shimadzu LabSolutions all rely on classical baseline algorithms
+        that could benefit from learned parameter tuning.
+\end{itemize}
+\textbf{Thesis references:} Sec.~1.1, Sec.~6 (future work).
+\end{answerbox}
+
+% ── Q5 ──────────────────────────────────────────────────────────────────────
+\question{Why not just use a black-box neural network---a U-Net or a
+1-D ResNet?  They clearly generalise better and do not suffer from
+$\ell_1$ leakage.  What does unrolling buy you over a purely
+learned architecture?}
+
+\begin{answerbox}
+\textbf{Key points:}
+\begin{itemize}[nosep]
+  \item \textbf{Parameter efficiency:} LBEADS-NET has \textbf{100 learnable
+        scalars} ($5 \times 20$ layers).  A comparable 1-D U-Net would
+        have $10^5$--$10^6$ parameters, requiring far more training data
+        than our 200 synthetic signals (Sec.~3.2, Sec.~4.1).
+  \item \textbf{Interpretability:} every learned parameter has a physical
+        meaning---$\lambda_0$ controls fidelity, $\lambda_1$/$\lambda_2$
+        control sparsity, $r$ controls penalty shape, $\eta$ is the
+        step size.  This matters for regulatory contexts.
+  \item \textbf{Inductive bias:} the unrolled architecture \emph{guarantees}
+        the three-component decomposition structure.  A black-box net
+        must learn this from data alone.
+  \item \textbf{Honest concession:} black-box nets would likely achieve
+        lower reconstruction error given enough data.  The trade-off
+        is interpretability and data efficiency versus raw performance.
+\end{itemize}
+\textbf{Thesis references:} Sec.~2.4 (algorithm unrolling theory), Sec.~3.2 (architecture), Table~3.2 (parameter count).
+\end{answerbox}
+
+
+% ============================================================================
+%  2. ALGORITHM UNROLLING THEORY
+% ============================================================================
+\section{Algorithm Unrolling Theory}
+
+% ── Q6 ──────────────────────────────────────────────────────────────────────
+\question{What convergence guarantees does LBEADS-NET inherit from the
+classical BEADS algorithm?  Can you prove that the learned iterates
+converge to anything meaningful?}
+
+\begin{answerbox}
+\textbf{Key points (this is a trap question---acknowledge it):}
+\begin{itemize}[nosep]
+  \item Classical BEADS is derived via majorisation-minimisation (MM)
+        and converges to the global optimum of its convex cost function
+        (Sec.~2.3.3, Eq.~2.24).
+  \item \textbf{Untied parameters break MM convergence.}  Each layer
+        minimises a \emph{different} surrogate, so the sequence of
+        iterates does not descend a single objective.
+  \item This is a known trade-off in all algorithm unrolling:
+        we sacrifice convergence guarantees for task-specific performance
+        via end-to-end training (Sec.~2.4.3).
+  \item Cite Chen \& Pock (2017) and Monga et al.\ (2021): unrolled
+        networks should be understood as \emph{feed-forward architectures
+        with structured layers}, not as truncated optimisers.
+  \item The network is still well-posed in that training converges
+        and test loss is stable---but ``convergence of the iterates''
+        in the MM sense does not apply.
+\end{itemize}
+\textbf{Thesis references:} Sec.~2.4.3 (unrolling trade-offs), Sec.~3.3 (ISTA reformulation).
+\end{answerbox}
+
+% ── Q7 ──────────────────────────────────────────────────────────────────────
+\question{Why ISTA over FISTA?  You lose the $O(1/k^2)$ momentum
+acceleration for free.  Was this a deliberate choice or just simpler
+to implement?}
+
+\begin{answerbox}
+\textbf{Key points:}
+\begin{itemize}[nosep]
+  \item The primary reason was \textbf{avoiding gradient vanishing through
+        $K \times K_{\text{inner}}$ depth}.  Classical BEADS uses a
+        conjugate-gradient inner loop; unrolling both outer MM and inner
+        CG iterations creates excessive depth (Sec.~3.3).
+  \item ISTA replaces the inner CG loop entirely: each unrolled layer
+        is a single proximal-gradient step, giving depth $K$ instead
+        of $K \times K_{\text{inner}}$.
+  \item FISTA's momentum term introduces a non-monotone trajectory
+        that complicates backpropagation through the unrolled graph
+        (the Nesterov correction depends on the \emph{previous two}
+        iterates, increasing memory footprint).
+  \item In the unrolled setting with untied parameters, the step-size
+        $\eta^{(k)}$ is learned per layer and effectively subsumes much
+        of the acceleration benefit.
+  \item Concede: FISTA layers are a natural extension for future work.
+\end{itemize}
+\textbf{Thesis references:} Sec.~3.3 (ISTA reformulation), Sec.~2.4.2 (LISTA and ISTA-based unrolling).
+\end{answerbox}
+
+% ── Q8 ──────────────────────────────────────────────────────────────────────
+\question{How does your approach differ from LISTA fundamentally?  LISTA
+learns entire weight matrices, whereas you learn only scalars.  Is
+LBEADS-NET actually ``unrolling'' or just ``parameterised iteration''?}
+
+\begin{answerbox}
+\textbf{Key points:}
+\begin{itemize}[nosep]
+  \item LISTA (Gregor \& LeCun, 2010) unrolls ISTA for sparse coding:
+        it learns the dictionary $\mathbf{W}$ and the Gram matrix
+        $\mathbf{S}$ as free matrices, so each layer is a full affine
+        transform (Sec.~2.4.2).
+  \item LBEADS-NET retains the \emph{fixed structural operators}
+        ($\mathbf{H}$ highpass filter, $\mathbf{D}$ difference matrices)
+        and only untie the \emph{scalar regularisation weights} across
+        layers---5 scalars per layer.
+  \item This is a design choice for interpretability and parameter
+        efficiency, not a limitation.  The structural operators encode
+        domain knowledge (filter design, finite differences) that should
+        \emph{not} be made freely learnable with only 200 training signals.
+  \item It is still correctly termed ``unrolling'': each layer corresponds
+        to one iteration of a known algorithm with layer-specific parameters.
+        The Monga et al.\ (2021) taxonomy calls this
+        ``algorithm unrolling with untied hyperparameters.''
+\end{itemize}
+\textbf{Thesis references:} Sec.~2.4.2 (LISTA), Sec.~3.2 (LBEADS-NET architecture), Table~3.2.
+\end{answerbox}
+
+% ── Q9 ──────────────────────────────────────────────────────────────────────
+\question{What happens if you tie all parameters across layers---that is,
+force $\lambda_0^{(k)} = \lambda_0$ for all $k$?  Does it reduce to
+classical BEADS?  Have you tried it?}
+
+\begin{answerbox}
+\textbf{Key points:}
+\begin{itemize}[nosep]
+  \item With tied parameters, each layer applies the \emph{same}
+        proximal-gradient step, so the unrolled network becomes
+        $K$ iterations of ISTA applied to the BEADS cost function
+        with \emph{learned} but \emph{shared} regularisation weights.
+  \item It does \textbf{not} exactly reduce to classical BEADS because
+        (a) BEADS uses MM with CG inner solve, not ISTA, and (b) the
+        $K=20$ iteration budget may not suffice for convergence of the
+        tied-parameter ISTA.
+  \item The tied-parameter variant is an important ablation that
+        isolates the benefit of \emph{per-layer specialisation}.
+  \item Concede: this ablation is listed in Table~5.3 but has not
+        been run yet.  It is planned before the final submission.
+  \item The emergent parameter specialisation (Sec.~5.2.3) suggests
+        that untying is beneficial: early layers learn coarse
+        separation, later layers learn aggressive refinement.
+\end{itemize}
+\textbf{Thesis references:} Sec.~3.2 (architecture), Sec.~5.2.3 (parameter analysis), Table~5.3 (ablation, currently empty).
+\end{answerbox}
+
+% ── Q10 ─────────────────────────────────────────────────────────────────────
+\question{The BEADS cost function is convex.  Does unrolling preserve
+convexity of the end-to-end mapping?  If not, what are the
+optimisation implications for training?}
+
+\begin{answerbox}
+\textbf{Key points:}
+\begin{itemize}[nosep]
+  \item \textbf{No.}  The end-to-end mapping
+        $\mathbf{y}\mapsto(\hat{\mathbf{b}},\hat{\mathbf{p}})$ is a
+        composition of 20 layers, each involving soft-thresholding
+        (non-linear) and matrix multiplications parameterised by
+        learned scalars.  The composition is \emph{not} convex in the
+        parameters $\{\lambda_0^{(k)},\ldots,\eta^{(k)}\}$.
+  \item The \emph{training loss landscape} is therefore non-convex,
+        which is standard for neural networks.
+  \item However, each \emph{individual layer} is a proximal operator
+        applied to a convex penalty, which provides local regularity
+        (Lipschitz continuity of the proximal map).
+  \item Practically, the 3-stage curriculum (Sec.~3.8) and progressive
+        loss introduction help navigate the non-convex landscape by
+        providing a good initialisation path.
+\end{itemize}
+\textbf{Thesis references:} Sec.~2.3.3 (BEADS convexity), Sec.~3.3 (ISTA layers), Sec.~3.8 (curriculum training).
+\end{answerbox}
+
+
+% ============================================================================
+%  3. ARCHITECTURE & DESIGN CHOICES
+% ============================================================================
+\section{Architecture \& Design Choices}
+
+% ── Q11 ─────────────────────────────────────────────────────────────────────
+\question{Why $K{=}20$ layers?  Your ablation table (Table~5.3) is
+completely empty.  How do you justify this choice without any
+empirical evidence?}
+
+\begin{answerbox}
+\textbf{Key points:}
+\begin{itemize}[nosep]
+  \item Honest answer: $K{=}20$ was chosen heuristically based on
+        (a)~the classical BEADS default of 20--30 outer iterations
+        and (b)~GPU memory constraints with $N{=}4096$ and dense matrices.
+  \item The parameter analysis in Sec.~5.2.3 was conducted with $K{=}6$
+        and $N{=}1024$, which is not directly comparable.
+  \item Acknowledge that the empty ablation table is a gap.
+        State that $K \in \{6, 10, 15, 20, 30\}$ should be swept.
+  \item Qualitative argument: BEADS typically converges in
+        $\sim$15--20 iterations, so the unrolled variant should need
+        \emph{at most} that many layers (and likely fewer, since
+        parameters are untied).
+  \item Cite the LISTA literature: Borgerding et al.\ (2017) show
+        that unrolled ISTA with 15--20 layers matches 100+ iterations
+        of classical ISTA.
+\end{itemize}
+\textbf{Thesis references:} Table~5.3 (empty ablation), Sec.~5.2.3 (6-layer analysis), Sec.~3.2.
+\end{answerbox}
+
+% ── Q12 ─────────────────────────────────────────────────────────────────────
+\question{Your implementation uses dense $N \times N$ matrices with
+$O(N^2)$ memory.  For $N{=}4096$ in float64, each matrix is 128\,MB.
+With 20 layers, you are storing gigabytes of intermediate buffers.
+Why not exploit the banded structure of $\mathbf{H}$ and
+$\mathbf{D}$?}
+
+\begin{answerbox}
+\textbf{Key points:}
+\begin{itemize}[nosep]
+  \item You are correct---this is the single largest engineering
+        limitation of the current implementation.
+  \item The highpass filter $\mathbf{H}$ is a banded Toeplitz matrix
+        and $\mathbf{D}$ (first/second difference) is banded with
+        bandwidth 1--2.  Products $\mathbf{H}^T\mathbf{H}$ and
+        $\mathbf{D}^T\mathbf{D}$ are also banded.
+  \item The reason for dense matrices: the filter $\mathbf{H}$ is
+        constructed via \texttt{scipy.signal} and converted to a dense
+        NumPy array before wrapping in a PyTorch tensor.  Implementing
+        banded-matrix operations natively in PyTorch would require
+        custom CUDA kernels or use of \texttt{torch.sparse}.
+  \item This is an engineering priority for future work.  Banded storage
+        would reduce memory from $O(N^2)$ to $O(N \cdot b)$ where $b$
+        is the bandwidth ($b \ll N$), enabling $N{=}65536$+ signals.
+  \item Practically, the current implementation fits on a single GPU
+        for $N{=}4096$ only because of small batch sizes.
+\end{itemize}
+\textbf{Thesis references:} Sec.~3.4 (filter construction), Sec.~6 (future work).
+\end{answerbox}
+
+% ── Q13 ─────────────────────────────────────────────────────────────────────
+\question{You say $f_c$ (the highpass cutoff frequency) is not learnable
+because of the ``SciPy--PyTorch autograd boundary.''  But why not
+implement the entire filter construction in PyTorch?  The
+Butterworth poles-and-zeros are closed-form.}
+
+\begin{answerbox}
+\textbf{Key points:}
+\begin{itemize}[nosep]
+  \item The current implementation calls
+        \texttt{scipy.signal.butter()} and
+        \texttt{scipy.signal.tf2zpk()}, which are not differentiable
+        through PyTorch's autograd (Sec.~3.4).
+  \item In principle, the bilinear-transform design of a Butterworth
+        filter \emph{can} be written as closed-form operations on
+        $f_c$ (pole placement on the unit circle), and these operations
+        are differentiable.
+  \item The difficulty is constructing the \emph{banded matrix}
+        $\mathbf{H}(f_c)$ from those poles in a way that is compatible
+        with efficient batched backpropagation.
+  \item A more practical route: parameterise the filter as a
+        learnable FIR filter of fixed order and initialise it from the
+        Butterworth design.  This avoids the IIR stability issues.
+  \item This is listed as future work (Sec.~6) and would add one more
+        learnable parameter per layer (101 total scalars).
+\end{itemize}
+\textbf{Thesis references:} Sec.~3.4 (filter construction), Eq.~3.5--3.6, Sec.~6 (future work).
+\end{answerbox}
+
+% ── Q14 ─────────────────────────────────────────────────────────────────────
+\question{What is the effective receptive field of LBEADS-NET?  Each layer
+operates on the full signal via dense matrix multiplication, so is
+the receptive field trivially the entire signal?}
+
+\begin{answerbox}
+\textbf{Key points:}
+\begin{itemize}[nosep]
+  \item Yes---formally, every output sample depends on every input
+        sample after a single layer, because $\mathbf{H}$ is an IIR
+        filter realised as a dense matrix (Sec.~3.4).
+  \item However, the \emph{effective} receptive field (in the
+        Luo et al.\ 2016 sense) is narrower because the energy of
+        $\mathbf{H}$ decays exponentially away from the diagonal.
+  \item The practical receptive field is governed by the filter order
+        and $f_c{=}0.006$: the $-3$\,dB point at $0.6\%$ of Nyquist
+        corresponds to a spatial scale of $\sim$167 samples.
+  \item For baseline estimation, a large receptive field is
+        \emph{desirable}: the baseline is a slowly-varying component
+        that depends on global signal context.
+  \item For peak estimation, local structure matters more, which is
+        why the sparsity penalties ($\ell_1$, TV) act element-wise
+        or on adjacent differences.
+\end{itemize}
+\textbf{Thesis references:} Sec.~3.4 (filter design), Sec.~2.3.3 (BEADS formulation).
+\end{answerbox}
+
+% ── Q15 ─────────────────────────────────────────────────────────────────────
+\question{Why float64 instead of float32?  Is this a fundamental numerical
+requirement of the algorithm, or is it just an engineering choice
+that doubles your memory usage?}
+
+\begin{answerbox}
+\textbf{Key points:}
+\begin{itemize}[nosep]
+  \item It is partially fundamental: the highpass filter $\mathbf{H}$
+        at $f_c{=}0.006$ has eigenvalues spanning several orders of
+        magnitude.  In float32, the matrix
+        $\mathbf{H}^T\mathbf{H} + \lambda_0 \mathbf{I}$ can become
+        poorly conditioned and produce NaN gradients during
+        backpropagation.
+  \item Empirically, early experiments in float32 showed training
+        instability (gradient overflow in layers 15--20).
+  \item However, with banded solvers or mixed-precision strategies
+        (float64 for the filter, float32 for the rest), it should be
+        possible to reduce memory.  This was not explored.
+  \item The ISTA reformulation partially mitigates the conditioning
+        issue (no matrix inverse required), so float32 may be viable
+        with careful step-size initialisation.
+\end{itemize}
+\textbf{Thesis references:} Sec.~3.4 (numerical considerations), Sec.~4.2 (training configuration).
+\end{answerbox}
+
+% ── Q16 ─────────────────────────────────────────────────────────────────────
+\question{You mention using softplus for non-negativity constraints in v7
+but not in v5.  Softplus versus ReLU---what is the difference in
+this context, and why does it matter?}
+
+\begin{answerbox}
+\textbf{Key points:}
+\begin{itemize}[nosep]
+  \item The regularisation parameters $\lambda_0, \lambda_1, \lambda_2,
+        r, \eta$ must be strictly positive.  A reparameterisation is
+        needed: the network stores unconstrained $\theta^{(k)}$ and
+        maps to $\lambda^{(k)} = g(\theta^{(k)})$.
+  \item \textbf{ReLU:} $g(\theta) = \max(0, \theta)$.  Has zero
+        gradient for $\theta < 0$ (``dead parameter'' problem) and
+        is non-differentiable at 0.
+  \item \textbf{Softplus:} $g(\theta) = \log(1 + e^\theta)$.
+        Smooth, strictly positive, non-zero gradient everywhere.
+  \item In v7, softplus was adopted after observing that some
+        parameters collapsed to zero under ReLU and could not recover
+        (gradient was exactly zero).
+  \item Softplus provides a mild bias toward small positive values
+        rather than exact zeros, which is physically appropriate---the
+        regularisation weights should not be zero.
+\end{itemize}
+\textbf{Thesis references:} Sec.~3.6 (parameter constraints), Sec.~3.7.1 (v7 modifications).
+\end{answerbox}
+
+
+% ============================================================================
+%  4. LOSS FUNCTION DEEP DIVES
+% ============================================================================
+\section{Loss Function Deep Dives}
+
+% ── Q17 ─────────────────────────────────────────────────────────────────────
+\question{You have 12 loss terms with 12 hyperparameters (the weights).
+Classical BEADS has 6 parameters.  Haven't you just replaced one
+tuning problem with a larger one?  How is this progress?}
+
+\begin{answerbox}
+\textbf{Key points:}
+\begin{itemize}[nosep]
+  \item Fair criticism---acknowledge it directly.
+  \item The critical difference: BEADS's 6 parameters must be tuned
+        \emph{per signal} (or per instrument/method), whereas the
+        12 loss weights are set \emph{once during training} and the
+        network then adapts its 100 per-layer parameters to each new
+        signal at inference time.
+  \item The loss weights are meta-parameters that define the
+        \emph{training objective}, not the inference-time model.
+        At test time, LBEADS-NET has zero user-tunable parameters.
+  \item Concede: the proliferation of loss terms (especially the
+        12-term v7 variant) is itself a finding---Experiment 1.5 shows
+        that the full 12-term loss \emph{hurts} performance due to
+        competing gradients (Sec.~5.2).
+  \item The thesis's \emph{negative result}---that more loss terms do
+        not help---is itself a contribution.
+\end{itemize}
+\textbf{Thesis references:} Table~3.3 (loss terms), Sec.~5.2.1 (Exp.~1.5 results), Sec.~3.7.
+\end{answerbox}
+
+% ── Q18 ─────────────────────────────────────────────────────────────────────
+\question{The orthogonality loss $\mathcal{L}_{\text{orth}}$ uses
+\texttt{.detach()}'d ground-truth-derived weights.  Isn't this a
+form of label leakage during training?  You are giving the network
+access to the answer.}
+
+\begin{answerbox}
+\textbf{Key points:}
+\begin{itemize}[nosep]
+  \item Clarify what happens: the ground-truth peak signal is used to
+        construct a \emph{weighting mask} that emphasises peak regions,
+        and this mask is detached (no gradient flows through it).
+        The loss penalises $\langle \hat{\mathbf{b}}, \mathbf{w} \rangle$
+        where $\mathbf{w}$ is the detached mask.
+  \item This is \textbf{not} label leakage in the test-time sense:
+        the mask is used only during training (supervised learning
+        always uses ground truth).  At inference, no ground truth
+        is available or used.
+  \item The \texttt{.detach()} prevents the gradient from flowing
+        back through the mask construction, which would create
+        a circular dependency.
+  \item Analogy: it is similar to importance sampling in RL, where
+        the sampling distribution depends on the target but gradients
+        are blocked through the weights.
+  \item However, this does make the loss non-differentiable with
+        respect to the mask shape, so the network cannot learn to
+        ``game'' the mask.
+\end{itemize}
+\textbf{Thesis references:} Sec.~3.7 (loss function definition), Eq.~3.18 (orthogonality loss).
+\end{answerbox}
+
+% ── Q19 ─────────────────────────────────────────────────────────────────────
+\question{Your asymmetric baseline loss uses $\alpha{=}0.9$ (a 9:1 ratio
+penalising over-estimation versus under-estimation).  How sensitive
+is the model to this choice?  Did you try $\alpha{=}0.7$ or
+$\alpha{=}0.95$?}
+
+\begin{answerbox}
+\textbf{Key points:}
+\begin{itemize}[nosep]
+  \item The intuition for $\alpha{=}0.9$: baseline over-estimation
+        absorbs peak energy (leakage), which is harder to correct
+        downstream than a small under-estimation.  So we penalise
+        over-estimation 9$\times$ more heavily.
+  \item Concede: a sensitivity sweep over $\alpha$ was not performed.
+        This is a gap.
+  \item Argue that the exact value matters less than the
+        \emph{qualitative asymmetry}: any $\alpha > 0.5$ biases the
+        baseline downward, and the effect saturates.
+  \item Very high $\alpha$ (e.g., 0.99) would force the baseline to
+        zero everywhere, destroying the baseline estimate.  Very low
+        $\alpha$ (e.g., 0.6) provides weak anti-leakage pressure.
+  \item A proper sweep (Table~5.4) is listed but not yet run.
+\end{itemize}
+\textbf{Thesis references:} Sec.~3.7 (asymmetric loss), Table~5.4 (sensitivity ablation, currently empty).
+\end{answerbox}
+
+% ── Q20 ─────────────────────────────────────────────────────────────────────
+\question{The envelope constraint uses a soft-minimum with temperature
+$\tau{=}0.1$ and a window size of 51.  How sensitive are the results
+to these choices?  Why 51?}
+
+\begin{answerbox}
+\textbf{Key points:}
+\begin{itemize}[nosep]
+  \item Window size 51 corresponds to roughly the half-width of a
+        typical synthetic peak ($\sigma \approx 20$--30 samples), so
+        the envelope captures the local minimum in the valley between
+        adjacent peaks.
+  \item Temperature $\tau{=}0.1$ makes the soft-min approximate a
+        hard min: $\text{softmin}_\tau(\mathbf{x}) \to \min(\mathbf{x})$
+        as $\tau \to 0$.  At $\tau{=}0.1$, the approximation is tight
+        while remaining differentiable.
+  \item Sensitivity: smaller windows ($\sim$21) would miss wide peaks;
+        larger windows ($\sim$101) would create a baseline that cannot
+        follow moderate-frequency drift.
+  \item This was not swept systematically.  The values were set once
+        based on the known peak widths in the synthetic data.
+  \item On real data with unknown peak widths, these would need
+        adaptive selection---a limitation.
+\end{itemize}
+\textbf{Thesis references:} Sec.~3.7 (envelope constraint definition).
+\end{answerbox}
+
+% ── Q21 ─────────────────────────────────────────────────────────────────────
+\question{You describe the $\ell_1$ and TV penalties as \emph{both} the
+cause of baseline leakage \emph{and} necessary for sparsity in
+non-peak regions.  This seems like a fundamental contradiction.
+How do you resolve it?}
+
+\begin{answerbox}
+\textbf{Key points:}
+\begin{itemize}[nosep]
+  \item This is the \textbf{central tension of the thesis}---do not
+        try to resolve it cleanly, because it \emph{is not resolved}.
+  \item $\ell_1$ promotes sparsity in $\mathbf{p}$, which is correct
+        in regions with no peaks (sparse support).  But in dense-peak
+        regions, $\ell_1$ biases peak amplitudes toward zero
+        (\emph{soft-thresholding shrinkage bias}, well-known in
+        compressed sensing).
+  \item The energy removed from peaks has to go somewhere in the
+        $\mathbf{y} = \mathbf{b} + \mathbf{p} + \boldsymbol{\varepsilon}$
+        decomposition---it leaks into $\hat{\mathbf{b}}$.
+  \item The 12-term loss attempts to \emph{mitigate} this with
+        anti-leakage terms, but BLI plateaus at $\sim$0.59, confirming
+        that loss engineering cannot overcome the architectural bias.
+  \item \textbf{The honest conclusion}: $\ell_1$-based unrolling is
+        fundamentally limited for dense-peak signals.  Future work
+        should explore group sparsity, $\ell_0$-like penalties, or
+        hybrid architectures.
+\end{itemize}
+\textbf{Thesis references:} Sec.~3.7 (loss design rationale), Sec.~5.2.2 (BLI plateau analysis), Sec.~5.5 (leakage discussion).
+\end{answerbox}
+
+% ── Q22 ─────────────────────────────────────────────────────────────────────
+\question{You use Huber loss with $\delta{=}1.0$ for reconstruction in the
+main experiments but mention $\delta{=}0.1$ elsewhere.  Which is it,
+and why Huber over MSE in the first place?}
+
+\begin{answerbox}
+\textbf{Key points:}
+\begin{itemize}[nosep]
+  \item Huber loss is piecewise: quadratic for $|e| \le \delta$,
+        linear for $|e| > \delta$.  It down-weights large residuals,
+        providing robustness to outlier peaks.
+  \item $\delta{=}1.0$: the data is normalised to $[0, 1]$, so
+        $\delta{=}1.0$ means \emph{almost all residuals fall in the
+        quadratic regime}---Huber$_{1.0}$ $\approx$ MSE for
+        normalised data.
+  \item $\delta{=}0.1$: makes the linear regime much larger, acting
+        more like MAE.  This was used in the curriculum's Stage~B
+        (Sec.~3.8) to reduce sensitivity to large leakage residuals
+        during the early anti-leakage phase.
+  \item Acknowledge that the $\delta$ value is not consistently
+        documented and should be clarified.
+  \item MSE was not used because early experiments showed that
+        squared large residuals from leakage regions dominated the
+        gradient, destabilising training.
+\end{itemize}
+\textbf{Thesis references:} Sec.~3.7 (loss terms), Sec.~3.8 (curriculum training), Table~4.2 (training config).
+\end{answerbox}
+
+
+% ============================================================================
+%  5. EXPERIMENTAL METHODOLOGY
+% ============================================================================
+\section{Experimental Methodology}
+
+% ── Q23 ─────────────────────────────────────────────────────────────────────
+\question{200 signals total, 40 for testing.  How can you draw
+\emph{any} statistically meaningful conclusions from 40 test
+signals?  What is your confidence interval on, say, peak
+correlation?}
+
+\begin{answerbox}
+\textbf{Key points:}
+\begin{itemize}[nosep]
+  \item Concede: 40 test signals is small.  No confidence intervals
+        or statistical tests are reported, which is a limitation.
+  \item Mitigating factors: each signal contains 8--25 peaks, so the
+        effective sample size for \emph{per-peak} metrics is $\sim$600.
+        Per-signal metrics are averaged over $\sim$40 diverse signals.
+  \item The synthetic data generation is controlled, so there is no
+        domain shift between train and test---only random variation
+        in peak parameters.
+  \item The small dataset is \emph{by design}: it tests whether
+        unrolling's inductive bias can compensate for data scarcity.
+        A 100k-signal dataset would not test this hypothesis.
+  \item For a proper statistical treatment, report mean $\pm$ std
+        and bootstrap confidence intervals.  This should be added
+        before the final submission.
+\end{itemize}
+\textbf{Thesis references:} Sec.~4.1 (data generation), Sec.~5.1 (evaluation metrics), Table~5.1.
+\end{answerbox}
+
+% ── Q24 ─────────────────────────────────────────────────────────────────────
+\question{Your comparison with classical BEADS uses parameters designed for
+unnormalised data, applied to normalised data.  Isn't this a
+deliberately unfair comparison that makes BEADS look worse than it
+is?}
+
+\begin{answerbox}
+\textbf{Key points:}
+\begin{itemize}[nosep]
+  \item Partially valid criticism.  The default BEADS parameters
+        ($\lambda_0{=}1, \lambda_1{=}1, \lambda_2{=}1$) are
+        recommended for unnormalised chromatograms with peak heights
+        of $10^3$--$10^6$.  On $[0,1]$-normalised data, these
+        regularisation strengths are relatively too large.
+  \item However: the comparison is intended to show what happens
+        when a user applies BEADS ``out of the box'' without
+        per-signal tuning.  This is the common use case.
+  \item A \emph{fairer} comparison would grid-search BEADS parameters
+        on a validation set.  This was not done and should be
+        acknowledged as a limitation.
+  \item The main contribution is not ``LBEADS-NET beats BEADS'' but
+        rather the analysis of leakage and the unrolling methodology.
+\end{itemize}
+\textbf{Thesis references:} Sec.~5.2 (comparison setup), Table~5.1 (results).
+\end{answerbox}
+
+% ── Q25 ─────────────────────────────────────────────────────────────────────
+\question{You survey arPLS, airPLS, SNIP, and several deep learning
+baselines in Chapter~2, but you never compare against \emph{any}
+of them experimentally.  Why not?}
+
+\begin{answerbox}
+\textbf{Key points:}
+\begin{itemize}[nosep]
+  \item Concede: this is a significant omission.
+  \item The reason is scope and time: implementing each baseline
+        with proper hyperparameter tuning on the synthetic dataset
+        would require substantial additional work.
+  \item The thesis's primary goal is to unroll \emph{BEADS
+        specifically} (given the advisor's authorship of BEADS),
+        not to conduct a broad benchmark.
+  \item arPLS is the most important missing comparison because it is
+        the most widely used method in practice.  This should be
+        added before the defense if possible.
+  \item Deep learning baselines (1-D U-Net) would require
+        architectural design and training, which is a separate study.
+  \item Frame as future work.
+\end{itemize}
+\textbf{Thesis references:} Sec.~2.3 (method survey), Table~2.1 (comparison table), Sec.~6 (future work).
+\end{answerbox}
+
+% ── Q26 ─────────────────────────────────────────────────────────────────────
+\question{Your synthetic data uses bi-Gaussian peaks (Section~4.1.1), but
+your background chapter discusses the EMG (Exponentially Modified
+Gaussian) model in detail (Section~2.1.4).  Why the mismatch?  Does
+this limit the relevance of your results?}
+
+\begin{answerbox}
+\textbf{Key points:}
+\begin{itemize}[nosep]
+  \item EMG is the standard physical model for chromatographic peaks
+        (mass transfer kinetics cause exponential tailing).
+        Bi-Gaussian is a simpler empirical model that captures
+        asymmetry without the convolution integral.
+  \item Bi-Gaussian was chosen for computational simplicity in
+        synthetic data generation and because it has an analytic
+        closed-form (no numerical convolution needed).
+  \item The two models produce qualitatively similar peak shapes
+        for moderate asymmetry.  For heavy tailing, EMG produces
+        longer tails that bi-Gaussian cannot capture.
+  \item This mismatch is not explained in the thesis and should be.
+        Add a brief justification in Sec.~4.1.1.
+  \item The choice does limit relevance: results on bi-Gaussian
+        peaks may not transfer to heavily tailed EMG peaks.
+\end{itemize}
+\textbf{Thesis references:} Sec.~2.1.4 (EMG model), Sec.~4.1.1 (bi-Gaussian generation).
+\end{answerbox}
+
+% ── Q27 ─────────────────────────────────────────────────────────────────────
+\question{Your synthetic data generation has many design choices: cluster
+probability 0.4, log-uniform amplitude distributions, specific
+$\sigma$ ranges.  How sensitive are your results to these choices?
+Have you tested on a different distribution?}
+
+\begin{answerbox}
+\textbf{Key points:}
+\begin{itemize}[nosep]
+  \item These parameters control the ``difficulty distribution'' of
+        the training set: cluster probability determines how often
+        dense-peak regions occur (which is where leakage is worst).
+  \item No sensitivity analysis on data generation parameters was
+        performed.  This is a limitation.
+  \item Higher cluster probability would create more dense-peak
+        signals, likely increasing average BLI.  Lower cluster
+        probability would create easier signals with better metrics.
+  \item The log-uniform amplitude distribution ensures coverage of
+        both small and large peaks, which is more realistic than
+        uniform sampling.
+  \item A robust model should be tested on out-of-distribution
+        data (different peak width ranges, different noise levels).
+        This was not done.
+\end{itemize}
+\textbf{Thesis references:} Sec.~4.1.1 (data generation parameters), Table~4.1 (generation config).
+\end{answerbox}
+
+
+% ============================================================================
+%  6. RESULTS INTERPRETATION
+% ============================================================================
+\section{Results Interpretation}
+
+% ── Q28 ─────────────────────────────────────────────────────────────────────
+\question{BLI is approximately 0.59 across \emph{all} configurations---from
+the simplest 4-term loss to the full 12-term v7 loss.  Doesn't this
+mean your entire loss engineering effort was basically useless for
+addressing leakage?}
+
+\begin{answerbox}
+\textbf{Key points:}
+\begin{itemize}[nosep]
+  \item \textbf{Yes, essentially.}  This is a key negative result
+        and should be stated directly.
+  \item The BLI plateau at $\sim$0.59 across all configurations is
+        strong evidence that leakage is an \textbf{architectural}
+        property of $\ell_1$-based unrolling, not a loss-function
+        problem.
+  \item This is a \emph{valuable finding}: it tells future
+        researchers not to invest in loss engineering for this
+        architecture.  The fix must be structural (different penalty,
+        different architecture).
+  \item The loss terms \emph{do} help other metrics (reconstruction
+        error, peak shape fidelity), just not leakage.
+  \item Frame this as: ``the thesis \emph{discovered} the leakage
+        floor and \emph{proved} that loss engineering cannot break
+        through it.''
+\end{itemize}
+\textbf{Thesis references:} Table~5.1 (BLI column), Sec.~5.2.2 (BLI analysis), Sec.~5.5 (leakage discussion).
+\end{answerbox}
+
+% ── Q29 ─────────────────────────────────────────────────────────────────────
+\question{Area error is 49--58\% across all LBEADS-NET variants.  In
+pharmaceutical QC, 1\% accuracy is the requirement.  50\% error
+is catastrophic.  How can you call this a contribution?}
+
+\begin{answerbox}
+\textbf{Key points:}
+\begin{itemize}[nosep]
+  \item Do not try to defend 50\% area error as acceptable---it is
+        not, and any committee member from chromatography would dismiss
+        this immediately.
+  \item Reframe: the contribution is \emph{not} a production-ready
+        tool.  It is a \textbf{methodological study} that:
+        (a)~demonstrates algorithm unrolling for BEADS,
+        (b)~identifies and characterises the $\ell_1$ leakage limit,
+        (c)~documents the failure of loss engineering to fix it.
+  \item The area error is dominated by leakage in dense-peak regions.
+        For isolated peaks, the per-peak area error is much lower
+        (this should be reported separately if data is available).
+  \item The hybrid pipeline (Sec.~3.9) improves area error by
+        applying classical BEADS post-processing, but the fundamental
+        limit remains.
+  \item Honest conclusion: LBEADS-NET in its current form is not
+        suitable for quantitative chromatography.
+\end{itemize}
+\textbf{Thesis references:} Table~5.1 (area error), Sec.~5.2 (quantitative results), Sec.~5.5.
+\end{answerbox}
+
+% ── Q30 ─────────────────────────────────────────────────────────────────────
+\question{Experiment~1.5 (the full v7 12-term loss) performs \emph{worse}
+than Experiment~1.3 (a simpler configuration).  Your own results
+show that simpler is better.  Why do you propose the complex
+version at all?}
+
+\begin{answerbox}
+\textbf{Key points:}
+\begin{itemize}[nosep]
+  \item This is a genuinely important finding.  The 12-term loss
+        creates \textbf{competing gradient directions}: the
+        reconstruction loss pulls parameters one way while the
+        anti-leakage losses pull them another way, resulting in
+        a compromise that is worse on all metrics.
+  \item This is an example of \emph{over-regularisation}---adding
+        too many constraints to a 100-parameter model.
+  \item The simpler Experiment~1.3 succeeds because fewer loss terms
+        give the optimiser a cleaner gradient signal.
+  \item The thesis proposes v7 as a \emph{research contribution}
+        (novel loss formulations) even though v5/Exp.~1.3 is
+        empirically better.  The intellectual value is in
+        understanding \emph{why} the complex version fails.
+  \item Recommendation: the thesis should more prominently highlight
+        Exp.~1.3 as the best-performing configuration.
+\end{itemize}
+\textbf{Thesis references:} Table~5.1 (Exp.~1.3 vs 1.5), Sec.~5.2.1 (progressive results).
+\end{answerbox}
+
+% ── Q31 ─────────────────────────────────────────────────────────────────────
+\question{Peak correlation maxes at 0.793.  What does this mean physically?
+That 79\% of the peak shape is recovered?  What is an acceptable
+value in practice?}
+
+\begin{answerbox}
+\textbf{Key points:}
+\begin{itemize}[nosep]
+  \item Correlation measures \emph{shape similarity} (cosine of the
+        angle between the estimated and true peak vectors), not
+        amplitude accuracy.  A correlation of 0.793 means the
+        estimated peaks preserve $\sim$79\% of the shape structure.
+  \item The remaining $\sim$21\% discrepancy comes from
+        (a)~amplitude shrinkage due to $\ell_1$ bias and
+        (b)~baseline leakage distorting the peak shape, especially
+        at the base.
+  \item In practice, $r > 0.95$ is expected for quantitative
+        chromatography.  $0.793$ would not be acceptable.
+  \item For qualitative analysis (peak detection, retention time
+        identification), $0.793$ may be sufficient since the peak
+        \emph{positions} are typically preserved even when amplitudes
+        are distorted.
+  \item The gap from 0.793 to 1.0 is another manifestation of the
+        $\ell_1$ leakage problem.
+\end{itemize}
+\textbf{Thesis references:} Sec.~5.1 (metric definitions), Table~5.1 (peak correlation).
+\end{answerbox}
+
+% ── Q32 ─────────────────────────────────────────────────────────────────────
+\question{The learned parameter analysis (Section~5.2.3) uses a 6-layer
+model with $N{=}1024$, but the main results use a 20-layer model
+with $N{=}4096$.  Are these comparable?  Why not analyse the
+parameters of the actual model you evaluate?}
+
+\begin{answerbox}
+\textbf{Key points:}
+\begin{itemize}[nosep]
+  \item They are \textbf{not directly comparable}, and this should
+        be acknowledged.
+  \item The 6-layer/$N{=}1024$ model was used for the parameter
+        analysis because (a)~it is easier to visualise 6 layers
+        and (b)~it was an earlier experiment before the full
+        20-layer model was trained.
+  \item The qualitative pattern (early layers learn coarse separation,
+        later layers learn refinement) is expected to hold across
+        depths, but the specific parameter values would differ.
+  \item Ideally, the parameter trajectories of the 20-layer model
+        should be plotted.  This is a gap.
+  \item The analysis still provides insight into the
+        \emph{specialisation phenomenon}, which is the main finding
+        of that section, even if the numerical values are
+        model-specific.
+\end{itemize}
+\textbf{Thesis references:} Sec.~5.2.3 (parameter analysis), Sec.~4.2 (model configurations).
+\end{answerbox}
+
+
+% ============================================================================
+%  7. BASELINE LEAKAGE DEEP DIVE
+% ============================================================================
+\section{Baseline Leakage Deep Dive}
+
+% ── Q33 ─────────────────────────────────────────────────────────────────────
+\question{You claim leakage is a ``fundamental limit of $\ell_1$-based
+formulations.''  But classical BEADS with properly tuned parameters
+on unnormalised data presumably has lower leakage.  Isn't the
+leakage just a parameter-tuning problem that you failed to solve?}
+
+\begin{answerbox}
+\textbf{Key points:}
+\begin{itemize}[nosep]
+  \item The leakage mechanism is \emph{not} a tuning artefact:
+        it stems from the soft-thresholding operator
+        $\text{soft}(x, \lambda) = \text{sign}(x)(|x| - \lambda)_+$,
+        which \emph{always} shrinks non-zero entries by exactly
+        $\lambda$.  This bias exists for any $\lambda > 0$.
+  \item Classical BEADS on unnormalised data has the \emph{same}
+        mechanism, but the effect may be less visible because
+        (a)~peak amplitudes are $10^3$--$10^6$ so the relative
+        shrinkage $\lambda / A$ is small, and (b)~users tune
+        $\lambda$ to minimise visible artefacts.
+  \item On normalised $[0,1]$ data, the shrinkage $\lambda / A$
+        is relatively larger, making leakage more prominent.
+  \item The deeper point: in \emph{dense-peak regions}, the
+        sparsity assumption fails entirely (peaks overlap, the
+        signal is not sparse), so $\ell_1$ is the wrong prior.
+  \item The leakage is thus both a tuning issue (partially)
+        \emph{and} a structural issue (fundamentally, in dense regions).
+\end{itemize}
+\textbf{Thesis references:} Sec.~5.5 (leakage analysis), Sec.~3.5 (proximal operator), Eq.~3.11.
+\end{answerbox}
+
+% ── Q34 ─────────────────────────────────────────────────────────────────────
+\question{You mention group sparsity as a potential solution to leakage.
+Can you explain concretely how it would help, and why you did not
+pursue it?}
+
+\begin{answerbox}
+\textbf{Key points:}
+\begin{itemize}[nosep]
+  \item Group sparsity (e.g., group LASSO or $\ell_{2,1}$ penalty)
+        penalises \emph{groups} of adjacent coefficients jointly:
+        $\sum_g \|\mathbf{p}_g\|_2$.  Either the entire group is
+        zero or non-zero---no element-wise shrinkage within active
+        groups.
+  \item This directly addresses the leakage mechanism: within an
+        active peak group, amplitudes are \emph{not} shrunk toward
+        zero, preserving peak shape and area.
+  \item Implementation challenge: defining the groups.  Peak
+        boundaries are unknown a priori, so the grouping must be
+        adaptive or overlapping (e.g., sliding-window group LASSO).
+  \item The proximal operator for group $\ell_{2,1}$ is a
+        \emph{block} soft-thresholding, which is straightforward
+        to implement in PyTorch.
+  \item Not pursued due to scope and time constraints.  This is
+        the highest-priority future work.
+\end{itemize}
+\textbf{Thesis references:} Sec.~5.5 (leakage discussion), Sec.~6 (future work).
+\end{answerbox}
+
+% ── Q35 ─────────────────────────────────────────────────────────────────────
+\question{Gharbi et al.'s U-HQ method uses a hybrid penalty that avoids
+$\ell_1$ shrinkage bias.  You cite it in the background.  Why not
+adopt their approach instead of fighting the $\ell_1$ bias with
+loss terms?}
+
+\begin{answerbox}
+\textbf{Key points:}
+\begin{itemize}[nosep]
+  \item U-HQ (Gharbi et al.) uses a non-convex penalty that
+        approximates $\ell_0$: it does not shrink large coefficients,
+        only eliminates small ones.  This would indeed avoid leakage.
+  \item The challenge: non-convex penalties lose the convergence
+        guarantees of MM/ISTA.  The proximal operator may not be
+        unique, and unrolling a non-convergent algorithm is
+        theoretically questionable.
+  \item Adopting U-HQ would require redesigning the entire unrolling
+        framework: different cost function, different proximal operator,
+        different convergence analysis.
+  \item This is the right direction for future work, but it is a
+        separate thesis.
+  \item The contribution here is establishing \emph{why} the $\ell_1$
+        version fails, which motivates the move to U-HQ-style penalties.
+\end{itemize}
+\textbf{Thesis references:} Sec.~2.3 (U-HQ discussion), Sec.~5.5 (leakage analysis), Sec.~6.
+\end{answerbox}
+
+% ── Q36 ─────────────────────────────────────────────────────────────────────
+\question{If baseline leakage is truly a fundamental limitation of the
+$\ell_1$ formulation, then why build on BEADS at all?  Isn't
+choosing a flawed base algorithm the core problem?}
+
+\begin{answerbox}
+\textbf{Key points:}
+\begin{itemize}[nosep]
+  \item BEADS was chosen because (a)~it is the advisor's algorithm,
+        making this a natural extension of the group's research, and
+        (b)~it is one of the most widely used baseline estimation
+        methods with a clear optimisation structure suitable for
+        unrolling.
+  \item BEADS is not ``flawed''---it is a well-designed convex
+        programme that works well for sparse-peak chromatograms.
+        The limitation arises specifically in the dense-peak regime.
+  \item The thesis demonstrates \emph{exactly where} BEADS breaks
+        down when unrolled.  This is a contribution: understanding
+        the limits of an existing method rigorously.
+  \item The negative result is arguably more valuable than a modest
+        positive improvement: it redirects future research toward
+        structural solutions (group sparsity, non-convex penalties).
+  \item ``All models are wrong; some are useful.''  BEADS is useful;
+        we now know precisely where it stops being useful.
+\end{itemize}
+\textbf{Thesis references:} Sec.~1.2 (thesis scope), Sec.~2.3.3 (BEADS), Sec.~5.5 (limitations).
+\end{answerbox}
+
+
+% ============================================================================
+%  8. PRACTICAL / "SO WHAT" QUESTIONS
+% ============================================================================
+\section{Practical / ``So What'' Questions}
+
+% ── Q37 ─────────────────────────────────────────────────────────────────────
+\question{Has LBEADS-NET been validated on even \emph{one} real
+chromatographic dataset with known ground truth?}
+
+\begin{answerbox}
+\textbf{Key points:}
+\begin{itemize}[nosep]
+  \item \textbf{No.}  All experiments use synthetic data.
+  \item The fundamental problem: real chromatograms do not have
+        ground-truth decompositions ($\mathbf{b}$, $\mathbf{p}$,
+        $\boldsymbol{\varepsilon}$ are not separately measurable).
+  \item Semi-synthetic validation is possible: take a known peak
+        standard (e.g., caffeine), subtract a fitted baseline
+        manually, and use the result as ``ground truth.''  This
+        was not attempted.
+  \item Public chromatographic datasets with ground truth are
+        essentially non-existent.  This is a known challenge in
+        the field.
+  \item Real-data validation is the most important next step (Sec.~6).
+\end{itemize}
+\textbf{Thesis references:} Sec.~4.1 (synthetic data only), Sec.~6 (future work).
+\end{answerbox}
+
+% ── Q38 ─────────────────────────────────────────────────────────────────────
+\question{What is the inference time of LBEADS-NET?  If each layer requires
+a dense $N \times N$ matrix--vector multiply, it might be slower
+than classical BEADS, which is $O(N)$ per iteration with banded
+solvers.}
+
+\begin{answerbox}
+\textbf{Key points:}
+\begin{itemize}[nosep]
+  \item Inference time is \textbf{not reported} in the thesis---this
+        is a gap.
+  \item Each of the $K{=}20$ layers performs $O(N^2)$ operations
+        due to dense matrix multiplication.  For $N{=}4096$, this
+        is $\sim$20 $\times$ $16\text{M}$ = $320\text{M}$ flops.
+  \item Classical BEADS with banded solvers is $O(N \cdot b \cdot K)$
+        where $b$ is bandwidth ($\sim$5--10), so $\sim$20 $\times$
+        $40\text{K}$ = $800\text{K}$ flops---\textbf{400$\times$ fewer}.
+  \item On a GPU, the dense matmuls are parallelised, so wall-clock
+        time may be comparable.  But on CPU (the typical analytical
+        lab environment), LBEADS-NET is significantly slower.
+  \item With banded implementation, LBEADS-NET would also be $O(N)$
+        per layer, eliminating the gap.
+\end{itemize}
+\textbf{Thesis references:} Sec.~3.4 (implementation), Sec.~6 (future work on banded ops).
+\end{answerbox}
+
+% ── Q39 ─────────────────────────────────────────────────────────────────────
+\question{How would a chromatographer actually use LBEADS-NET?  They do not
+have ground-truth baselines for training.  Does the model
+generalise to unseen instrument configurations?}
+
+\begin{answerbox}
+\textbf{Key points:}
+\begin{itemize}[nosep]
+  \item Usage scenario: train on synthetic data that covers the
+        expected range of peak shapes, baseline curvatures, and
+        noise levels; deploy on real data.
+  \item This is the standard paradigm for model-based deep learning
+        in domains without ground truth (e.g., MRI reconstruction).
+  \item Generalisation to unseen instruments depends on whether
+        the synthetic data distribution covers the real data
+        distribution.  This is not tested.
+  \item Domain adaptation (fine-tuning on a small set of manually
+        corrected real chromatograms) is a natural extension.
+  \item Practically, the user would run LBEADS-NET as a preprocessing
+        step in their chromatography data system (CDS) software,
+        replacing the built-in baseline correction module.
+\end{itemize}
+\textbf{Thesis references:} Sec.~4.1 (synthetic data rationale), Sec.~6 (deployment discussion).
+\end{answerbox}
+
+% ── Q40 ─────────────────────────────────────────────────────────────────────
+\question{Your hybrid pipeline adds classical BEADS as a post-processing
+step.  If you still need classical BEADS at the end, what did
+unrolling actually buy you?}
+
+\begin{answerbox}
+\textbf{Key points:}
+\begin{itemize}[nosep]
+  \item The hybrid pipeline uses LBEADS-NET to provide an
+        \emph{initial decomposition} that is closer to the true
+        solution than the default initialisation ($\mathbf{b}_0 = 0$).
+        Classical BEADS then refines from this warm start.
+  \item The benefit: BEADS converges in fewer iterations from a
+        good initialisation, and the learned parameters provide
+        signal-adaptive regularisation weights that BEADS alone
+        cannot.
+  \item Concede: if classical BEADS with proper tuning achieves
+        similar results, the unrolling step adds complexity without
+        clear benefit.
+  \item The honest framing: the hybrid pipeline is a
+        \emph{fallback strategy} when LBEADS-NET alone is insufficient,
+        not the primary contribution.
+  \item The primary contribution is the understanding of leakage,
+        not the pipeline itself.
+\end{itemize}
+\textbf{Thesis references:} Sec.~3.9 (hybrid pipeline), Sec.~5.2 (hybrid results).
+\end{answerbox}
+
+
+% ============================================================================
+%  9. WRITING & COMPLETENESS
+% ============================================================================
+\section{Writing \& Completeness}
+
+% ── Q41 ─────────────────────────────────────────────────────────────────────
+\question{Your abstract is Lorem Ipsum.  Your conclusions chapter is Lorem
+Ipsum.  Your ablation tables have all dashes.  Several sections are
+marked as placeholders.  Is this thesis actually complete?}
+
+\begin{answerbox}
+\textbf{Key points:}
+\begin{itemize}[nosep]
+  \item \textbf{Do not get defensive.}  Acknowledge that these
+        sections are incomplete and will be finalised before the
+        official submission deadline.
+  \item Emphasise that the \emph{technical content} (Chapters 2--5)
+        is complete and the defence focuses on the technical
+        contribution.
+  \item Provide a timeline: abstract and conclusions will be written
+        after the defence, incorporating committee feedback.
+  \item For the ablation tables: state which experiments are planned
+        and the expected timeline.
+  \item This is a common situation for defences that occur before
+        the final manuscript submission.
+\end{itemize}
+\textbf{Thesis references:} Abstract, Chapter~6 (conclusions), Tables~5.3--5.4.
+\end{answerbox}
+
+% ── Q42 ─────────────────────────────────────────────────────────────────────
+\question{Several cross-references in your document show ``Chapter~??''
+(pages 43, 56, 68).  Have you compiled and checked the final PDF?}
+
+\begin{answerbox}
+\textbf{Key points:}
+\begin{itemize}[nosep]
+  \item Acknowledge the broken references.  These are caused by
+        missing \verb|\label{}| tags or mismatched \verb|\ref{}| keys.
+  \item State that a full compilation pass with \verb|latexmk|
+        (multiple runs to resolve references) will be done before
+        submission.
+  \item This is a mechanical fix, not a content issue.
+  \item Have a plan: grep for ``??'' in the compiled PDF, trace each
+        to the source \verb|\ref{}| command, and fix.
+\end{itemize}
+\textbf{Thesis references:} Throughout document (cross-references).
+\end{answerbox}
+
+% ── Q43 ─────────────────────────────────────────────────────────────────────
+\question{You say ``twelve-term composite loss'' in Section~3.7 and
+Table~3.3, but your Introduction says ``11-term.''  Which is
+correct?}
+
+\begin{answerbox}
+\textbf{Key points:}
+\begin{itemize}[nosep]
+  \item The correct count is \textbf{twelve}.  Section~3.7 and
+        Table~3.3 enumerate all twelve terms explicitly.
+  \item The Introduction's ``11-term'' is a typo from an earlier
+        version of the loss function before the twelfth term
+        (likely the envelope constraint) was added.
+  \item This will be corrected in the Introduction before
+        submission.
+  \item Having the specific section and table to point to
+        (Sec.~3.7, Table~3.3) provides a definitive answer.
+\end{itemize}
+\textbf{Thesis references:} Sec.~1.2 (Introduction, ``11-term''), Sec.~3.7 (``twelve-term''), Table~3.3.
+\end{answerbox}
+
+
+% ============================================================================
+%  10. FUTURE WORK & BIG PICTURE
+% ============================================================================
+\section{Future Work \& Big Picture}
+
+% ── Q44 ─────────────────────────────────────────────────────────────────────
+\question{If you had 6 more months, what would you do first and why?}
+
+\begin{answerbox}
+\textbf{Key points (prioritised):}
+\begin{enumerate}[nosep]
+  \item \textbf{Group sparsity penalty} (2 months): replace $\ell_1$
+        with $\ell_{2,1}$ or overlapping group LASSO.  This directly
+        addresses the leakage ceiling and is the highest-impact change.
+  \item \textbf{Banded matrix implementation} (1 month): exploit the
+        sparsity structure of $\mathbf{H}$ and $\mathbf{D}$ to reduce
+        memory from $O(N^2)$ to $O(N)$ and enable $N{=}65536$+ signals.
+  \item \textbf{Real data validation} (1 month): obtain chromatographic
+        data from a collaborating lab, create semi-synthetic ground
+        truth, and evaluate.
+  \item \textbf{arPLS/airPLS baseline comparison} (2 weeks): implement
+        and tune arPLS on the existing synthetic dataset.
+  \item \textbf{Learnable $f_c$} (2 weeks): parameterise the highpass
+        filter as a learnable FIR filter initialised from the
+        Butterworth design.
+  \item \textbf{Complete ablations} (2 weeks): fill Tables~5.3 and
+        5.4.
+\end{enumerate}
+\textbf{Thesis references:} Sec.~6 (future work), Sec.~5.5 (leakage analysis).
+\end{answerbox}
+
+% ── Q45 ─────────────────────────────────────────────────────────────────────
+\question{Could the LBEADS-NET approach generalise to other signal
+decomposition problems---Raman spectroscopy, NMR, mass
+spectrometry?}
+
+\begin{answerbox}
+\textbf{Key points:}
+\begin{itemize}[nosep]
+  \item \textbf{Yes, in principle.}  Any problem where the signal
+        decomposes as $\mathbf{y} = \mathbf{b} + \mathbf{p} +
+        \boldsymbol{\varepsilon}$ with a smooth baseline and sparse
+        peaks is a candidate.
+  \item \textbf{Raman spectroscopy}: fluorescence background is
+        smooth and broadband, peaks are narrow Lorentzian---very
+        similar structure.  BEADS-like methods are already used
+        (Zhang et al., 2010).
+  \item \textbf{NMR}: baseline distortion from phase errors and
+        receiver artefacts.  The peak model is Lorentzian with
+        known analytic form.
+  \item \textbf{Mass spectrometry}: chemical noise creates a
+        baseline, but the signal is often discrete (centroid data),
+        which changes the problem structure.
+  \item The unrolling framework is modular: replace the peak prior
+        (Lorentzian instead of bi-Gaussian) and the filter design
+        (adjust $f_c$ for the spectral content), and retrain.
+  \item The $\ell_1$ leakage limitation would apply equally in
+        all these domains---the proposed group sparsity fix would
+        also be needed.
+\end{itemize}
+\textbf{Thesis references:} Sec.~2.1 (signal model), Sec.~6 (future work).
+\end{answerbox}
+
+% ── Q46 ─────────────────────────────────────────────────────────────────────
+\question{What would it take to make $f_c$ learnable?  Sketch the approach
+at the whiteboard.}
+
+\begin{answerbox}
+\textbf{Key points (sketch for the whiteboard):}
+\begin{enumerate}[nosep]
+  \item \textbf{Current}: $f_c$ enters through
+        \texttt{scipy.signal.butter(d, f\_c)} $\to$ IIR coefficients
+        $\to$ dense matrix $\mathbf{H}$.  This pipeline is not
+        differentiable.
+  \item \textbf{Approach 1---Differentiable IIR:} Place Butterworth
+        poles at $p_k = e^{j(\pi/2 \pm \Delta\theta_k)}$ where
+        $\Delta\theta_k = g(f_c)$.  Construct the transfer function
+        $H(z) = \prod_k (1 - p_k z^{-1})$ in PyTorch.  Apply via
+        \texttt{torch.linalg.solve\_triangular} (causal IIR).
+        Gradients flow through $f_c \to p_k \to H(z) \to
+        \mathbf{H}\mathbf{y}$.
+  \item \textbf{Approach 2---Learnable FIR:} Design an FIR filter
+        of order $M$ initialised from the Butterworth impulse
+        response truncated at $M$ taps.  Make the tap weights
+        $h_0, \ldots, h_M$ learnable.  Apply via
+        \texttt{torch.nn.functional.conv1d}.  This is simpler but
+        loses the sharp IIR rolloff.
+  \item \textbf{Approach 3---Frequency-domain:} Multiply
+        $\mathbf{Y}(f)$ by a learnable frequency response
+        $|\hat{H}(f)|$ parameterised by $f_c$ and filter order.
+        Invert via IFFT.  Fully differentiable but introduces
+        circular convolution artefacts.
+  \item \textbf{Recommended}: Approach~2 (FIR) for simplicity and
+        robustness, with $M \sim 64$ taps.
+\end{enumerate}
+\textbf{Thesis references:} Sec.~3.4 (current filter construction), Sec.~6 (future work).
+\end{answerbox}
+
+
+% ============================================================================
+%  11. KILLER QUESTIONS -- THE MEANEST ONES
+% ============================================================================
+\newpage
+\section{Killer Questions --- The Ones That Hurt}
+
+\begin{tcolorbox}[
+  enhanced,
+  colback=WarnBG,
+  colframe=WarnFrame,
+  fonttitle=\bfseries\sffamily,
+  title={Warning},
+  coltitle=white,
+  attach boxed title to top left={yshift=-2mm, xshift=4mm},
+  boxed title style={colback=WarnFrame, colframe=WarnFrame, sharp corners, size=small},
+  left=4pt, right=4pt, top=4pt, bottom=4pt
+]
+These are the questions designed to make you uncomfortable.  They target
+circular reasoning, contribution validity, mathematical rigour, and the
+``so what'' factor.  If you can handle these, you can handle anything.
+\end{tcolorbox}
+
+\vspace{0.5em}
+
+% ── Q47 ─────────────────────────────────────────────────────────────────────
+\question{Strip away the loss engineering that your own results show does
+not work.  What remains?  You unrolled BEADS into ISTA layers with
+scalar parameters---that is just LISTA applied to a different cost
+function.  Where, exactly, is the novelty?}
+
+\begin{answerbox}
+\textbf{Key points:}
+\begin{itemize}[nosep]
+  \item Acknowledge the similarity to LISTA, but clarify the differences:
+        (a)~LISTA learns full matrices $\mathbf{W}_e, \mathbf{S}$;
+        LBEADS-NET fixes the operators and learns only scalars.
+        (b)~LISTA targets sparse coding; LBEADS-NET targets a
+        \emph{three-component} signal decomposition with frequency-domain
+        separation (baseline $+$ peaks $+$ noise).
+  \item The novelty is application-specific:
+        \emph{no prior work has unrolled the BEADS algorithm}.
+        The ISTA reformulation of the MM update (replacing CG inner
+        solve with proximal gradient) is a design contribution.
+  \item The identification and systematic characterisation of
+        baseline leakage as a fundamental $\ell_1$ limitation in
+        this architecture is novel.
+  \item The 12-term anti-leakage loss design (even though it fails
+        to break the BLI floor) and the curriculum strategy are
+        original engineering contributions.
+  \item Concede: the theoretical novelty is modest.  This is an
+        \emph{applied} thesis.
+\end{itemize}
+\textbf{Thesis references:} Sec.~2.3.2 (LISTA), Sec.~3.2--3.3 (ISTA reformulation), Sec.~1.2 (contributions).
+\end{answerbox}
+
+% ── Q48 ─────────────────────────────────────────────────────────────────────
+\question{You train on synthetic data and test on synthetic data generated
+by the \emph{same} code with the \emph{same} distributions.  This is
+a closed loop.  You have proven nothing about real chromatography.
+How do you respond?}
+
+\begin{answerbox}
+\textbf{Key points:}
+\begin{itemize}[nosep]
+  \item This is correct, and it is a fundamental limitation.
+  \item The synthetic data was calibrated against 8 real chromatograms
+        (Sec.~4.1)---peak heights 10--2600+, widths FWHM 3--370+,
+        29--58 peaks per signal---but the test set is still synthetic.
+  \item The thesis contribution is \emph{algorithmic}: demonstrating
+        unrolling and characterising leakage.  The synthetic evaluation
+        framework controls for confounding variables that real data
+        would introduce.
+  \item All supervised deep learning for baseline correction
+        (Kensert et al., Chen et al., Han et al.) uses synthetic
+        training data---this is standard practice because ground truth
+        does not exist for real chromatograms.
+  \item The honest response: real-data validation is the single most
+        important missing piece and the top priority for future work.
+\end{itemize}
+\textbf{Thesis references:} Sec.~4.1 (data generation), Sec.~5.6 (real chromatogram discussion).
+\end{answerbox}
+
+% ── Q49 ─────────────────────────────────────────────────────────────────────
+\question{Your standard deviations are enormous.  Peak MSE is $9.30
+\pm 4.7 \times 10^{-3}$.  That means some signals have MSE of
+$4.6 \times 10^{-3}$ and others have $14.0 \times 10^{-3}$---a
+$3\times$ range.  Is your model actually learning anything consistent,
+or is it just averaging over easy and hard cases?}
+
+\begin{answerbox}
+\textbf{Key points:}
+\begin{itemize}[nosep]
+  \item The high variance is expected: the test set deliberately
+        includes signals with very different peak densities (20--55
+        peaks), baseline shapes (spline, exponential, mixed), and
+        noise levels ($\sigma_w \in [2, 6]$).
+  \item A signal with 20 well-separated peaks and low noise is
+        genuinely \emph{easier} than one with 55 overlapping peaks
+        and high noise.  The variance reflects problem difficulty,
+        not model inconsistency.
+  \item To verify: stratify results by peak density (sparse vs
+        dense) and report separately.  This was not done but should be.
+  \item The \emph{relative} improvement over classical BEADS is
+        consistent across signals (the std of the improvement would
+        be more informative than the std of the raw metric).
+  \item Concede: reporting only mean $\pm$ std is insufficient.
+        Median, IQR, and per-signal scatter plots would be more
+        informative.
+\end{itemize}
+\textbf{Thesis references:} Table~5.1 (standard deviations), Sec.~4.1 (data diversity).
+\end{answerbox}
+
+% ── Q50 ─────────────────────────────────────────────────────────────────────
+\question{You say LBEADS-NET has ``only 100 learnable parameters.''  But the
+dense matrices $\mathbf{A}$, $\mathbf{B}$, and $\mathbf{L}$ are
+each $N \times N = 4096^2 \approx 16.7$ million entries.  These are
+frozen, not absent.  The model capacity is dominated by these
+fixed operators.  Isn't ``100 parameters'' misleading?}
+
+\begin{answerbox}
+\textbf{Key points:}
+\begin{itemize}[nosep]
+  \item This is a valid nuance.  The \emph{learnable} parameter
+        count is 100 scalars.  The \emph{total model capacity}
+        includes the fixed filter matrices, which encode substantial
+        prior knowledge.
+  \item However, the fixed matrices are determined entirely by two
+        hyperparameters ($f_c$ and $d$) and the signal length $N$.
+        They are not ``learned from data''---they are analytically
+        derived from the Butterworth filter design.
+  \item The analogy: a CNN with a fixed Gabor filter bank and 100
+        learnable classification weights also has ``100 learnable
+        parameters'' even though the Gabor filters encode structure.
+  \item The ``100 parameters'' claim is about \emph{what backpropagation
+        can adjust}, not about the total information content of the
+        model.  This distinction should be made clearer in the thesis.
+  \item The correct framing: ``100 learnable parameters, with
+        fixed structural operators derived from the BEADS
+        formulation.''
+\end{itemize}
+\textbf{Thesis references:} Sec.~3.4 (architecture), Table~3.1 (parameters per layer).
+\end{answerbox}
+
+% ── Q51 ─────────────────────────────────────────────────────────────────────
+\question{Why not just use Bayesian optimisation to tune the 6 classical
+BEADS parameters on a validation set?  That would be simpler than
+unrolling, fully interpretable, and might work just as well.}
+
+\begin{answerbox}
+\textbf{Key points:}
+\begin{itemize}[nosep]
+  \item Bayesian optimisation (BO) over $\{f_c, d, r, \lambda_0,
+        \lambda_1, \lambda_2\}$ on a validation set is a perfectly
+        reasonable baseline.  It was not compared against, and it
+        should have been.
+  \item Key difference: BO finds a \emph{single global} parameter
+        set optimised for the validation distribution.  LBEADS-NET
+        learns \emph{per-layer} parameters that specialise across
+        depth (Sec.~5.5)---this is fundamentally richer.
+  \item BO-tuned BEADS would still suffer from the same $\ell_1$
+        leakage in dense-peak regions (the leakage is structural,
+        not a tuning issue).  But BO would likely achieve better
+        results than the ``unfair'' default-parameter comparison.
+  \item Concede: BO-tuned BEADS is the missing comparison that would
+        isolate the benefit of \emph{unrolling} from the benefit of
+        \emph{better parameters}.
+  \item This is arguably the most important missing experiment.
+\end{itemize}
+\textbf{Thesis references:} Sec.~4.5 (comparison methods), Sec.~5.1 (results).
+\end{answerbox}
+
+% ── Q52 ─────────────────────────────────────────────────────────────────────
+\question{Your three-stage curriculum training is just a manually designed
+training schedule.  You replaced BEADS's 6 hand-tuned parameters
+with 12 hand-tuned loss weights \emph{plus} a hand-designed
+3-stage curriculum with hand-picked epoch budgets.  How is this
+reducing human design effort?}
+
+\begin{answerbox}
+\textbf{Key points:}
+\begin{itemize}[nosep]
+  \item This is a fair and damaging critique.  Acknowledge it.
+  \item The key distinction: the manual design effort is a
+        \emph{one-time cost} during model development.  Once trained,
+        the model requires \emph{zero} user input at inference time.
+        Classical BEADS requires per-signal tuning at every use.
+  \item The curriculum and loss weights are meta-level design
+        decisions analogous to choosing a network architecture in
+        deep learning---they are set by the model developer, not
+        the end user.
+  \item Concede: the total design effort for LBEADS-NET (12 loss
+        weights, 3 curriculum stages, epoch budgets, etc.) is
+        \emph{greater} than tuning BEADS for a single signal.  The
+        payoff is generalisation across signals.
+  \item Automated hyperparameter optimisation (e.g., learning the
+        loss weights via meta-learning) would strengthen this claim
+        and is a natural extension.
+\end{itemize}
+\textbf{Thesis references:} Sec.~3.6 (curriculum), Table~3.2 (stage configuration), Sec.~3.7 (loss weights).
+\end{answerbox}
+
+% ── Q53 ─────────────────────────────────────────────────────────────────────
+\question{Gharbi et al.\ already showed in 2024 that $\ell_1$-based
+unrolled networks exhibit shrinkage bias in chromatographic
+signal recovery.  You cite their work.  Your ``fundamental insight''
+about baseline leakage is a confirmation of their finding, not a
+new discovery.  What do you actually add beyond their result?}
+
+\begin{answerbox}
+\textbf{Key points:}
+\begin{itemize}[nosep]
+  \item Gharbi et al.\ (2024) observed that $\ell_1$-based unrolled
+        methods (U-PD, U-ISTA) produce biased peak intensities
+        compared to their U-HQ hybrid penalty.  This is indeed the
+        same underlying phenomenon.
+  \item What LBEADS-NET adds:
+        (a)~\textbf{Quantification}: the BLI and PBER metrics provide
+        the first \emph{numerical characterisation} of the leakage
+        magnitude (BLI $\approx$ 0.59).
+        (b)~\textbf{Systematic mitigation attempt}: 12 anti-leakage
+        loss terms, progressive experiments, and the proof that loss
+        engineering cannot break the floor.
+        (c)~\textbf{Different algorithm}: BEADS (MM-based) vs Gharbi's
+        PD/ISTA/HQ formulations.
+        (d)~\textbf{Curriculum training}: novel for this domain.
+  \item Concede: the conceptual finding is not new.  The
+        contribution is the \emph{depth of analysis} and the specific
+        characterisation for the BEADS architecture.
+  \item Frame as: ``We independently confirmed and quantified a
+        phenomenon that Gharbi et al.\ identified qualitatively.''
+\end{itemize}
+\textbf{Thesis references:} Sec.~2.3.5 (Gharbi et al.), Sec.~5.1.2 (BLI analysis), Sec.~1.3 (contributions).
+\end{answerbox}
+
+% ── Q54 ─────────────────────────────────────────────────────────────────────
+\question{At the end of the day: your best model has 50\% area error,
+0.79 peak correlation, and 0.59 BLI.  A practising chromatographer
+would never deploy this.  Your loss engineering does not fix
+leakage.  Your ablation tables are empty.  What exactly is the
+contribution to knowledge?}
+
+\begin{answerbox}
+\textbf{Key points (this is THE critical question---have this answer cold):}
+\begin{itemize}[nosep]
+  \item \textbf{Contribution 1}: First unrolling of the BEADS
+        algorithm.  Demonstrated that BEADS can be reformulated as
+        ISTA layers, trained end-to-end, and applied without
+        per-signal parameter tuning.
+  \item \textbf{Contribution 2}: Identification and quantification
+        of the $\ell_1$ leakage floor (BLI $\approx$ 0.59) as a
+        \emph{fundamental architectural limit} that loss engineering
+        cannot overcome.  This is a negative result with clear
+        implications for the field.
+  \item \textbf{Contribution 3}: The failure mode catalogue---CG
+        gradient vanishing, non-learnable $f_c$, train/inference
+        mismatch, softplus artefacts---provides practical guidance
+        for anyone attempting algorithm unrolling.
+  \item \textbf{Contribution 4}: Emergent parameter specialisation
+        across layers, demonstrating that unrolled networks learn
+        non-uniform iteration schedules that classical algorithms
+        cannot express.
+  \item \textbf{The framing}: this is a \emph{methodological
+        exploration} and \emph{negative result study}, not a
+        deployment-ready tool.  The value is in \emph{what we learned}
+        about unrolling sparsity-based algorithms.
+\end{itemize}
+\textbf{Thesis references:} Sec.~1.3 (contributions), Sec.~5.7 (summary of findings).
+\end{answerbox}
+
+% ── Q55 ─────────────────────────────────────────────────────────────────────
+\question{Your advisor invented BEADS.  How do we know this thesis is not
+just an exercise in making the advisor's algorithm look relevant?
+Where is the objectivity?}
+
+\begin{answerbox}
+\textbf{Key points:}
+\begin{itemize}[nosep]
+  \item The thesis is arguably \emph{harder} on BEADS than an
+        independent researcher would be: it identifies three failure
+        modes of BEADS (sparsity violation, filter bandwidth mismatch,
+        spatially uniform regularisation), demonstrates that the
+        $\ell_1$ prior is fundamentally limited in dense-peak
+        regimes, and shows that unrolling inherits these limitations.
+  \item A thesis that just praised BEADS would be weaker.  The
+        negative findings (leakage floor, over-regularisation,
+        CG gradient collapse) are honest scientific reporting.
+  \item BEADS was chosen because it has the cleanest structure for
+        unrolling (explicit MM iterations, scalar parameters,
+        joint peak+baseline estimation).  This is a technical
+        motivation, not a promotional one.
+  \item The thesis \emph{motivates moving beyond BEADS}
+        (group sparsity, U-HQ penalties) as the primary future
+        direction.
+\end{itemize}
+\textbf{Thesis references:} Sec.~2.2.1.5 (BEADS failure modes), Sec.~5.1.2 (leakage analysis), Sec.~5.7 (honest summary).
+\end{answerbox}
+
+% ── Q56 ─────────────────────────────────────────────────────────────────────
+\question{Can you derive the soft-thresholding operator on the board right
+now?  Show me that it is the proximal operator of the $\ell_1$
+norm, and explain why it causes shrinkage bias.}
+
+\begin{answerbox}
+\textbf{Whiteboard derivation (MUST be prepared):}
+\begin{enumerate}[nosep]
+  \item The proximal operator: $\text{prox}_{\lambda\|\cdot\|_1}(\mathbf{v})
+        = \arg\min_{\mathbf{x}} \frac{1}{2}\|\mathbf{x} - \mathbf{v}\|^2
+        + \lambda\|\mathbf{x}\|_1$.
+  \item The problem separates element-wise:
+        $\min_{x_i} \frac{1}{2}(x_i - v_i)^2 + \lambda|x_i|$.
+  \item Take subgradient, set to zero:
+        $(x_i - v_i) + \lambda \cdot \text{sign}(x_i) = 0$.
+  \item Three cases: $v_i > \lambda \Rightarrow x_i = v_i - \lambda$;
+        $v_i < -\lambda \Rightarrow x_i = v_i + \lambda$;
+        $|v_i| \le \lambda \Rightarrow x_i = 0$.
+  \item This is $\mathcal{S}_\lambda(v_i)
+        = \text{sign}(v_i)\max(|v_i| - \lambda, 0)$.
+  \item \textbf{The bias}: for any non-zero true signal $x^* > 0$,
+        $\mathcal{S}_\lambda(x^*) = x^* - \lambda < x^*$.  The
+        estimate is \emph{always} shrunk by exactly $\lambda$.
+        In dense-peak regions where many entries are non-zero,
+        this shrinkage accumulates.
+\end{enumerate}
+\textbf{Thesis references:} Eq.~3.14 (asymmetric soft-thresholding), Sec.~3.2.4 (proximal step).
+\end{answerbox}
+
+% ── Q57 ─────────────────────────────────────────────────────────────────────
+\question{Your masked baseline loss (Term~5) supervises the baseline only
+where peaks are absent.  But at inference time, you do not know
+where peaks are.  The model was trained with ground-truth peak
+masks that it will never have in deployment.  Isn't the model
+learning to rely on information it cannot access?}
+
+\begin{answerbox}
+\textbf{Key points:}
+\begin{itemize}[nosep]
+  \item The masked loss provides a \emph{training signal}, not
+        an inference-time input.  The network does not receive the
+        mask at test time---it receives only $\mathbf{y}$.
+  \item The training objective teaches the network to produce
+        baselines that are accurate in non-peak regions.  At inference,
+        the network generalises this learned behaviour to unseen signals.
+  \item This is standard supervised learning: the ground truth is used
+        to compute the loss during training but is not available at
+        test time.  All supervised losses ``rely on information the
+        model cannot access at inference.''
+  \item The concern would be valid if the mask were an \emph{input}
+        to the network.  It is not---it only shapes the gradient.
+  \item Potential issue: if the peak mask definition ($\gamma = 0.02$
+        threshold) is very different between training and real data,
+        the learned baseline behaviour may not transfer.
+\end{itemize}
+\textbf{Thesis references:} Sec.~3.7.3 (masked baseline loss), Eqs.~3.27--3.29.
+\end{answerbox}
+
+% ── Q58 ─────────────────────────────────────────────────────────────────────
+\question{You claim ``interpretability'' as a key advantage.  But can you
+actually \emph{diagnose} why LBEADS-NET fails on a specific signal
+by inspecting the learned parameters?  Show me how.}
+
+\begin{answerbox}
+\textbf{Key points:}
+\begin{itemize}[nosep]
+  \item Partial yes: the per-layer parameters have physical meaning.
+        If $\lambda_0^{(k)}$ is very large in early layers, one can
+        diagnose ``early layers are over-thresholding small peaks.''
+        If $r^{(k)}$ is low, ``insufficient asymmetric penalisation
+        of negative artefacts.''
+  \item More concretely: one can run the signal through each layer
+        sequentially, inspecting the intermediate $\mathbf{x}^{(k)}$
+        and $\mathbf{f}^{(k)}$ at each stage.  This ``layer-by-layer
+        decomposition'' is impossible with a black-box U-Net.
+  \item However, with $K{=}20$ layers and $5$ parameters each, the
+        interaction effects are complex.  ``Interpretable'' does not
+        mean ``simple to diagnose.''
+  \item The emergent specialisation (Sec.~5.5) demonstrates that
+        the parameters \emph{are} interpretable post-training.  But
+        using them for per-signal failure diagnosis is an unsolved
+        practical problem.
+  \item Honest answer: ``more interpretable than a black box'' is
+        correct, but ``fully diagnosable'' is an overstatement.
+\end{itemize}
+\textbf{Thesis references:} Sec.~5.5 (parameter analysis), Sec.~3.4.3 (layer chaining).
+\end{answerbox}
+
+% ── Q59 ─────────────────────────────────────────────────────────────────────
+\question{You exploit dense $O(N^2)$ matrices when the orignal BEADS uses
+$O(N)$ banded solvers.  An undergraduate could implement banded
+matrix-vector products in PyTorch.  Why didn't you?}
+
+\begin{answerbox}
+\textbf{Key points:}
+\begin{itemize}[nosep]
+  \item Concede: banded matrix operations are straightforward in
+        theory.  The challenge is integrating them cleanly with
+        PyTorch's autograd for backpropagation.
+  \item The highpass filter involves $\mathbf{H} = \mathbf{B}\mathbf{A}^{-1}$,
+        where $\mathbf{A}$ is banded.  The forward pass requires
+        solving $\mathbf{A}\mathbf{z} = \mathbf{v}$ (banded system solve).
+        The \emph{backward} pass requires differentiating through
+        this solve, which PyTorch does not natively support for
+        banded systems.
+  \item Options: (a)~use \texttt{torch.linalg.solve\_triangular}
+        with LU-factored $\mathbf{A}$, (b)~write a custom autograd
+        function for banded solves, (c)~use implicit differentiation.
+  \item All of these require more engineering effort than converting
+        to dense, which was the pragmatic choice given the thesis
+        timeline.
+  \item This is the single most important engineering improvement
+        for practical deployment.
+\end{itemize}
+\textbf{Thesis references:} Sec.~3.2.2 (filter construction), Sec.~3.4 (dense implementation).
+\end{answerbox}
+
+% ── Q60 ─────────────────────────────────────────────────────────────────────
+\question{ADMM-Net is the standard framework for unrolling constrained
+optimisation problems.  Why did you not use ADMM?  The baseline
+non-negativity constraint and the frequency separation are natural
+ADMM constraints.}
+
+\begin{answerbox}
+\textbf{Key points:}
+\begin{itemize}[nosep]
+  \item ADMM decomposes the problem into sub-problems that handle
+        different constraints/penalties separately, linked by dual
+        variables (Lagrange multipliers).  This would naturally
+        separate peak sparsity, baseline smoothness, and frequency
+        separation into distinct ADMM updates.
+  \item BEADS is formulated as an unconstrained MM problem, not as
+        a constrained optimisation.  Converting to ADMM would require
+        reformulating the cost function with explicit constraints,
+        which changes the algorithm being unrolled.
+  \item The thesis's goal is to unroll \emph{BEADS specifically},
+        preserving its structure.  ADMM-based unrolling would be a
+        different method.
+  \item ADMM introduces additional hyperparameters (penalty parameter
+        $\rho$, dual variable update rate) that would also need to be
+        learned per layer.
+  \item Concede: ADMM unrolling is a promising alternative approach
+        that should be explored.
+\end{itemize}
+\textbf{Thesis references:} Sec.~2.3.4 (ADMM-Net survey), Sec.~3.2 (ISTA choice rationale).
+\end{answerbox}
+
+% ── Q61 ─────────────────────────────────────────────────────────────────────
+\question{Your model is trained at $N{=}4096$ and tested at $N{=}4096$.
+Real chromatograms can have $N{=}10^5$ to $10^6$ points.  What
+happens when you apply this model to a different signal length?
+Does it even work?}
+
+\begin{answerbox}
+\textbf{Key points:}
+\begin{itemize}[nosep]
+  \item \textbf{It does not work directly.}  The dense matrices
+        $\mathbf{A}$, $\mathbf{B}$, $\mathbf{L}$ are precomputed at
+        construction time for a fixed $N$.  A different signal length
+        requires reconstructing these matrices (which changes their
+        spectral properties) and re-registering the buffers.
+  \item The 100 learned scalar parameters are \emph{independent of
+        $N$}---they can be transferred to any signal length.  Only the
+        filter matrices need to be recomputed.
+  \item This is a strength of the architecture: the learned
+        parameters are signal-length-agnostic.  The filter construction
+        adapts automatically via \texttt{BAfilt(d, fc, N\_new)}.
+  \item However, \textbf{this was not tested}.  The normalised cutoff
+        $f_c{=}0.006$ has a different physical meaning at different $N$
+        (the period $1/f_c \approx 167$ samples is fixed, so longer
+        signals have proportionally more baseline variation relative
+        to the filter's passband).
+  \item With banded implementation, arbitrary $N$ would be trivial.
+        With dense matrices, $N{=}10^5$ requires $\sim$80\,GB per
+        matrix---infeasible.
+\end{itemize}
+\textbf{Thesis references:} Sec.~3.4 (architecture), Sec.~3.2.2 (filter parameterisation).
+\end{answerbox}
+
+% ── Q62 ─────────────────────────────────────────────────────────────────────
+\question{You initialise all layers with identical parameters and let
+training differentiate them.  But you only train for 30 epochs
+(300 gradient steps).  With 100 parameters to differentiate in
+300 steps, haven't the parameters barely moved from their
+initialisation?  How much specialisation can actually emerge?}
+
+\begin{answerbox}
+\textbf{Key points:}
+\begin{itemize}[nosep]
+  \item The 30-epoch / 300-step budget is indeed very tight for
+        100 parameters.  This is why the more complex loss
+        configurations (Exp.~1.5) fail---they need more steps.
+  \item However, the progressive experiments show meaningful
+        learning: Peak MSE drops from 21.27 (classical) to 9.30
+        (Exp.~1.3) in 300 steps.  The parameters have clearly moved.
+  \item The parameter analysis in Sec.~5.5 uses a different model
+        (6 layers, 100 epochs = 1000 steps) where specialisation
+        is more pronounced.
+  \item Concede: the 30-epoch budget was a practical constraint
+        (training time on CPU), not an optimised choice.  Longer
+        training would likely improve all configurations, especially
+        the complex ones.
+  \item This is precisely why the curriculum training (Sec.~3.6)
+        exists: it provides a \emph{structured path} through parameter
+        space that achieves more in fewer steps than random
+        initialisation.
+\end{itemize}
+\textbf{Thesis references:} Table~4.2 (training config), Sec.~5.5 (parameter analysis), Sec.~3.6 (curriculum).
+\end{answerbox}
+
+% ── Q63 ─────────────────────────────────────────────────────────────────────
+\question{Write the BEADS cost function on the board.  Now take the
+gradient with respect to $\mathbf{x}$.  Now show me how one MM
+iteration relates to one ISTA step.  Where does the approximation
+enter?}
+
+\begin{answerbox}
+\textbf{Whiteboard derivation (MUST be prepared):}
+\begin{enumerate}[nosep]
+  \item BEADS cost: $J(\mathbf{x}) = \tfrac{1}{2}\|H(\mathbf{y} - \mathbf{x})\|^2
+        + \lambda_0 \sum_n \theta(x_n) + \lambda_1 \sum_n \phi(\Delta x_n)
+        + \lambda_2 \sum_n \phi(\Delta^2 x_n)$.
+  \item Split into smooth + non-smooth:
+        $J = \underbrace{J_{\text{smooth}}}_{\text{data fidelity + smoothness}}
+        + \underbrace{J_{\text{non-smooth}}}_{\lambda_0 \sum \theta(x_n)}$.
+  \item $\nabla J_{\text{smooth}} = -H^T H(\mathbf{y} - \mathbf{x})
+        + \lambda_1 D_1^T \psi(D_1 \mathbf{x})
+        + \lambda_2 D_2^T \psi(D_2 \mathbf{x})$
+        where $\psi(z) = z/(|z| + \epsilon)$.
+  \item \textbf{MM step}: majorise the non-quadratic terms, solve the
+        resulting banded linear system exactly.  This gives
+        \emph{exact} majoriser minimisation.
+  \item \textbf{ISTA step}: take one gradient step on $J_{\text{smooth}}$:
+        $\mathbf{x}_{\text{update}} = \mathbf{x}^{k-1} + \eta \nabla J_{\text{smooth}}$,
+        then apply proximal operator for $\theta$:
+        $\mathbf{x}^k = \mathcal{S}_{\text{asym}}(\mathbf{x}_{\text{update}};
+        \lambda_0 \eta, r)$.
+  \item \textbf{The approximation}: ISTA replaces exact MM
+        minimisation with a single gradient step + proximal.  It is
+        less accurate per iteration but \emph{much simpler} to
+        differentiate.
+\end{enumerate}
+\textbf{Thesis references:} Eq.~2.1 (BEADS cost), Algorithm~1 (MM), Algorithm~2 (ISTA layer), Sec.~3.3.
+\end{answerbox}
+
+% ── Q64 ─────────────────────────────────────────────────────────────────────
+\question{Your v5 model uses clamped exponential parameterisation, but
+Section~3.2.1 says ``No clamping is applied---the exponential
+function alone guarantees positivity.''  Which is it?  Does the
+6-layer parameter analysis (Table~5.5) show clamped parameters
+(marked with $*$)?  These statements contradict each other.}
+
+\begin{answerbox}
+\textbf{Key points:}
+\begin{itemize}[nosep]
+  \item This is a genuine inconsistency in the thesis.
+  \item Section~3.2.1 describes the v5 architecture (the final model)
+        where parameters use unclamped exponential parameterisation:
+        $\lambda = \exp(\theta)$, no bounds.
+  \item Table~5.5 shows parameters from a \emph{different model}
+        (6-layer, $N{=}1024$, curriculum-trained) that uses clamped
+        parameterisation (parameters marked with $*$ hit clamp
+        boundaries).
+  \item The two models have different parameterisation schemes.  This
+        is not made clear in the thesis and creates confusion.
+  \item Fix: add a note in Sec.~5.5 that the 6-layer model uses a
+        different (earlier) parameterisation with clamps, and clarify
+        that the main 20-layer model uses unclamped exponential.
+\end{itemize}
+\textbf{Thesis references:} Sec.~3.2.1 (unclamped), Table~5.5 (clamped $*$ markers).
+\end{answerbox}
+
+% ── Q65 ─────────────────────────────────────────────────────────────────────
+\question{You claim the per-layer independence enables ``emergent parameter
+specialisation.''  But with 100 parameters trained on 160 signals
+for 30 epochs, how do you distinguish ``specialisation'' from
+``overfitting to the training set''?  What would the parameters
+look like on a different random seed?}
+
+\begin{answerbox}
+\textbf{Key points:}
+\begin{itemize}[nosep]
+  \item Valid concern.  The monotonic increase in $\lambda_0$ across
+        layers could be a genuine pattern or a training artefact.
+  \item To distinguish: train multiple models with different random
+        seeds and check whether the same qualitative pattern
+        (increasing sparsity, non-monotonic asymmetry, stable step
+        size) appears.  This was not done.
+  \item Evidence against overfitting: the test-set metrics improve
+        consistently across the progressive experiments, suggesting
+        the learned parameters generalise.  If the model were
+        overfitting, we would expect test performance to diverge from
+        training performance.
+  \item The specialisation pattern is also \emph{physically sensible}:
+        it matches the behaviour of iterative thresholding algorithms
+        (coarse-to-fine refinement).  Overfitting would produce
+        arbitrary or noisy parameter values.
+  \item Concede: multi-seed experiments are needed to confirm the
+        robustness of the specialisation pattern.
+\end{itemize}
+\textbf{Thesis references:} Sec.~5.5 (parameter analysis), Table~5.5 (learned values).
+\end{answerbox}
+
+
+% ============================================================================
+%  KNOWN INCONSISTENCIES TO FIX
+% ============================================================================
+\newpage
+\section{Known Inconsistencies \& Issues to Fix Before Defense}
+
+\begin{warnbox}[CRITICAL: Fix Before Defense]
+The following issues have been identified in the current thesis draft.
+Each should be resolved before the defense to avoid uncomfortable questions.
+\end{warnbox}
+
+\vspace{0.5em}
+
+\renewcommand{\arraystretch}{1.4}
+\begin{table}[h!]
+\centering
+\small
+\begin{tabular}{@{} c p{5.8cm} p{3cm} p{3.5cm} @{}}
+\toprule
+\textbf{\#} & \textbf{Issue} & \textbf{Location} & \textbf{Fix} \\
+\midrule
+1 & Abstract is Lorem Ipsum placeholder text &
+    Abstract page &
+    Write the real abstract \\
+2 & Conclusions chapter is Lorem Ipsum placeholder &
+    Chapter 6 &
+    Write real conclusions \\
+3 & Dedication has ``YOUR DEDICATION (1-2 LINES)'' placeholder &
+    Dedication page &
+    Write dedication or remove \\
+4 & Broken cross-references showing ``Chapter~??'' &
+    pp.\ 43, 56, 68 &
+    Fix \verb|\label/\ref| pairs \\
+5 & University ID and NetID are placeholders (``N\#'', ``NetID'') &
+    Title/signature pages &
+    Insert real ID numbers \\
+6 & Ablation tables 5.3 and 5.4 have all dashes &
+    Tables 5.3--5.4 &
+    Run experiments or remove \\
+7 & Sections 5.3 (Qualitative Examples) and 5.4 (Training Dynamics) are placeholder &
+    Sec.\ 5.3--5.4 &
+    Write or mark as future work \\
+8 & Advisor title inconsistency: ``Assistant Prof.'' vs ``Professor'' &
+    Abstract vs.\ approval page &
+    Verify correct title, unify \\
+9 & Loss term count: ``11-term'' in Intro vs ``twelve'' in Sec.\ 3.7 &
+    Sec.\ 1.2 vs Sec.\ 3.7 &
+    Correct Intro to ``twelve-term'' \\
+10 & Peak model mismatch: EMG in Sec.\ 2.1.4 vs bi-Gaussian in Sec.\ 4.1.1 &
+     Sec.\ 2.1.4 vs 4.1.1 &
+     Add justification in Sec.\ 4.1.1 \\
+\bottomrule
+\end{tabular}
+\caption{Known issues in the current thesis draft, ordered by severity.}
+\label{tab:issues}
+\end{table}
+
+\vspace{1em}
+
+\begin{warnbox}[Priority Actions]
+\begin{enumerate}[nosep]
+  \item[\textbf{P0}] Items 1, 2, 5: These will be immediately noticed by any
+        committee member opening the document.
+  \item[\textbf{P1}] Items 3, 4, 8, 9: Visible quality issues that suggest
+        the document was not carefully reviewed.
+  \item[\textbf{P2}] Items 6, 7, 10: Content gaps that may or may not be
+        raised depending on committee member interests.
+\end{enumerate}
+\end{warnbox}
+
+
+% ============================================================================
+%  GENERAL DEFENSE ADVICE
+% ============================================================================
+\newpage
+\section*{General Defense Advice}
+\addcontentsline{toc}{section}{General Defense Advice}
+
+\begin{tcolorbox}[
+  enhanced,
+  colback=blue!3!white,
+  colframe=SectionBlue,
+  fonttitle=\bfseries\sffamily,
+  title={Guiding Principles for the Defense},
+  coltitle=white,
+  attach boxed title to top center={yshift=-2mm},
+  boxed title style={colback=SectionBlue, colframe=SectionBlue, sharp corners, size=small},
+  left=6pt, right=6pt, top=6pt, bottom=6pt
+]
+
+\begin{enumerate}[leftmargin=*, itemsep=8pt]
+
+\item \textbf{Own the negative results.}
+The BLI plateau at 0.59 and the over-regularisation finding (Exp.~1.5)
+are \emph{contributions}, not failures.  Present them as deliberate
+investigations.  ``We tried X, and it did not work because of Y'' is a
+perfectly valid scientific finding.
+
+\item \textbf{Know what you do not know.}
+When a question targets a gap (e.g., ``why no arPLS comparison?''),
+say: ``That is a limitation of this work.  Here is what I would do
+if I had more time.''  Do not bluff.
+
+\item \textbf{Redirect to the architecture.}
+Many attack questions (area error, BLI, peak correlation) have the same
+root cause: $\ell_1$ shrinkage bias.  Learn the shrinkage bias argument
+cold and redirect to it.
+
+\item \textbf{Prepare the whiteboard.}
+Be ready to derive:
+(a)~the BEADS cost function (Eq.~2.24),
+(b)~the ISTA proximal step (Eq.~3.9),
+(c)~the soft-thresholding operator and its bias,
+(d)~why untied parameters break MM convergence.
+
+\item \textbf{Credit the advisor.}
+Professor Selesnick co-authored BEADS.  When discussing the algorithm,
+frame the work as a natural evolution of the group's research programme.
+
+\item \textbf{Time management.}
+Aim for 25--30 minutes of presentation, leaving 30--45 minutes for
+questions.  For each question, answer in 60--90 seconds.  If the
+committee wants more detail, they will ask.
+
+\item \textbf{Do not read from this document during the defense.}
+Internalise the key points.  The goal is fluency, not recitation.
+
+\end{enumerate}
+\end{tcolorbox}
+
+\vfill
+\begin{center}
+\small\itshape
+Prepared April 2026.\\
+Good luck, Saad.
+\end{center}
+
+
+% ============================================================================
+%  GLOSSARY
+% ============================================================================
+\newpage
+\section*{Glossary of Key Terms}
+\addcontentsline{toc}{section}{Glossary of Key Terms}
+
+\begin{tcolorbox}[
+  enhanced,
+  colback=blue!3!white,
+  colframe=SectionBlue,
+  fonttitle=\bfseries\sffamily,
+  title={Terms Defined in the Context of This Thesis},
+  coltitle=white,
+  attach boxed title to top center={yshift=-2mm},
+  boxed title style={colback=SectionBlue, colframe=SectionBlue, sharp corners, size=small},
+  left=6pt, right=6pt, top=6pt, bottom=6pt
+]
+{\small This glossary defines terms as they are used specifically within the
+LBEADS-NET thesis.  Definitions are scoped to the chromatographic
+baseline-correction context and may differ from their broader usage in
+other fields.}
+\end{tcolorbox}
+
+\vspace{1em}
+
+\newcommand{\glossterm}[1]{\par\vspace{0.6em}\noindent\textbf{\textsf{\textcolor{SectionBlue}{#1}}}\par\nopagebreak\vspace{0.15em}}
+
+\glossterm{$\ell_1$ Leakage Limit}
+The empirically observed floor on the Baseline Leakage Index
+(BLI~$\approx 0.59$) that persists across \emph{all} LBEADS-NET loss
+configurations (Experiments~1.1--1.5).  The limit arises because the
+$\ell_1$-based soft-thresholding operator at the core of every ISTA layer
+shrinks \emph{every} non-zero signal value by exactly~$\lambda$
+(the effective threshold).  In dense-peak regions where the sparsity
+assumption is violated, this shrinkage accumulates: the total missing
+peak energy is proportional to $\lambda \times (\text{number of non-zero
+samples})$, and this energy is absorbed into the baseline estimate via the
+low-pass filter.  Because the shrinkage is a structural property of the
+proximal operator---not a tunable weight---no amount of loss engineering
+(anti-leakage penalties, asymmetric baseline loss, envelope constraints,
+etc.)\ can push the BLI below this floor.  The limit generalises to
+\emph{any} unrolled network that inherits $\ell_1$-based sparsity priors,
+as independently confirmed by Gharbi et~al.\ (2024) in their work on
+unrolled sparse-recovery architectures.
+\hfill\textit{Thesis refs: Sec.~5.1.2, Table~5.2, Sec.~1.3 (Contribution~3)}
+
+
+\end{document}

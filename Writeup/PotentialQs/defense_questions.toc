@@ -1,0 +1,14 @@
+\contentsline {section}{\numberline {1}Foundational / ``Why This Problem'' Questions}{3}{section.1}%
+\contentsline {section}{\numberline {2}Algorithm Unrolling Theory}{5}{section.2}%
+\contentsline {section}{\numberline {3}Architecture \& Design Choices}{7}{section.3}%
+\contentsline {section}{\numberline {4}Loss Function Deep Dives}{9}{section.4}%
+\contentsline {section}{\numberline {5}Experimental Methodology}{11}{section.5}%
+\contentsline {section}{\numberline {6}Results Interpretation}{13}{section.6}%
+\contentsline {section}{\numberline {7}Baseline Leakage Deep Dive}{15}{section.7}%
+\contentsline {section}{\numberline {8}Practical / ``So What'' Questions}{17}{section.8}%
+\contentsline {section}{\numberline {9}Writing \& Completeness}{19}{section.9}%
+\contentsline {section}{\numberline {10}Future Work \& Big Picture}{20}{section.10}%
+\contentsline {section}{\numberline {11}Killer Questions --- The Ones That Hurt}{22}{section.11}%
+\contentsline {section}{\numberline {12}Known Inconsistencies \& Issues to Fix Before Defense}{31}{section.12}%
+\contentsline {section}{General Defense Advice}{32}{table.1}%
+\contentsline {section}{Glossary of Key Terms}{33}{Item.30}%

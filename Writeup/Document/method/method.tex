@@ -1,0 +1,702 @@
+%!TEX root = ../thesis.tex
+\chapter{Proposed Method: LBEADS-NET}
+\label{chap:method}
+
+This chapter presents the architecture and design of LBEADS-NET, a neural network that unrolls the classical BEADS algorithm into a differentiable, end-to-end trainable pipeline. \refsec{sec:method_formulation} formalizes the learning objective. \refsec{sec:method_beadslayer} derives the core ISTA-style layer that constitutes the fundamental computational unit. \refsec{sec:method_ista} motivates the choice of this proximal gradient formulation over an earlier conjugate gradient variant. \refsec{sec:method_pipeline} describes the full $K$-layer pipeline that chains ISTA layers into a complete network. \refsec{sec:method_fc} discusses the non-learnable cutoff frequency and the autograd boundary that prevents its optimization. \refsec{sec:method_curriculum} presents the multi-stage curriculum training strategy. \refsec{sec:method_loss} details the twelve-term composite loss function and its anti-leakage design. \refsec{sec:method_hybrid} describes the hybrid inference pipeline that combines the network's output with classical post-processing.
+
+
+% ====================================================================
+\section{Problem Formulation}
+\label{sec:method_formulation}
+% ====================================================================
+
+Recall from \refsec{sec:intro_problem} the additive signal model (\refeq{eq:signal_model}):
+\begin{equation}
+    \yvec = \xvec + \fvec + \wvec,
+\end{equation}
+where $\yvec \in \Rspace^N$ is the observed chromatographic signal, $\xvec \in \Rspace^N$ is the peak component, $\fvec \in \Rspace^N$ is the baseline drift, and $\wvec \in \Rspace^N$ is measurement noise.
+
+The classical BEADS algorithm estimates $\xvec$ and $\fvec$ by solving a regularized optimization problem whose solution requires manual specification of the regularization weights $\lambda_0, \lambda_1, \lambda_2$, the asymmetry ratio $r$, the filter cutoff frequency $f_c$, and the filter order $d$. As discussed in \refsec{sec:intro_classical}, no single parameter configuration generalizes across instruments, analytes, or signal conditions.
+
+The goal of LBEADS-NET is to learn a mapping
+\begin{equation}
+    (\hat{\xvec}, \hat{\fvec}) = \mathcal{N}(\yvec; \Theta),
+    \label{eq:lbeads_mapping}
+\end{equation}
+where $\mathcal{N}$ denotes the network, $\Theta$ collects all trainable parameters, $\hat{\xvec}$ is the estimated peak signal, and $\hat{\fvec}$ is the estimated baseline. The mapping is constructed so that $\hat{\xvec} + \hat{\fvec} \approx \yvec - \wvec$, recovering the noise-free signal decomposition.
+
+The central design principle is to \emph{unroll, not replace}: each iteration of the classical BEADS algorithm is mapped to a differentiable neural network layer, preserving the optimization structure of BEADS while making its parameters learnable via backpropagation. This approach inherits the inductive biases of BEADS, sparsity of $\xvec$ in the derivative domain, smoothness of $\fvec$, asymmetric penalization of negative values, while gaining adaptivity through end-to-end training on labeled data.
+
+Concretely, the network $\mathcal{N}$ consists of $K = 20$ sequentially chained ISTA-style layers. Each layer $k \in \{1, \ldots, K\}$ takes the current peak estimate $\xvec^{k-1}$ as input and produces an updated estimate $\xvec^k$. The baseline is computed once at the end by low-pass filtering the residual $\yvec - \xvec^K$. Each layer possesses its own learnable parameters $\theta^k = \{\lambda_0^k, \lambda_1^k, \lambda_2^k, r^k, \eta^k\}$, where $\eta^k$ denotes a layer-specific step size, enabling parameter specialization across the depth of the network. The total parameter count is $5K = 100$ learnable scalars, orders of magnitude fewer than a conventional neural network, reflecting the strong inductive bias inherited from BEADS.
+
+The training objective must not only encourage accurate decomposition of $\yvec$ into $\hat{\xvec}$ and $\hat{\fvec}$, but must also actively counteract \emph{baseline leakage}, the phenomenon in which energy from the peak component is erroneously absorbed into the baseline estimate. As discussed in \refsec{sec:intro_gap}, this failure mode arises inherently from sparsity-based formulations when the peak signal is insufficiently sparse. The design of the loss function to address this challenge is deferred to \refsec{sec:method_loss}.
+% sec:method_loss is defined in Section 3.7 below.
+
+
+% ====================================================================
+\section{From BEADS to BEADSLayer ,  the ISTA Reformulation}
+\label{sec:method_beadslayer}
+% ====================================================================
+
+This section describes the transformation of a single BEADS iteration into a differentiable neural network layer with learnable parameters. The resulting module constitutes the core computational unit of LBEADS-NET. Rather than solving the BEADS linear system exactly, each layer performs a single proximal gradient step, an ISTA-style update~\cite{daubechies2004ista, beck2009fista}, that decomposes the BEADS update into a gradient descent step on the smooth objectives followed by a proximal operator for the non-smooth sparsity penalty.
+
+
+% --------------------------------------------------------------------
+\subsection{Learnable Parameters}
+\label{sec:method_params}
+% --------------------------------------------------------------------
+
+Each layer maintains five learnable scalar parameters, summarized in \reftab{tab:beadslayer_params}. To guarantee positivity, each parameter $\phi$ is stored in log-space as $\log \phi$ and recovered via exponentiation:
+\begin{equation}
+    \phi = \exp(\log \phi).
+    \label{eq:log_space_param}
+\end{equation}
+This parameterization ensures that gradients flow smoothly through the exponential map, preventing negative regularization weights that would render the optimization ill-posed. No clamping is applied, the exponential function alone guarantees positivity, and unconstrained log-space parameters allow the optimizer full freedom to explore the parameter space.
+
+\begin{table}[t]
+    \centering
+    \caption{Learnable parameters per ISTA layer. All parameters are stored in log-space and recovered via exponentiation. Default initial values correspond to the training configuration used in the final model ($K = 20$ layers, 100 total learnable scalars).}
+    \label{tab:beadslayer_params}
+    \begin{tabular}{@{}llll@{}}
+        \toprule
+        \textbf{Parameter} & \textbf{Log-space name} & \textbf{Role} & \textbf{Init.\ value} \\
+        \midrule
+        $\lambda_0$ & \texttt{log\_lam0} & Asymmetric sparsity weight & 0.01 \\
+        $\lambda_1$ & \texttt{log\_lam1} & First-derivative penalty weight & 0.5 \\
+        $\lambda_2$ & \texttt{log\_lam2} & Second-derivative penalty weight & 0.5 \\
+        $r$ & \texttt{log\_r} & Asymmetry ratio & 6.0 \\
+        $\eta$ & \texttt{log\_step\_size} & Proximal gradient step size & 0.05 \\
+        \bottomrule
+    \end{tabular}
+\end{table}
+
+The five parameters are stored as independent \texttt{nn.ParameterList} entries, one list per parameter type, each containing $K$ scalar entries, rather than being encapsulated in per-layer \texttt{nn.Module} objects. This flat storage avoids redundant precomputation of filter matrices within each layer. The parameters are initialized to values informed by the classical BEADS defaults but adapted for the proximal gradient formulation: the step size $\eta = 0.05$ is small to ensure stable refinement from the high-pass initialization, and $\lambda_0 = 0.01$ is conservative to avoid over-thresholding small peaks in the first layers.
+
+
+% --------------------------------------------------------------------
+\subsection{Butterworth Filter Construction}
+\label{sec:method_filters}
+% --------------------------------------------------------------------
+
+The BEADS algorithm employs a zero-phase Butterworth high-pass filter, realized through banded matrices $A$ and $B$, to enforce frequency-domain separation between peaks (high-frequency) and baseline (low-frequency). In LBEADS-NET, the filter coefficients are \emph{fixed}, the cutoff frequency $f_c$ and filter order $d$ are not learnable parameters.
+
+The filter coefficients are computed by the \texttt{BAfilt} function as follows. For filter order $d$ and normalized cutoff frequency $f_c \in (0, 0.5)$, define the frequency-warping parameter
+\begin{equation}
+    t = \left(\frac{1 - \cos(2\pi f_c)}{1 + \cos(2\pi f_c)}\right)^d.
+\end{equation}
+The high-pass numerator polynomial $\mathbf{b} \in \Rspace^{2d+1}$ is constructed by convolving $(2d+1)$-tap FIR kernels derived from the first-order difference operator $[1, -1]$:
+\begin{equation}
+    \mathbf{b} = \underbrace{[1, -1] * [-1, 2, -1] * \cdots}_{d-1 \text{ convolutions}} * [-1, 1],
+\end{equation}
+and the denominator polynomial is
+\begin{equation}
+    \mathbf{a} = \mathbf{b} + t \cdot \underbrace{[1, 2, 1] * [1, 2, 1] * \cdots}_{d \text{ convolutions}}.
+\end{equation}
+
+The coefficient vectors $\mathbf{a}$ and $\mathbf{b}$, each of length $2d+1$, define banded Toeplitz matrices $A, B \in \Rspace^{N \times N}$ with bandwidth $d$. The matrix $A$ has entries $A_{ij} = a_{|i-j|+d}$ for $|i-j| \leq d$ and zero otherwise, and similarly for $B$. The high-pass filter operator is then $H = BA^{-1}$, and the complementary low-pass operator is $L = I - H = I - BA^{-1}$.
+
+Unlike the classical BEADS implementation, which exploits banded structure for $O(dN)$ matrix-vector products, the v5 architecture precomputes and stores $A$ and $B$ as \emph{dense} $N \times N$ matrices (\texttt{A\_dense} and \texttt{B\_dense}), registered as non-learnable buffers. The low-pass operator $L = I - BA^{-1}$ is also precomputed as a dense matrix (\texttt{lowpass\_dense}) via the \texttt{compute\_lowpass\_matrix} function, which computes $A^{-1}$ by solving $A Z = I$ and then forms $L = I - BZ$. When iterated low-pass filtering is desired, the matrix power $L^p$ is computed by repeated matrix multiplication via \texttt{compute\_iterated\_lowpass\_matrix}. In the final trained model, $p = 1$ (a single-pass low-pass filter, matching classical BEADS).
+
+The use of dense matrices trades memory ($O(N^2)$ per buffer) for simplicity and full differentiability: every filter application reduces to a matrix-vector product that PyTorch's autograd can differentiate without custom backward passes. For the final model with $N = 4096$, each dense buffer requires approximately 128~MB in float64, which is feasible on modern hardware. The decision to fix $f_c$ and $d$ rather than learning them is discussed further in \refchap{chap:discussion}.
+% NOTE: chap:discussion to be written later.
+
+
+% --------------------------------------------------------------------
+\subsection{Difference Operators}
+\label{sec:method_diff_ops}
+% --------------------------------------------------------------------
+
+The smoothness penalties in the BEADS objective require first- and second-order finite difference operators $D_1 \in \Rspace^{(N-1) \times N}$ and $D_2 \in \Rspace^{(N-2) \times N}$. Rather than storing these as matrices, the implementation computes their actions via efficient vectorized slicing operations:
+\begin{align}
+    [D_1 \xvec]_i &= x_{i+1} - x_i, \quad i = 1, \ldots, N-1, \label{eq:diff1} \\
+    [D_2 \xvec]_i &= x_{i+2} - 2x_{i+1} + x_i, \quad i = 1, \ldots, N-2. \label{eq:diff2}
+\end{align}
+The transpose operations $D_1^\top$ and $D_2^\top$, required for computing gradients, are implemented as adjoint accumulation operations:
+\begin{align}
+    [D_1^\top \mathbf{v}]_i &=
+    \begin{cases}
+        -v_1 & i = 1, \\
+        v_{i-1} - v_i & 2 \leq i \leq N-1, \\
+        v_{N-1} & i = N,
+    \end{cases} \label{eq:diff1_T} \\[6pt]
+    [D_2^\top \mathbf{v}]_i &=
+    \begin{cases}
+        v_1 & i = 1, \\
+        -2v_1 + v_2 & i = 2, \\
+        v_{i-2} - 2v_{i-1} + v_i & 3 \leq i \leq N-2, \\
+        v_{N-3} - 2v_{N-2} & i = N-1, \\
+        v_{N-2} & i = N.
+    \end{cases} \label{eq:diff2_T}
+\end{align}
+These four operations, \texttt{diff1}, \texttt{diff2}, \texttt{diff1\_T}, and \texttt{diff2\_T}, are implemented as methods of the network class and operate on batched tensors of shape $(\text{batch}, N)$. Each runs in $O(N)$ time and requires no stored matrices.
+
+
+% --------------------------------------------------------------------
+\subsection{The ISTA Layer Forward Pass}
+\label{sec:method_forward}
+% --------------------------------------------------------------------
+
+Each ISTA layer implements one proximal gradient step for the BEADS objective. Given the current peak estimate $\xvec^{k-1}$ and the observed signal $\yvec$, the layer computes the updated estimate $\xvec^k$ through two stages: a gradient descent step on the smooth terms, followed by a proximal step for the non-smooth asymmetric sparsity penalty.
+
+\myparagraph{Data fidelity gradient.}
+The data fidelity term measures how well the current peak estimate explains the high-frequency content of the observed signal. The residual $\yvec - \xvec^{k-1}$ contains both baseline (low-frequency) and unexplained peak (high-frequency) content. The gradient is computed by applying the high-pass filter to extract only the high-frequency component of the residual:
+\begin{equation}
+    \mathbf{g}_{\text{data}} = H(\yvec - \xvec^{k-1}),
+    \label{eq:data_grad}
+\end{equation}
+where $H = I - L$ is the high-pass operator and $L$ is the precomputed dense low-pass matrix. This formulation ensures that the low-frequency (baseline) content of the residual does not influence the peak update, only the high-frequency residual drives the peak estimate toward the data. In the implementation, $H(\mathbf{v})$ is computed as $\mathbf{v} - L\mathbf{v}$ via the \texttt{apply\_highpass\_filter} function, which calls \texttt{apply\_lowpass\_filter} internally.
+
+\myparagraph{Smoothness penalty gradients.}
+The first- and second-order smoothness penalties encourage sparse derivatives in the peak signal. Their gradients with respect to $\xvec$ are:
+\begin{equation}
+    \nabla_{\xvec} \mathcal{R}_1 = \lambda_1^k\, D_1^\top\! \left(\frac{D_1 \xvec^{k-1}}{|D_1 \xvec^{k-1}| + \epsilon}\right), \qquad
+    \nabla_{\xvec} \mathcal{R}_2 = \lambda_2^k\, D_2^\top\! \left(\frac{D_2 \xvec^{k-1}}{|D_2 \xvec^{k-1}| + \epsilon}\right),
+    \label{eq:smoothness_grads}
+\end{equation}
+where $\epsilon = 10^{-6}$ is a smoothing constant that prevents division by zero. These are the subgradients of the smoothed $\ell_1$ norms $\sum_i |[D_j \xvec]_i|$, with the ratio $u / (|u| + \epsilon)$ serving as a differentiable approximation to $\text{sign}(u)$. The operations $D_1, D_2$ and their transposes $D_1^\top, D_2^\top$ are computed via the vectorized slicing operations described in \refsec{sec:method_diff_ops}.
+
+\myparagraph{Gradient descent step.}
+The data fidelity gradient and the smoothness penalty gradients are combined into a single update, scaled by the learnable step size $\eta^k$:
+\begin{equation}
+    \xvec_{\text{update}} = \xvec^{k-1} + \eta^k\, \mathbf{g}_{\text{data}} - \eta^k\, \big(\nabla_{\xvec} \mathcal{R}_1 + \nabla_{\xvec} \mathcal{R}_2\big).
+    \label{eq:grad_step}
+\end{equation}
+The first term moves the estimate toward the high-frequency content of the observed signal, while the second term penalizes non-sparse derivatives. The step size $\eta^k$ controls the aggressiveness of the update: small values produce cautious refinements, while large values produce aggressive corrections.
+
+\myparagraph{Proximal step (asymmetric soft thresholding).}
+The sparsity-promoting asymmetric penalty is handled via a proximal operator, the asymmetric soft-thresholding function:
+\begin{equation}
+    [\xvec^k]_i = \mathcal{S}_{\text{asym}}([\xvec_{\text{update}}]_i;\; \lambda_0^k \eta^k,\; r^k) =
+    \begin{cases}
+        [\xvec_{\text{update}}]_i - \lambda_0^k \eta^k & \text{if } [\xvec_{\text{update}}]_i > \lambda_0^k \eta^k, \\
+        [\xvec_{\text{update}}]_i + \lambda_0^k \eta^k r^k & \text{if } [\xvec_{\text{update}}]_i < -\lambda_0^k \eta^k r^k, \\
+        0 & \text{otherwise}.
+    \end{cases}
+    \label{eq:asym_threshold}
+\end{equation}
+The asymmetric soft-thresholding operator is the proximal operator of the asymmetric $\ell_1$ penalty function. It enforces sparsity by shrinking values with small magnitude to exactly zero, while the asymmetry ratio $r^k$ causes negative values to be thresholded $r^k$ times more aggressively than positive values. Since chromatographic peaks are positive, this encourages positive sparse peaks and strongly suppresses negative artifacts. The threshold $\lambda_0^k \eta^k$, the product of the sparsity weight and the step size, is an effective threshold that the network can modulate independently through either parameter.
+
+The complete ISTA layer forward pass is summarized in \refalg{alg:beadslayer}.
+
+\begin{algorithm}[t]
+    \caption{ISTA Layer Forward Pass}
+    \label{alg:beadslayer}
+    \begin{algorithmic}[1]
+        \REQUIRE Current peak estimate $\xvec^{k-1}$, observed signal $\yvec$, low-pass matrix $L$
+        \REQUIRE Learnable parameters: $\lambda_0^k, \lambda_1^k, \lambda_2^k, r^k, \eta^k$ (all recovered via $\exp(\cdot)$ from log-space)
+        \STATE \textbf{Data fidelity gradient:}
+        \STATE $\mathbf{g}_{\text{data}} \leftarrow (\yvec - \xvec^{k-1}) - L(\yvec - \xvec^{k-1})$ \hfill \textit{(high-pass filter of residual)}
+        \STATE \textbf{Smoothness penalty gradients:}
+        \STATE $\mathbf{w}_1 \leftarrow D_1 \xvec^{k-1} \,/\, (|D_1 \xvec^{k-1}| + \epsilon)$
+        \STATE $\mathbf{w}_2 \leftarrow D_2 \xvec^{k-1} \,/\, (|D_2 \xvec^{k-1}| + \epsilon)$
+        \STATE $\nabla \mathcal{R}_1 \leftarrow \lambda_1^k \, D_1^\top \mathbf{w}_1$, \quad $\nabla \mathcal{R}_2 \leftarrow \lambda_2^k \, D_2^\top \mathbf{w}_2$
+        \STATE \textbf{Gradient step:}
+        \STATE $\xvec_{\text{update}} \leftarrow \xvec^{k-1} + \eta^k \, \mathbf{g}_{\text{data}} - \eta^k \, (\nabla \mathcal{R}_1 + \nabla \mathcal{R}_2)$
+        \STATE \textbf{Proximal step (asymmetric soft thresholding):}
+        \STATE $\xvec^k \leftarrow \mathcal{S}_{\text{asym}}(\xvec_{\text{update}};\; \lambda_0^k \eta^k,\; r^k)$ \hfill \textit{(\refeq{eq:asym_threshold})}
+        \ENSURE Updated peak estimate $\xvec^k$
+    \end{algorithmic}
+\end{algorithm}
+
+
+% ====================================================================
+\section{Why ISTA Over Conjugate Gradient}
+\label{sec:method_ista}
+% ====================================================================
+
+The ISTA-style layer described in \refsec{sec:method_beadslayer} is not the only possible unrolling of the BEADS algorithm. An earlier variant, implemented as the \texttt{LBEADS\_NET} class using \texttt{BEADSLayer} modules, faithfully reproduced the BEADS update by solving the full linear system at each layer via conjugate gradient (CG). This section explains why the CG variant was abandoned in favor of the proximal gradient formulation.
+
+
+% --------------------------------------------------------------------
+\subsection{The CG Variant}
+\label{sec:method_cg_variant}
+% --------------------------------------------------------------------
+
+In the classical BEADS algorithm, each iteration requires solving the linear system
+\begin{equation}
+    \big(B^\top B + A^\top M A\big)\, \mathbf{z} = \mathbf{d},
+    \label{eq:linear_system}
+\end{equation}
+where
+\begin{equation}
+    M = 2\lambda_0 \,\Gamma + D^\top \Lambda\, D, \qquad
+    D = \begin{bmatrix} D_1 \\ D_2 \end{bmatrix}, \qquad
+    \Lambda = \begin{bmatrix} \Lambda_1 & 0 \\ 0 & \Lambda_2 \end{bmatrix},
+\end{equation}
+and $\Gamma = \text{diag}(\gamma_1, \ldots, \gamma_N)$ contains the asymmetric penalty weights. The right-hand side $\mathbf{d}$ depends on the observed signal $\yvec$ and the current layer's learnable parameters $\lambda_0^k$ and $r^k$. The peak estimate is then recovered as $\xvec^k_{\text{raw}} = A\mathbf{z}$, followed by a learnable relaxation step $\xvec^k = \xvec^{k-1} + \alpha^k(\xvec^k_{\text{raw}} - \xvec^{k-1})$.
+
+The CG variant (\texttt{BEADSLayer} in v6) solves \refeq{eq:linear_system} using a fixed-iteration conjugate gradient method. The left-hand-side matrix-vector product $\mathbf{v} \mapsto (B^\top B + A^\top M A)\mathbf{v}$ is computed in operator form using banded coefficient vectors and vectorized difference operations, avoiding the assembly of any dense matrix. Each CG layer maintains five learnable parameters ($\lambda_0, \lambda_1, \lambda_2, r, \alpha$) with clamped exponential parameterization, and the CG iterations are warm-started from the previous iterate transformed to the $z$-domain via an $A$-system solve.
+
+
+% --------------------------------------------------------------------
+\subsection{The Gradient Flow Problem}
+\label{sec:method_cg_problem}
+% --------------------------------------------------------------------
+
+The CG-based architecture creates a critical obstacle for gradient-based training. Each of the $K$ outer layers contains an inner CG loop that runs for $K_{\text{inner}}$ fixed iterations. Backpropagation must differentiate through every CG iteration within every layer, producing a computational graph of effective depth $K \times K_{\text{inner}}$. With a training configuration of $K = 8$ outer layers and $K_{\text{inner}} = 12$ CG steps, this yields an effective depth of 96 sequential differentiable operations.
+
+Each CG iteration involves multiple banded matrix-vector products with the operators $A$, $B$, $D_1$, $D_2$ and their transposes, as well as inner products and scalar divisions. The Jacobian of the CG iterate with respect to the input is a product of $K_{\text{inner}}$ matrices, each dependent on the intermediate CG state. As is well established in the deep learning literature, such depth causes \emph{gradient vanishing}: the magnitude of gradients with respect to early-layer parameters decays exponentially with depth, effectively preventing the early layers from learning meaningful parameter updates.
+
+Furthermore, the CG solver's convergence behavior introduces additional gradient instability. In practice, $K_{\text{inner}}$ CG iterations during training provide only an approximate solution to the linear system, and the quality of this approximation varies across training samples depending on the conditioning of $B^\top B + A^\top M A$. The resulting approximation error couples with the gradient vanishing problem, making the training dynamics unpredictable. Even the warm-starting strategy, which provides a good initial guess $\mathbf{z}_0 = A^{-1}\xvec^{k-1}$, does not resolve this issue, because the CG convergence trajectory still contributes $K_{\text{inner}}$ Jacobian factors to the gradient chain.
+
+
+% --------------------------------------------------------------------
+\subsection{Gradient Flow in the ISTA Variant}
+\label{sec:method_gradient_flow}
+% --------------------------------------------------------------------
+
+The ISTA variant provides a dramatic improvement in gradient flow. The key distinction lies in the effective computational depth.
+
+In the CG variant, the effective depth is $K \times K_{\text{inner}}$. Gradients must backpropagate through $K_{\text{inner}}$ sequential CG iterations within each of $K$ layers, producing a chain of Jacobians whose product contracts in norm.
+
+In the ISTA variant, the effective depth is simply $K$. Each layer performs exactly one gradient step (\refeq{eq:grad_step}) followed by one element-wise proximal operation (\refeq{eq:asym_threshold}). The high-pass filtering step $H(\yvec - \xvec^{k-1}) = (\yvec - \xvec^{k-1}) - L(\yvec - \xvec^{k-1})$ involves a single matrix-vector product with the precomputed dense low-pass matrix $L$, which is a fixed linear operator whose Jacobian is the operator itself, no iterative unrolling is required.
+
+% Placeholder for gradient magnitude comparison figure
+% \begin{figure}[t]
+%     \centering
+%     \includegraphics[width=\textwidth]{figures/fig_3_2_gradient_flow.pdf}
+%     \caption{Gradient magnitude (Frobenius norm of the Jacobian $\partial \xvec^K / \partial \theta^k$) as a function of layer index $k$ for the CG variant (LBEADS\_NET) and the ISTA variant (LBEADS\_NET\_Fast), both with $K = 8$ layers. The CG variant exhibits exponential gradient decay, while the ISTA variant maintains stable gradients across all layers.}
+%     \label{fig:gradient_flow}
+% \end{figure}
+
+The consequence is that the ISTA variant can effectively train deeper networks. The design principle that emerges is: \emph{simpler per-layer computations with more layers outperform complex per-layer computations with fewer layers}, provided that the per-layer computation captures the essential structure of the original algorithm. Each ISTA layer performs a less accurate approximation of the BEADS update than a CG layer, it takes a single gradient step rather than solving the full linear system, but the composition of $K = 20$ such layers, each with independently learned parameters, produces a more expressive and trainable network overall. In practice, the CG variant struggled to learn meaningful parameters beyond the first few layers even at $K = 8$, whereas the ISTA variant trains stably at $K = 20$ with all layers contributing to the decomposition.
+
+
+% ====================================================================
+\section{Full $K$-Layer Pipeline}
+\label{sec:method_pipeline}
+% ====================================================================
+
+The full LBEADS-NET architecture chains $K$ ISTA layers into a sequential pipeline that maps the observed signal $\yvec$ to the estimated decomposition $(\hat{\xvec}, \hat{\fvec})$. This section describes the complete forward pass of the \texttt{LBEADS\_NET\_Fast} class, which is the architecture used in the final trained model.
+
+
+% --------------------------------------------------------------------
+\subsection{Architecture Overview}
+\label{sec:method_architecture}
+% --------------------------------------------------------------------
+
+The network is parameterized by the signal length $N$, the filter order $d$ (default 1), the normalized cutoff frequency $f_c$ (default 0.006), and the number of unrolled layers $K$. In the final trained model, $N = 4096$ and $K = 20$.
+
+Each of the $K$ layers has five independent learnable parameters: $\lambda_0^k$, $\lambda_1^k$, $\lambda_2^k$, $r^k$, and $\eta^k$ (step size). The total learnable parameter count is $5K = 100$ scalars. The initial values are $\lambda_0 = 0.01$, $\lambda_1 = 0.5$, $\lambda_2 = 0.5$, $r = 6.0$, and $\eta = 0.05$, chosen to provide stable refinement from the high-pass initialization described below. All parameters are stored in log-space and recovered via exponentiation with no clamping.
+
+The network stores three dense $N \times N$ matrices as registered buffers: \texttt{A\_dense} (the banded denominator matrix), \texttt{B\_dense} (the banded numerator matrix), and \texttt{lowpass\_dense} (the precomputed low-pass operator $L = I - BA^{-1}$). Additionally, the product $B^\top B$ is precomputed and stored as \texttt{BTB\_dense}. These buffers are shared across all layers and are not learnable.
+
+% Placeholder for full pipeline diagram
+% \begin{figure}[t]
+%     \centering
+%     \includegraphics[width=\textwidth]{figures/fig_3_3_pipeline.pdf}
+%     \caption{Full LBEADS-NET pipeline. The observed signal $\yvec$ is first high-pass filtered to produce an initial peak estimate $\xvec^0 = \yvec - L(\yvec)$, which is then refined through $K = 20$ ISTA-style layers, each with independent learnable parameters. The final baseline $\hat{\fvec}$ is computed by low-pass filtering the residual $\yvec - \xvec^K$.}
+%     \label{fig:pipeline}
+% \end{figure}
+
+
+% --------------------------------------------------------------------
+\subsection{Initialization}
+\label{sec:method_initialization}
+% --------------------------------------------------------------------
+
+Rather than initializing the peak estimate to zero, the network computes a high-pass-filtered initial estimate:
+\begin{equation}
+    \xvec^0 = \yvec - L(\yvec),
+    \label{eq:init_highpass}
+\end{equation}
+where $L$ denotes the low-pass filter operator. In the implementation, the low-pass filter is applied via the precomputed dense matrix \texttt{lowpass\_dense}: $L(\yvec) = \yvec \cdot L^\top$ (exploiting the batch-row convention), and $\xvec^0 = \yvec - L(\yvec)$ is the complementary high-pass output.
+
+This initialization provides a substantially better starting point than $\xvec^0 = \mathbf{0}$. The high-pass filtering removes the bulk of the baseline, providing a rough peak estimate that the subsequent ISTA layers refine. Without this initialization, small peaks whose amplitude falls below the effective soft-thresholding level $\lambda_0^1 \eta^1$ would be permanently zeroed out by the proximal step in the first layer and could never be recovered by subsequent layers. The initialization ensures that all peaks present in the high-frequency band of $\yvec$ are available for refinement from the first layer onward.
+
+
+% --------------------------------------------------------------------
+\subsection{Layer Chaining}
+\label{sec:method_chaining}
+% --------------------------------------------------------------------
+
+The $K$ layers are applied sequentially. At each layer $k$, the update rule from \refsec{sec:method_forward} is applied:
+\begin{align}
+    \xvec_{\text{update}}^k &= \xvec^{k-1} + \eta^k\, H(\yvec - \xvec^{k-1}) - \eta^k\, \big(\nabla_{\xvec} \mathcal{R}_1^k + \nabla_{\xvec} \mathcal{R}_2^k\big), \\
+    \xvec^k &= \mathcal{S}_{\text{asym}}\!\big(\xvec_{\text{update}}^k;\; \lambda_0^k \eta^k,\; r^k\big).
+\end{align}
+The observed signal $\yvec$ is shared across all layers, it defines the data fidelity term, but the penalty weights $\lambda_0^k, \lambda_1^k, \lambda_2^k$, the asymmetry ratio $r^k$, and the step size $\eta^k$ are all layer-specific. This independence enables \emph{parameter specialization}: during training, early layers tend to learn coarse peak-baseline separation with larger step sizes and stronger regularization, while later layers learn finer refinement with smaller adjustments. This specialization emerges naturally from the training process without explicit architectural constraints.
+
+As an example of learned specialization, after training on the final model, layer~0 has parameters $\lambda_0 = 0.00755$, $\lambda_1 = 0.576$, $\lambda_2 = 0.740$, $r = 4.153$, and $\eta = 0.0705$, moderately larger step size and derivative penalties for initial shaping. Deeper layers adjust these values to fine-tune the decomposition.
+
+When intermediate supervision is enabled during training, each layer's output $\xvec^k$ is stored and a corresponding baseline estimate $\fvec^k = L(\yvec - \xvec^k)$ is computed. The loss function can then incorporate supervision at every layer, providing direct gradient signal to each layer and further alleviating gradient attenuation across depth.
+
+
+% --------------------------------------------------------------------
+\subsection{Final Output Computation}
+\label{sec:method_output}
+% --------------------------------------------------------------------
+
+After the final layer, the peak and baseline estimates are computed as follows.
+
+\myparagraph{Peak estimate.}
+The final peak estimate is the output of the $K$-th layer:
+\begin{equation}
+    \hat{\xvec} = \xvec^K.
+\end{equation}
+No additional output gain, scaling, or post-processing is applied to the peak estimate.
+
+\myparagraph{Baseline estimate.}
+The baseline is not predicted directly by the network layers. Instead, it is computed by low-pass filtering the residual:
+\begin{equation}
+    \hat{\fvec} = L(\yvec - \hat{\xvec}),
+    \label{eq:baseline_output}
+\end{equation}
+where $L$ is the same precomputed dense low-pass matrix used in the initialization step. This ensures that $\hat{\fvec}$ is inherently smooth, a structural guarantee inherited from the BEADS formulation that a purely data-driven network could not provide without explicit architectural enforcement. The residual $\yvec - \hat{\xvec}$ contains both baseline and noise; the low-pass filter extracts only the smooth baseline component, implicitly discarding noise.
+
+The noise estimate is implicitly defined as $\hat{\wvec} = \yvec - \hat{\xvec} - \hat{\fvec}$, capturing any signal content that is neither sparse (peaks) nor smooth (baseline). Since the low-pass filter removes high-frequency content from the residual, the noise estimate contains primarily the high-frequency portion of $\yvec - \hat{\xvec}$ that is not captured by the peak estimate.
+
+
+% ====================================================================
+\section{Non-Learnable Cutoff Frequency and the Autograd Boundary}
+\label{sec:method_fc}
+% ====================================================================
+
+The Butterworth filter matrices $A$ and $B$ described in \refsec{sec:method_filters} are parameterized by the cutoff frequency $f_c$ and the filter order $d$. Although these quantities fundamentally determine the frequency boundary between baseline and peaks, and thus the quality of the decomposition, they are \emph{fixed} hyperparameters in LBEADS-NET, not learnable parameters. This section explains why.
+
+\myparagraph{The SciPy--PyTorch boundary.}
+The filter coefficients $\mathbf{a}$ and $\mathbf{b}$ are computed by the \texttt{BAfilt} function, which uses SciPy's sparse matrix construction routines to build the banded Toeplitz matrices $A$ and $B$ from the coefficient vectors. These sparse matrices are then converted to dense NumPy arrays and loaded into PyTorch as registered buffers via \texttt{register\_buffer}. This conversion crosses an \emph{autograd boundary}: SciPy operations are opaque to PyTorch's automatic differentiation engine. The gradient $\partial L / \partial f_c$ cannot be computed because the chain $f_c \to \mathbf{a}, \mathbf{b} \to A, B \to L \to \hat{\fvec}$ passes through non-differentiable SciPy operations. Consequently, $f_c$ has no gradient and cannot be updated by backpropagation.
+
+\myparagraph{Implications of a fixed $f_c$.}
+In the final trained model, $f_c = 0.006$ (normalized frequency, corresponding to a period of approximately 167 samples). This value is fixed for \emph{all} input signals regardless of their spectral content. For signals whose baseline varies on a timescale shorter than $1/f_c$, the low-pass filter cannot track the baseline, and the untracked baseline energy appears as a residual in the peak estimate. Conversely, for signals with broad peaks whose spectral content extends below $f_c$, the low-pass filter absorbs peak energy into the baseline, a direct mechanism for baseline leakage.
+
+\myparagraph{Connection to baseline leakage.}
+The fixed cutoff frequency interacts with the leakage problem in two ways. First, dense peak regions produce broad spectral energy that extends into the low-frequency band below $f_c$, where it is captured by the low-pass filter and attributed to the baseline. Second, spatially uniform regularization ($f_c$ is the same everywhere) cannot adapt to local signal characteristics: a region with closely spaced peaks may require a lower $f_c$ to avoid absorbing peak flanks, while a region with rapid baseline variation may require a higher $f_c$. A learnable, spatially varying $f_c$ could in principle adapt the frequency boundary to local signal conditions.
+
+\myparagraph{Potential solutions.}
+Several approaches could make the filter boundary learnable. First, one could implement a differentiable IIR filter design entirely within PyTorch, replacing the SciPy coefficient computation with differentiable arithmetic on the frequency-warping parameter $t$ and the coefficient polynomials. Second, one could replace the Butterworth filter entirely with learnable convolution kernels that are trained end-to-end. Third, a meta-learning approach could predict $f_c$ from signal features (e.g., spectral energy distribution) using a lightweight auxiliary network, using the predicted $f_c$ to construct the filter matrices at inference time. These directions are deferred to future work (\refchap{chap:discussion}).
+
+
+% ====================================================================
+\section{Multi-Stage Curriculum Training}
+\label{sec:method_curriculum}
+% ====================================================================
+
+Training LBEADS-NET with the full composite loss function described in \refsec{sec:method_loss} from the first epoch leads to optimization instability. The 12-term loss landscape is non-convex and multi-modal: competing objectives, such as sparsity penalties that encourage peak shrinkage versus anti-leakage penalties that penalize baseline over-estimation, create conflicting gradients that prevent convergence. To address this, we adopt a \emph{multi-stage curriculum training} strategy~\cite{hacohen2019curriculum} that progressively introduces loss terms in order of increasing complexity.
+
+The curriculum decomposes training into three stages, each defined by a distinct subset of active loss terms and a corresponding epoch budget. The progression follows the principle that simpler objectives should be mastered before harder ones: the network first learns basic peak reconstruction, then learns structured separation with anti-leakage constraints, and finally refines the decomposition with the full loss suite. This approach is analogous to the scoring-and-pacing framework of Hacohen and Weinshall~\cite{hacohen2019curriculum}, where easier examples are presented before harder ones to accelerate convergence and improve generalization. In our setting, the ``difficulty'' axis is the complexity of the loss landscape rather than the training data.
+
+
+% --------------------------------------------------------------------
+\subsection{Stage A: Peak Reconstruction}
+\label{sec:method_stage_a}
+% --------------------------------------------------------------------
+
+The first stage trains with only the reconstruction loss ($\alpha_{\text{mse}} = 1.0$), setting all other loss weights to zero. This establishes the basic peak-baseline separation: the network learns to produce a peak estimate $\hat{\xvec}$ that matches the ground truth peak signal $\xvec$ in the mean squared error sense. By deferring all regularization and anti-leakage penalties, Stage~A allows the learnable parameters $\{\lambda_0^k, \lambda_1^k, \lambda_2^k, r^k, \eta^k\}_{k=1}^K$ to move freely toward configurations that minimize reconstruction error without interference from competing objectives.
+
+Stage~A serves as a warmup that prevents early divergence. Without it, the anti-leakage losses (which penalize baseline behavior at peak locations) would fire on a poorly initialized decomposition, producing large, noisy gradients that destabilize the parameter updates before the network has learned any useful structure.
+
+
+% --------------------------------------------------------------------
+\subsection{Stage B: Baseline Leakage Mitigation}
+\label{sec:method_stage_b}
+% --------------------------------------------------------------------
+
+The second stage activates the core set of regularization and anti-leakage losses while retaining the reconstruction anchor. The active terms and their weights are: reconstruction ($\alpha_{\text{mse}} = 1.0$), $\ell_1$ sparsity ($\alpha_{\ell_1} = 0.01$), total variation ($\alpha_{\text{tv}} = 0.01$), baseline smoothness ($\alpha_{\text{smooth}} = 0.2$), non-negativity ($\alpha_{\text{neg}} = 2.0$), masked baseline reconstruction ($\alpha_{\text{baseline}} = 0.5$), high-frequency leakage ($\alpha_{\text{leakage}} = 0.3$), peak-baseline orthogonality ($\alpha_{\text{ortho}} = 0.1$), baseline third-derivative ($\alpha_{\text{baseline\_tv}} = 0.05$), and asymmetric baseline ($\alpha_{\text{asym}} = 1.0$ with asymmetry ratio $0.9$).
+
+This is the critical stage where the anti-leakage machinery takes effect. The masked baseline reconstruction loss provides direct supervision of the baseline in non-peak regions. The asymmetric baseline loss penalizes baseline over-estimation nine times more heavily than under-estimation, directly targeting the leakage failure mode. The orthogonality and high-frequency leakage penalties enforce mutual exclusivity between the peak and baseline components.
+
+The envelope constraint ($\alpha_{\text{envelope}}$) and frequency separation ($\alpha_{\text{freq}}$) losses are not activated in Stage~B. These terms are computationally expensive, the envelope constraint requires a sliding-window soft-minimum computation, and the frequency separation loss requires a full FFT, and their early activation was found to slow convergence without improving final performance.
+
+
+% --------------------------------------------------------------------
+\subsection{Stage C: Full Refinement}
+\label{sec:method_stage_c}
+% --------------------------------------------------------------------
+
+The third stage trains with the full set of loss weights from the global loss configuration (\reftab{tab:loss_terms}), with the exception that the envelope and frequency separation terms remain disabled for computational efficiency. This stage fine-tunes the decomposition learned in Stage~B, adjusting all parameters simultaneously under the complete multi-objective landscape.
+
+The stage configurations are summarized in \reftab{tab:curriculum_stages}.
+
+\begin{table}[t]
+    \centering
+    \caption{Multi-stage curriculum training configuration. Each stage defines a subset of active loss terms and a corresponding epoch budget. Stages are executed sequentially; parameters are carried forward between stages.}
+    \label{tab:curriculum_stages}
+    \begin{tabular}{@{}llp{8cm}@{}}
+        \toprule
+        \textbf{Stage} & \textbf{Epochs} & \textbf{Active Loss Terms} \\
+        \midrule
+        A: Peak Reconstruction & 1 & Reconstruction (MSE) only \\
+        B: Leakage Mitigation & 1 & MSE + $\ell_1$ + TV + smoothness + non-negativity + masked baseline + leakage + orthogonality + baseline TV + asymmetric baseline \\
+        C: Full Refinement & 1 & All terms from global loss configuration (envelope and frequency separation disabled for efficiency) \\
+        \bottomrule
+    \end{tabular}
+\end{table}
+
+
+% --------------------------------------------------------------------
+\subsection{Intermediate Supervision}
+\label{sec:method_intermediate}
+% --------------------------------------------------------------------
+
+An orthogonal training enhancement explored in later development iterations is \emph{intermediate supervision}: computing the loss not only at the final layer output $\xvec^K$ but at every intermediate layer output $\xvec^k$ for $k = 1, \ldots, K$. The baseline at each layer is computed as $\fvec^k = L(\yvec - \xvec^k)$, and the loss function is applied to each $(\xvec^k, \fvec^k)$ pair with layer-dependent weights. This provides direct gradient signal to each layer, further alleviating gradient attenuation across depth.
+
+The concept is motivated by the finding of Chen et al.~\cite{chen2025demun} that training unrolled networks with an intermediate loss function that penalizes reconstruction error at every layer outperforms training with a last-layer-only loss, due to a smoother optimization landscape. In the final trained model (v5), intermediate supervision was not used, all loss terms are applied only to the final output, but the infrastructure for per-layer loss computation is present in the architecture (\refsec{sec:method_chaining}) and was exercised in later development iterations.
+
+
+% ====================================================================
+\section{Composite Loss Function}
+\label{sec:method_loss}
+% ====================================================================
+
+The composite loss function is the central mechanism through which LBEADS-NET learns to produce accurate decompositions while actively suppressing baseline leakage. The loss serves two distinct objectives: (1)~\emph{reconstruction fidelity}, the estimated peaks $\hat{\xvec}$ and baseline $\hat{\fvec}$ should match the ground truth, and (2)~\emph{anti-leakage engineering}, the loss must actively penalize configurations in which peak energy is erroneously absorbed into the baseline estimate.
+
+The second objective is necessary because the network's architecture inherits the sparsity bias of the classical BEADS algorithm (\refsec{sec:method_formulation}). The $\ell_1$-based penalties and the asymmetric soft-thresholding operator encourage sparse peaks; when peaks are densely packed, these operators over-shrink the peak estimate, and the surplus energy is captured by the low-pass filter and attributed to the baseline. Without explicit anti-leakage terms in the loss, the network has no gradient signal to counteract this failure mode.
+
+The total loss is a weighted sum of twelve terms:
+\begin{equation}
+    \mathcal{L}_{\text{total}} = \sum_{i=1}^{12} \alpha_i \, \mathcal{L}_i,
+    \label{eq:total_loss}
+\end{equation}
+where each $\alpha_i$ is a non-negative scalar weight. The terms are organized into four groups by purpose: reconstruction fidelity, sparsity priors on peaks, baseline supervision, and leakage-specific penalties. Each term, its mathematical formulation, and the failure mode it targets are described below.
+
+
+% --------------------------------------------------------------------
+\subsection{Reconstruction Fidelity}
+\label{sec:method_loss_recon}
+% --------------------------------------------------------------------
+
+\myparagraph{Term 1: Reconstruction loss ($\alpha_{\text{mse}} = 1.0$).}
+The anchor term measures the discrepancy between the predicted peak signal $\hat{\xvec}$ and the ground truth peak signal $\xvec$. The implementation uses the Huber loss~\cite{huber1964robust} rather than the mean squared error:
+\begin{equation}
+    \mathcal{L}_{\text{recon}} = \frac{1}{N} \sum_{i=1}^{N} \ell_\delta(\hat{x}_i - x_i), \qquad
+    \ell_\delta(u) =
+    \begin{cases}
+        \tfrac{1}{2} u^2 & |u| \leq \delta, \\
+        \delta(|u| - \tfrac{1}{2}\delta) & |u| > \delta,
+    \end{cases}
+    \label{eq:huber_loss}
+\end{equation}
+with $\delta = 1.0$. The Huber loss is quadratic for small errors and linear for large errors, providing robustness to outlier samples in which the peak estimate deviates substantially from the ground truth. This term is active in all three curriculum stages and carries the highest weight ($\alpha_{\text{mse}} = 1.0$), ensuring that reconstruction accuracy remains the primary objective throughout training.
+
+
+% --------------------------------------------------------------------
+\subsection{Sparsity Priors on Peaks}
+\label{sec:method_loss_sparsity}
+% --------------------------------------------------------------------
+
+\myparagraph{Term 2: $\ell_1$ sparsity ($\alpha_{\ell_1} = 0.005$--$0.01$).}
+The $\ell_1$ penalty encourages the peak signal to be sparse, most sample values should be zero, with non-zero values only at peak locations:
+\begin{equation}
+    \mathcal{L}_{\ell_1} = \frac{1}{N} \sum_{i=1}^{N} |\hat{x}_i|.
+    \label{eq:l1_loss}
+\end{equation}
+This term encodes the prior that chromatographic peaks occupy a small fraction of the total signal length. The weight is kept deliberately low ($\alpha_{\ell_1} \leq 0.01$) because aggressive $\ell_1$ penalization over-shrinks dense peaks, directly causing the baseline leakage that the anti-leakage terms must then counteract. The tension between the $\ell_1$ penalty and the anti-leakage losses is a defining feature of the loss design: both are necessary (the $\ell_1$ penalty prevents false peaks in flat regions, while the anti-leakage losses prevent peak absorption in dense regions), but their weights must be carefully balanced.
+
+\myparagraph{Term 3: Total variation ($\alpha_{\text{tv}} = 0.005$--$0.01$).}
+The total variation penalty promotes piecewise-constant peak signals with sharp transitions:
+\begin{equation}
+    \mathcal{L}_{\text{tv}} = \frac{1}{N-1} \sum_{i=1}^{N-1} |\hat{x}_{i+1} - \hat{x}_i|.
+    \label{eq:tv_loss}
+\end{equation}
+This encodes the prior that chromatographic peaks have steep rising and falling edges with flat regions between them. Like the $\ell_1$ penalty, the TV weight is kept low to avoid over-regularization in dense-peak regions. The $\ell_1$ and TV penalties together are both the \emph{cause} of leakage (they over-shrink dense peaks) and necessary for correct behavior in sparse regions, a fundamental tension in the loss design.
+
+\myparagraph{Term 4: Non-negativity ($\alpha_{\text{neg}} = 0.1$--$2.0$).}
+Chromatographic peaks are physically non-negative. The non-negativity penalty discourages negative values in the peak estimate:
+\begin{equation}
+    \mathcal{L}_{\text{neg}} = \frac{1}{N} \sum_{i=1}^{N} \big[\max(0, -\hat{x}_i)\big]^2.
+    \label{eq:neg_loss}
+\end{equation}
+The squared penalty provides a smooth gradient that grows with the magnitude of the violation. This term complements the asymmetric soft-thresholding in the ISTA layers (\refsec{sec:method_forward}), which already penalizes negative values more aggressively through the asymmetry ratio $r^k$. The loss-level penalty provides an additional training signal that is independent of the per-layer thresholding behavior.
+
+In later development iterations (v7), the non-negativity constraint was also enforced architecturally by applying $\texttt{softplus}(\hat{\xvec}, \beta = 20)$ as a final activation, ensuring that the output is strictly positive regardless of the loss function. This architectural enforcement was not used in the v5 model that constitutes the thesis system.
+
+
+% --------------------------------------------------------------------
+\subsection{Baseline Supervision}
+\label{sec:method_loss_baseline}
+% --------------------------------------------------------------------
+
+\myparagraph{Term 5: Masked baseline reconstruction ($\alpha_{\text{baseline}} = 0.5$--$2.0$).}
+This term, introduced in the fourth development iteration (v4), was the single most impactful addition to the loss function. It provides direct supervision of the baseline estimate in non-peak regions by constructing a binary peak mask from the ground truth peak signal:
+\begin{align}
+    \tau &= \max\!\big(\gamma \cdot \max_i |x_i|,\; \tau_{\min}\big), \label{eq:peak_threshold} \\
+    m_i &= \mathbf{1}\!\big[|x_i| \geq \tau\big], \label{eq:peak_mask} \\
+    \mathcal{L}_{\text{baseline}} &= \frac{\sum_{i=1}^{N} (1 - m_i) \cdot (\hat{f}_i - f_i)^2}{\sum_{i=1}^{N} (1 - m_i) + \epsilon}, \label{eq:baseline_loss}
+\end{align}
+where $\gamma = 0.02$ is the relative threshold, $\tau_{\min} = 10^{-4}$ is the absolute floor, and $\epsilon = 10^{-8}$ prevents division by zero. The mask $m_i$ is one at peak locations and zero in baseline-only regions. The loss supervises the baseline only where peaks are absent, that is, where the ground truth baseline $\fvec$ is directly observable from the data.
+
+The masking is critical: supervising the baseline at peak locations would require the loss to know the correct baseline \emph{under} the peaks, which is precisely the quantity being estimated. By restricting supervision to background regions, the loss provides a reliable training signal without circular reasoning. The denominator normalizes by the number of background samples, preventing the loss magnitude from varying with the peak density of each training example.
+
+\myparagraph{Term 6: Baseline smoothness ($\alpha_{\text{smooth}} = 0.01$--$0.2$).}
+The smoothness penalty penalizes the curvature of the baseline estimate via its second derivative:
+\begin{equation}
+    \mathcal{L}_{\text{smooth}} = \frac{1}{N-2} \sum_{i=1}^{N-2} \big[\hat{f}_{i+2} - 2\hat{f}_{i+1} + \hat{f}_i\big]^2.
+    \label{eq:smooth_loss}
+\end{equation}
+This encodes the physical prior that baseline drift is a slowly varying, low-frequency phenomenon. A perfectly smooth baseline has zero second derivative everywhere; the squared penalty allows moderate curvature (as in gentle drift) while strongly penalizing sharp localized features (as in leakage-induced bumps).
+
+\myparagraph{Term 7: Baseline third derivative ($\alpha_{\text{baseline\_tv}} = 0.0$--$0.1$).}
+The third-derivative penalty catches localized bumps in the baseline that the second-derivative penalty misses:
+\begin{equation}
+    \mathcal{L}_{\text{base\_tv}} = \frac{1}{N-3} \sum_{i=1}^{N-3} \big[\hat{f}_{i+3} - 3\hat{f}_{i+2} + 3\hat{f}_{i+1} - \hat{f}_i\big]^2.
+    \label{eq:baseline_tv_loss}
+\end{equation}
+A localized bump in the baseline produces a large second derivative at its peak but also produces a large \emph{third} derivative at its edges, where the curvature changes sign. The third-derivative penalty targets these transitions, providing additional smoothness enforcement that is complementary to the second-derivative penalty.
+
+
+% --------------------------------------------------------------------
+\subsection{Leakage-Specific Penalties}
+\label{sec:method_loss_leakage}
+% --------------------------------------------------------------------
+
+The following four terms were developed specifically to detect and penalize baseline leakage. Each targets a distinct observable signature of the leakage failure mode.
+
+\myparagraph{Term 8: High-frequency baseline leakage ($\alpha_{\text{leakage}} = 0.3$--$1.0$).}
+When peak energy leaks into the baseline, it manifests as high-frequency content in the baseline at peak locations. This term directly penalizes this signature:
+\begin{equation}
+    \mathcal{L}_{\text{leakage}} =
+    \begin{cases}
+        \displaystyle\frac{\sum_{i=1}^{N} m_i \cdot [\hat{f}_i^{\text{hf}}]^2}{\sum_{i=1}^{N} m_i + \epsilon} & \text{if } \hat{\fvec}^{\text{hf}} \text{ is provided,} \\[10pt]
+        \displaystyle\frac{\sum_{i=1}^{N-2} m_i' \cdot [D_2 \hat{\fvec}]_i^2}{\sum_{i=1}^{N-2} m_i' + \epsilon} & \text{otherwise,}
+    \end{cases}
+    \label{eq:leakage_loss}
+\end{equation}
+where $\hat{\fvec}^{\text{hf}}$ is the high-pass filtered baseline (if the network provides it as an auxiliary output), $m_i$ is the peak mask from \refeq{eq:peak_mask}, $m_i'$ is the peak mask restricted to the interior samples (indices $2, \ldots, N-1$), and $D_2$ is the second-difference operator. The fallback formulation uses the second derivative of the baseline as a proxy for high-frequency content, since the Butterworth high-pass filter used in BEADS is approximately equivalent to a second-derivative operator at low frequencies.
+
+The normalization by $\sum m_i$ ensures that the loss is computed per-peak-sample rather than per-total-sample, preventing the penalty from being diluted in signals with few peaks.
+
+\myparagraph{Term 9: Peak-baseline orthogonality ($\alpha_{\text{ortho}} = 0.1$--$0.5$).}
+This term enforces the principle that the baseline should be locally flat wherever peaks are present. If the baseline has a nonzero gradient at a peak location, it is ``tracking'' the peak shape, a hallmark of leakage. The v5 implementation penalizes the first derivative of the baseline, weighted by the ground truth peak magnitude:
+\begin{equation}
+    \mathcal{L}_{\text{ortho}} = \frac{1}{N-1} \sum_{i=1}^{N-1} w_i \cdot \big[\hat{f}_{i+1} - \hat{f}_i\big]^2,
+    \label{eq:ortho_loss}
+\end{equation}
+where the weights are
+\begin{equation}
+    w_i = \frac{|x_i|}{\max_j |x_j| + \epsilon}, \qquad \text{(detached from the computational graph)}.
+    \label{eq:ortho_weights}
+\end{equation}
+The use of the ground truth peak signal $\xvec$ (detached) rather than the predicted peak signal $\hat{\xvec}$ as the weighting function is a deliberate design choice. If $\hat{\xvec}$ were used, the orthogonality penalty would vanish whenever the peak estimate collapses to zero, precisely the leakage scenario the penalty is intended to prevent. Using the detached ground truth ensures that the penalty remains active at peak locations regardless of the network's current prediction quality.
+
+The term draws conceptual motivation from orthogonal nonnegative matrix factorization, where orthogonality constraints between factor matrices enforce non-overlapping decompositions~\cite{ding2006orthonmf, pompili2014onmf}. In the signal decomposition context, the ``orthogonality'' is not between factor matrices but between the peak and baseline components at each spatial location: where one component is active, the other should be locally constant.
+
+\myparagraph{Term 10: Asymmetric baseline loss ($\alpha_{\text{asym}} = 1.0$, asymmetry ratio $\alpha = 0.9$).}
+This term applies an asymmetric penalty to the baseline reconstruction error, penalizing over-estimation of the baseline far more heavily than under-estimation:
+\begin{equation}
+    \mathcal{L}_{\text{asym}} = \frac{1}{N} \sum_{i=1}^{N}
+    \begin{cases}
+        \alpha \cdot (\hat{f}_i - f_i)^2 & \text{if } \hat{f}_i > f_i, \\
+        (1 - \alpha) \cdot (\hat{f}_i - f_i)^2 & \text{if } \hat{f}_i \leq f_i,
+    \end{cases}
+    \label{eq:asym_loss}
+\end{equation}
+where $\alpha = 0.9$ yields a $9{:}1$ asymmetry ratio, over-estimation of the baseline is penalized nine times more heavily than under-estimation of the same magnitude.
+
+The asymmetry directly targets baseline leakage. When peak energy leaks into the baseline, the baseline estimate rises above the true baseline ($\hat{f}_i > f_i$) at peak locations. The $9{:}1$ penalty ratio ensures that this over-estimation is strongly discouraged, even at the cost of slight under-estimation elsewhere. The design is motivated by the asymmetric reweighting schemes of the AsLS family: Eilers and Boelens~\cite{eilers2005baseline} introduced asymmetric weights into penalized least squares smoothing for baseline estimation, and Baek et al.~\cite{baek2015arpls} refined this approach with the arPLS method, which uses a generalized logistic function to assign data-dependent asymmetric weights. Our formulation applies the asymmetry in the \emph{loss function} rather than in the iterative reweighting scheme, but the underlying principle, that over-estimation of the baseline is more harmful than under-estimation, is the same.
+
+\myparagraph{Term 11: Envelope constraint ($\alpha_{\text{envelope}} = 0.5$).}
+The envelope constraint encodes the physical prior that the baseline should not exceed the local minimum of the observed signal:
+\begin{equation}
+    \mathcal{L}_{\text{envelope}} = \frac{1}{N} \sum_{i=1}^{N} \big[\max(0,\; \hat{f}_i - \tilde{y}_i^{\min})\big]^2,
+    \label{eq:envelope_loss}
+\end{equation}
+where $\tilde{y}_i^{\min}$ is a differentiable approximation to the sliding-window local minimum of $\yvec$, computed via the log-sum-exp trick:
+\begin{equation}
+    \tilde{y}_i^{\min} = -\tau \log \sum_{j \in \mathcal{W}_i} \exp\!\big(-y_j / \tau\big),
+    \label{eq:soft_local_min}
+\end{equation}
+with window size $|\mathcal{W}_i| = 51$ and temperature $\tau = 0.1$. The local minimum is detached from the computational graph to prevent the loss from encouraging degenerate solutions in which the network manipulates the local minimum computation rather than improving the baseline estimate.
+
+The ReLU activation ensures that only violations, cases where the baseline exceeds the local signal minimum, are penalized. In regions where peaks are absent, the observed signal $\yvec$ closely approximates the true baseline $\fvec$, so the local minimum of $\yvec$ provides an approximate upper bound on $\fvec$. Penalizing violations of this bound prevents the baseline from rising into peak regions.
+
+\myparagraph{Term 12: Frequency separation ($\alpha_{\text{freq}} = 0.05$).}
+The frequency separation loss enforces the spectral role assignment between peaks and baseline in the Fourier domain:
+\begin{equation}
+    \mathcal{L}_{\text{freq}} = \frac{1}{M} \sum_{m=1}^{M} \bigg[ |\hat{F}_m|^2 \cdot \mathbf{1}[\nu_m > f_c] + |\hat{X}_m|^2 \cdot \mathbf{1}[\nu_m \leq f_c] \bigg],
+    \label{eq:freq_loss}
+\end{equation}
+where $\hat{X}_m$ and $\hat{F}_m$ are the discrete Fourier transform coefficients of $\hat{\xvec}$ and $\hat{\fvec}$ respectively, $\nu_m$ denotes the $m$-th frequency bin, $f_c$ is the Butterworth cutoff frequency, and $M$ is the number of frequency bins. The first term penalizes high-frequency content in the baseline (above $f_c$), and the second term penalizes low-frequency content in the peaks (below $f_c$). Together, they enforce the same spectral separation that the Butterworth filter imposes structurally, but through a soft penalty rather than a hard filter.
+
+This term is computationally expensive due to the FFT computation and is typically disabled during training for efficiency. When active, its low weight ($\alpha_{\text{freq}} = 0.05$) reflects its role as a regularizer rather than a primary objective.
+
+
+% --------------------------------------------------------------------
+\subsection{Summary of Loss Terms}
+\label{sec:method_loss_summary}
+% --------------------------------------------------------------------
+
+\reftab{tab:loss_terms} summarizes all twelve loss terms, their weight ranges, the curriculum stage in which they are first activated, and the failure mode each term targets.
+
+\begin{table}[t]
+    \centering
+    \caption{Summary of the twelve-term composite loss function. Weight ranges reflect values used across development iterations. The ``Stage'' column indicates the earliest curriculum stage in which the term is active (A = peak reconstruction, B = leakage mitigation, C = full refinement). Terms marked ``, '' under ``Failure Mode'' serve as general priors rather than targeting a specific failure.}
+    \label{tab:loss_terms}
+    \small
+    \begin{tabular}{@{}rlllp{4.0cm}@{}}
+        \toprule
+        \textbf{\#} & \textbf{Term} & \textbf{Weight Range} & \textbf{Stage} & \textbf{Failure Mode Targeted} \\
+        \midrule
+        1 & Reconstruction (Huber) & 1.0 & A & ,  \\
+        2 & $\ell_1$ sparsity & 0.005--0.01 & B & False peaks in flat regions \\
+        3 & Total variation & 0.005--0.01 & B & Non-sharp peak transitions \\
+        4 & Non-negativity & 0.1--2.0 & B & Negative artifacts \\
+        5 & Masked baseline recon. & 0.5--2.0 & B & Baseline error in non-peak regions \\
+        6 & Baseline smoothness & 0.01--0.2 & B & High-curvature baseline \\
+        7 & Baseline 3rd deriv. & 0.0--0.1 & B & Localized baseline bumps \\
+        8 & High-freq.\ leakage & 0.3--1.0 & B & Peak energy in baseline \\
+        9 & Orthogonality & 0.1--0.5 & B & Baseline tracking peaks \\
+        10 & Asymmetric baseline & 1.0 & B & Baseline over-estimation \\
+        11 & Envelope constraint & 0.5 & C & Baseline exceeding signal \\
+        12 & Frequency separation & 0.05 & C & Spectral role violation \\
+        \bottomrule
+    \end{tabular}
+\end{table}
+
+\myparagraph{Design tension.}
+The $\ell_1$ and TV penalties (Terms 2--3) are both the \emph{cause} of baseline leakage, they over-shrink dense peaks, pushing surplus energy into the baseline, and \emph{necessary} for correct behavior in sparse regions, where they suppress false peaks. The anti-leakage terms (Terms 8--12) exist to counteract the side effects of the sparsity priors. This adversarial dynamic is a fundamental characteristic of the loss design: the sparsity terms and the anti-leakage terms pull the optimization in opposite directions, and the weight configuration determines the equilibrium point. As discussed in \refchap{chap:discussion}, no weight configuration fully resolves this tension when the sparsity assumption is severely violated.
+
+
+% ====================================================================
+\section{Hybrid Inference Pipeline}
+\label{sec:method_hybrid}
+% ====================================================================
+
+The trained LBEADS-NET produces a peak estimate $\hat{\xvec}$ and a baseline estimate $\hat{\fvec}$ in a single forward pass through $K = 20$ ISTA layers. While this output is often of sufficient quality for downstream analysis, the network's output can be further refined through a lightweight post-processing step that leverages the classical BEADS filter structure.
+
+
+% --------------------------------------------------------------------
+\subsection{Post-Processing with Low-Pass Refinement}
+\label{sec:method_postprocess}
+% --------------------------------------------------------------------
+
+The post-processing pipeline, implemented in the inference code, consists of two steps.
+
+\myparagraph{Adaptive noise thresholding.}
+The residual $\yvec - \hat{\xvec}$ is high-pass filtered using the same low-pass matrix $L$ employed by the network. The median absolute deviation (MAD) of the high-pass residual provides a robust estimate of the noise level $\hat{\sigma}$:
+\begin{equation}
+    \hat{\sigma} = \frac{\text{median}(|(\yvec - \hat{\xvec}) - L(\yvec - \hat{\xvec})|)}{0.6745}.
+    \label{eq:noise_estimate}
+\end{equation}
+The peak estimate is then denoised by subtracting $k \cdot \hat{\sigma}$ (with $k = 2.5$) and clamping to non-negative values:
+\begin{equation}
+    \hat{\xvec}_{\text{clean}} = \max\!\big(\hat{\xvec} - k\hat{\sigma},\; 0\big).
+    \label{eq:clean_peaks}
+\end{equation}
+This removes residual noise-level false peaks that the network's soft-thresholding did not fully suppress.
+
+\myparagraph{Iterated low-pass baseline recomputation.}
+The baseline is recomputed from the cleaned peak estimate by iterating the low-pass filter:
+\begin{equation}
+    \hat{\fvec}_{\text{refined}} = L^p(\yvec - \hat{\xvec}_{\text{clean}}),
+    \label{eq:refined_baseline}
+\end{equation}
+where $L^p$ denotes $p$ applications of the low-pass filter ($p = 3$ in the default configuration). The iterated application produces a smoother baseline than a single pass, suppressing any residual high-frequency content that may have leaked through.
+
+% Placeholder for hybrid pipeline figure
+% \begin{figure}[t]
+%     \centering
+%     \includegraphics[width=\textwidth]{figures/fig_3_4_hybrid_pipeline.pdf}
+%     \caption{Hybrid inference pipeline. The trained LBEADS-NET produces an initial decomposition in a single forward pass. The post-processing stage applies adaptive noise thresholding and iterated low-pass baseline recomputation to refine the output.}
+%     \label{fig:hybrid_pipeline}
+% \end{figure}
+
+
+% --------------------------------------------------------------------
+\subsection{Classical BEADS Refinement}
+\label{sec:method_classical_refinement}
+% --------------------------------------------------------------------
+
+A more ambitious hybrid strategy, explored but not used in the final system, uses the network output as an initialization for the classical iterative BEADS algorithm. The classical BEADS solver (\refsec{sec:method_cg_variant}) requires an initial guess $\xvec^0$; by providing the network's output $\hat{\xvec}$ as this initial guess rather than the default $\xvec^0 = \yvec$, the iterative solver starts from a high-quality decomposition and needs fewer iterations to converge. This approach combines the network's learned adaptivity (no manual parameter tuning) with the classical algorithm's convergence guarantees (the iterative solver is guaranteed to converge to a stationary point of the BEADS objective for any initial condition).
+
+The hybrid strategy is particularly relevant for deployment scenarios where the network has been trained on synthetic data but must be applied to real chromatograms whose characteristics differ from the training distribution. The classical BEADS refinement can correct distribution-shift artifacts in the network's output, provided that the classical BEADS parameters are appropriately chosen. The selection of these parameters, potentially informed by the learned parameters of the network's final layers, is an avenue for future development.
