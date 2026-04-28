@@ -82,43 +82,7 @@
 \begin{frame}{What is a Chromatogram?}
 \note{Chromatography separates chemical compounds. The detector records peaks whose areas are proportional to concentration. Baseline drift corrupts these measurements.}
 \centering
-\begin{tikzpicture}[scale=0.9, transform shape]
-  % --- Baseline (dashed) ---
-  \draw[dashed, thick, steelblue, domain=0:12, samples=100]
-    plot (\x, {0.3*sin(15*\x)+0.15*cos(25*\x)+0.8}) node[right]{\small Baseline drift $\mathbf{f}$};
-
-  % --- Peaks ---
-  \draw[forestgreen, very thick, domain=0:12, samples=200]
-    plot (\x, {
-      1.8*exp(-(\x-2.5)^2/0.3)
-      + 1.2*exp(-(\x-4.5)^2/0.15)
-      + 2.2*exp(-(\x-7)^2/0.5)
-      + 0.9*exp(-(\x-9.5)^2/0.2)
-      + 1.4*exp(-(\x-10.8)^2/0.25)
-    });
-  \node[forestgreen, right] at (12, 0.5) {\small Peaks $\mathbf{x}$};
-
-  % --- Combined signal ---
-  \draw[navy, thick, domain=0:12, samples=200]
-    plot (\x, {
-      0.3*sin(15*\x)+0.15*cos(25*\x)+0.8
-      + 1.8*exp(-(\x-2.5)^2/0.3)
-      + 1.2*exp(-(\x-4.5)^2/0.15)
-      + 2.2*exp(-(\x-7)^2/0.5)
-      + 0.9*exp(-(\x-9.5)^2/0.2)
-      + 1.4*exp(-(\x-10.8)^2/0.25)
-      + 0.03*sin(50*\x) + 0.02*cos(73*\x)
-    });
-  \node[navy, right] at (12, 1.8) {\small Observed $\mathbf{y}$};
-
-  % Noise annotation
-  \draw[->, warningred, thick] (0.5, 1.3) -- (0.5, 0.95);
-  \node[warningred, above] at (0.5, 1.3) {\small Noise $\mathbf{w}$};
-
-  % Axes
-  \draw[->, thick] (0, 0) -- (12.5, 0) node[right] {\small Time};
-  \draw[->, thick] (0, 0) -- (0, 3.8) node[above] {\small Intensity};
-\end{tikzpicture}
+\includegraphics[width=0.75\textwidth, height=0.75\textheight, keepaspectratio]{figures/Signal_3_decomposition.png}
 
 \vspace{0.3em}
 \centering
@@ -202,42 +166,9 @@ J(\mathbf{x}) = \tfrac{1}{2}\|H(\mathbf{y} - \mathbf{x})\|_2^2 + \lambda_0 \sum_
 % =============================================
 \begin{frame}{The Tuning Problem}
 \centering
-\begin{tikzpicture}[scale=0.65, transform shape]
-  % Under-regularized
-  \begin{scope}[xshift=0cm]
-    \fill[blue!5] (-0.3,-0.5) rectangle (4.3,3.5);
-    \draw[navy, thick, domain=0:4, samples=150]
-      plot (\x, {1.5*exp(-(\x-2)^2/0.3) + 0.15*sin(80*\x) + 0.1*cos(120*\x)});
-    \draw[warningred, thick, dashed, domain=0:4, samples=50]
-      plot (\x, {-0.1 + 0.05*\x});
-    \node[below, font=\small\bfseries, text=steelblue] at (2, -0.8) {Under-regularized};
-    \node[below, font=\scriptsize, text=gray] at (2, -1.3) {Noisy, baseline too low};
-  \end{scope}
+\includegraphics[width=0.85\textwidth, height=0.65\textheight, keepaspectratio]{figures/BEADS_EXAMPLE.png}
 
-  % Well-tuned
-  \begin{scope}[xshift=5.5cm]
-    \fill[forestgreen!5] (-0.3,-0.5) rectangle (4.3,3.5);
-    \draw[forestgreen!80!black, thick, domain=0:4, samples=100]
-      plot (\x, {1.8*exp(-(\x-2)^2/0.3)});
-    \draw[forestgreen, thick, dashed, domain=0:4, samples=50]
-      plot (\x, {0.1 + 0.02*\x});
-    \node[below, font=\small\bfseries, text=forestgreen] at (2, -0.8) {Well-tuned};
-    \node[below, font=\scriptsize, text=gray] at (2, -1.3) {Clean separation};
-  \end{scope}
-
-  % Over-regularized
-  \begin{scope}[xshift=11cm]
-    \fill[warningred!5] (-0.3,-0.5) rectangle (4.3,3.5);
-    \draw[warningred!80!black, thick, domain=0:4, samples=100]
-      plot (\x, {0.6*exp(-(\x-2)^2/0.5)});
-    \draw[warningred, thick, dashed, domain=0:4, samples=50]
-      plot (\x, {0.5 + 0.8*exp(-(\x-2)^2/0.6)});
-    \node[below, font=\small\bfseries, text=warningred] at (2, -0.8) {Over-regularized};
-    \node[below, font=\scriptsize, text=gray] at (2, -1.3) {Peaks absorbed into baseline};
-  \end{scope}
-\end{tikzpicture}
-
-\vspace{1.5em}
+\vspace{0.8em}
 \begin{resultbad}
 \centering
 \textbf{No single parameter configuration generalizes across instruments, analytes, or conditions.}
@@ -439,51 +370,46 @@ $r^k$ --- \textbf{asymmetry ratio}: suppresses negative artifacts
 % SLIDE 11 — Why Not Conjugate Gradient?
 % =============================================
 \begin{frame}{Why Not Conjugate Gradient?}
-\begin{columns}[T]
-\begin{column}{0.55\textwidth}
 \centering
-\begin{tikzpicture}[scale=0.65, transform shape,
+\begin{tikzpicture}[scale=0.55, transform shape,
     block/.style={rectangle, draw, minimum width=0.5cm, minimum height=0.6cm, font=\tiny},
     arr/.style={-{Stealth}, thick}]
 
   % CG variant
-  \node[font=\small\bfseries, text=warningred] at (-3, 2) {CG Variant};
+  \node[font=\small\bfseries, text=warningred, anchor=east] at (-1, 1.5) {CG Variant};
   \foreach \i in {0,...,3} {
-    \node[block, draw=warningred, fill=warningred!8] (cg\i) at (\i*2.2, 2) {$K_{\text{in}}\!=\!12$};
+    \node[block, draw=warningred, fill=warningred!8] (cg\i) at (\i*1.8, 1.5) {$K_{\text{in}}\!=\!12$};
   }
-  \node at (9.5, 2) {\small$\cdots$};
-  \node[block, draw=warningred, fill=warningred!8] (cg7) at (11, 2) {$K_{\text{in}}\!=\!12$};
-  \node[right, font=\scriptsize, text=warningred] at (12, 2) {Depth: $8\!\times\!12=96$};
+  \node at (7.8, 1.5) {\small$\cdots$};
+  \node[block, draw=warningred, fill=warningred!8] (cg7) at (9.2, 1.5) {$K_{\text{in}}\!=\!12$};
+  \node[right, font=\scriptsize, text=warningred] at (10.2, 1.5) {Depth: $8\!\times\!12=96$};
 
   % ISTA variant
-  \node[font=\small\bfseries, text=forestgreen] at (-3, 0) {ISTA Variant};
+  \node[font=\small\bfseries, text=forestgreen, anchor=east] at (-1, 0) {ISTA Variant};
   \foreach \i in {0,...,7} {
-    \node[block, draw=forestgreen, fill=forestgreen!8] (is\i) at (\i*1.5, 0) {};
+    \node[block, draw=forestgreen, fill=forestgreen!8] (is\i) at (\i*1.2, 0) {};
   }
-  \node at (12.5, 0) {\small$\cdots$};
-  \node[right, font=\scriptsize, text=forestgreen] at (13.5, 0) {Depth: $20$};
-\end{tikzpicture}
-\end{column}
+  \node at (9.8, 0) {\small$\cdots$};
+  \node[right, font=\scriptsize, text=forestgreen] at (10.5, 0) {Depth: $20$};
 
-\begin{column}{0.4\textwidth}
-\begin{tikzpicture}[scale=0.7, transform shape]
-  \begin{axis}[
-    width=6cm, height=4.5cm,
-    xlabel={\small Layer depth},
-    ylabel={\small $\|\nabla\|$},
-    ymode=log,
-    legend style={font=\tiny, at={(0.98,0.98)}, anchor=north east},
-    grid=major,
-    grid style={gray!20},
-  ]
-  \addplot[warningred, thick, domain=0:50, samples=50] {exp(-0.12*x)};
-  \addlegendentry{CG (vanishing)}
-  \addplot[forestgreen, thick, domain=0:50, samples=50] {0.5*exp(-0.015*x)};
-  \addlegendentry{ISTA (stable)}
-  \end{axis}
+  % Gradient plot -- placed to the right
+  \begin{scope}[xshift=15cm, yshift=0.5cm]
+    \begin{axis}[
+      width=7cm, height=4.5cm,
+      xlabel={\small Layer depth},
+      ylabel={\small $\|\nabla\|$},
+      ymode=log,
+      legend style={font=\tiny, at={(0.98,0.98)}, anchor=north east},
+      grid=major,
+      grid style={gray!20},
+    ]
+    \addplot[warningred, thick, domain=0:50, samples=50] {exp(-0.12*x)};
+    \addlegendentry{CG (vanishing)}
+    \addplot[forestgreen, thick, domain=0:50, samples=50] {0.5*exp(-0.015*x)};
+    \addlegendentry{ISTA (stable)}
+    \end{axis}
+  \end{scope}
 \end{tikzpicture}
-\end{column}
-\end{columns}
 
 \vspace{0.5em}
 \begin{insightbox}
@@ -546,7 +472,7 @@ Signal length $N=4096$ \quad|\quad $K=20$ layers \quad|\quad 5 params/layer \qua
 \begin{frame}{The Development Timeline}
 \note{Progressive development: each experiment adds one key idea. The sweet spot is in the middle.}
 \centering
-\begin{tikzpicture}[scale=0.75, transform shape]
+\begin{tikzpicture}[scale=0.7, transform shape]
   % Timeline line
   \draw[thick, gray] (0,0) -- (16,0);
 
@@ -566,15 +492,90 @@ Signal length $N=4096$ \quad|\quad $K=20$ layers \quad|\quad 5 params/layer \qua
 
   % Loss term counts
   \foreach \x/\n in {0/--,3.2/1,6.4/4,9.6/6,12.8/8,16/12} {
-    \node[below=1.8cm, font=\tiny, text=gray] at (\x, 0) {\n\ terms};
+    \node[below=1.6cm, font=\tiny\bfseries, text=gray] at (\x, 0) {\n\ terms};
   }
 
-  \node[font=\scriptsize\itshape, text=navy] at (8, -2.8) {Progressive Development: Each experiment adds one key idea};
+  % Loss terms added at each step
+  \node[below=2.2cm, align=center, font=\tiny, text=gray!80] at (0, 0)
+    {Fixed params};
+  \node[below=2.2cm, align=center, font=\tiny, text=steelblue!80] at (3.2, 0)
+    {Peak MSE};
+  \node[below=2.2cm, align=center, font=\tiny, text=steelblue] at (6.4, 0)
+    {$+\;\ell_1$ sparsity\\$+$ TV penalty\\$+$ Non-negativity};
+  \node[below=2.2cm, align=center, font=\tiny, text=forestgreen] at (9.6, 0)
+    {$+$ Masked baseline\\reconstruction\\$+$ Baseline smoothness};
+  \node[below=2.2cm, align=center, font=\tiny, text=teal] at (12.8, 0)
+    {$+$ Peak--baseline\\orthogonality\\$+$ 3rd-deriv.\ penalty};
+  \node[below=2.2cm, align=center, font=\tiny, text=warningred] at (16, 0)
+    {$+$ Asymmetric BL\\$+$ Leakage penalty\\$+$ Envelope\\$+$ Freq.\ separation};
+
+  \node[font=\scriptsize\itshape, text=navy] at (8, -5.5) {Progressive Development: Each experiment adds one key idea};
 \end{tikzpicture}
 \end{frame}
 
 % =============================================
-% SLIDE 14 — Exp 1.0: Classical BEADS
+% SLIDE 14 — Three-Stage Curriculum Training
+% =============================================
+\begin{frame}{Three-Stage Curriculum Training}
+\centering
+\begin{tikzpicture}[scale=0.8, transform shape,
+    stage/.style={rectangle, rounded corners=4pt, minimum width=3.5cm, minimum height=2.8cm, align=center, font=\small, text width=3.3cm},
+    arr/.style={-{Stealth}, very thick}]
+
+  % Stage A
+  \node[stage, draw=steelblue, fill=steelblue!8] (a) at (0, 0) {
+    \textbf{Stage A}\\[3pt]
+    {\scriptsize\textbf{Peak Reconstruction}}\\[6pt]
+    {\scriptsize Peak MSE only}\\[6pt]
+    {\scriptsize\textcolor{steelblue}{\textbf{1 active term}}}
+  };
+
+  % Stage B
+  \node[stage, draw=forestgreen, fill=forestgreen!8] (b) at (5.5, 0) {
+    \textbf{Stage B}\\[3pt]
+    {\scriptsize\textbf{Leakage Mitigation}}\\[6pt]
+    {\scriptsize $+$ Sparsity, TV, non-neg.}\\
+    {\scriptsize $+$ Baseline supervision}\\
+    {\scriptsize $+$ Orthogonality}\\[6pt]
+    {\scriptsize\textcolor{forestgreen}{\textbf{10 active terms}}}
+  };
+
+  % Stage C
+  \node[stage, draw=navy, fill=navy!8] (c) at (11, 0) {
+    \textbf{Stage C}\\[3pt]
+    {\scriptsize\textbf{Full Refinement}}\\[6pt]
+    {\scriptsize All terms active}\\
+    {\scriptsize Rebalanced weights}\\[6pt]
+    {\scriptsize\textcolor{navy}{\textbf{12 active terms}}}
+  };
+
+  % Arrows with labels above, spaced away from boxes
+  \draw[arr, steelblue!70] (a.east) -- (b.west);
+  \node[above=0.15cm, font=\tiny\itshape, text=gray] at (2.75, 0.9) {add anti-leakage};
+
+  \draw[arr, forestgreen!70] (b.east) -- (c.west);
+  \node[above=0.15cm, font=\tiny\itshape, text=gray] at (8.25, 0.9) {activate remaining};
+
+  % Labels below
+  \node[below=0.3cm, font=\scriptsize, text=steelblue] at (a.south) {Learn basic separation};
+  \node[below=0.3cm, font=\scriptsize, text=forestgreen] at (b.south) {Fix leakage pathways};
+  \node[below=0.3cm, font=\scriptsize, text=navy] at (c.south) {Fine-tune decomposition};
+\end{tikzpicture}
+
+\vspace{0.8em}
+\begin{insightbox}
+\centering
+\textbf{Why curriculum?} Activating 12 loss terms from scratch overwhelms 100 parameters.\\[3pt]
+Stage A provides a stable initialization before anti-leakage penalties introduce competing gradients.
+\end{insightbox}
+
+\vspace{0.3em}
+{\small\textcolor{forestgreen}{\textbf{Thesis model (v5):}} Stage A $\rightarrow$ Stage B only (8 terms). \quad
+\textcolor{warningred}{\textbf{v7:}} All three stages (12 terms) --- performed worse.}
+\end{frame}
+
+% =============================================
+% SLIDE 15 — Exp 1.0: Classical BEADS
 % =============================================
 \begin{frame}{Exp 1.0: Classical BEADS (Baseline)}
 \begin{itemize}
@@ -804,7 +805,7 @@ The relationship between loss complexity and model quality is \textbf{non-monoto
 };
 % Leakage floor line
 \draw[warningred, dashed, very thick] (axis cs:0.3, 0.59) -- (axis cs:5.7, 0.59);
-\node[right, font=\scriptsize, text=warningred] at (axis cs:5.1, 0.585) {Leakage Floor};
+\node[font=\scriptsize, text=warningred, anchor=east] at (axis cs:5.5, 0.583) {Leakage Floor $\downarrow$};
 \end{axis}
 \end{tikzpicture}
 
@@ -861,7 +862,51 @@ For \textbf{any} $\lambda > 0$, every non-zero signal value is shrunk by exactly
 \end{frame}
 
 % =============================================
-% SLIDE 23 — Three Root Causes
+% SLIDE 23 — Leakage in Action
+% =============================================
+\begin{frame}{Leakage in Action}
+\centering
+\includegraphics[width=0.9\textwidth, height=0.45\textheight, keepaspectratio]{figures/leakage-example.png}
+
+\vspace{0.5em}
+\begin{tikzpicture}[scale=0.85, transform shape,
+    stepbox/.style={rectangle, rounded corners=3pt, minimum width=2.8cm, minimum height=0.8cm, align=center, font=\scriptsize},
+    arr/.style={-{Stealth}, thick}]
+
+  % Step 1
+  \node[stepbox, draw=steelblue, fill=steelblue!10] (s1) at (0, 0)
+    {Soft-threshold\\shrinks \textbf{all} peaks by $\lambda$};
+
+  % Step 2
+  \node[stepbox, draw=orange, fill=orange!10] (s2) at (4.5, 0)
+    {Dense regions:\\shrinkage $\times$ many samples\\$=$ large energy deficit};
+
+  % Step 3
+  \node[stepbox, draw=warningred, fill=warningred!10] (s3) at (9.5, 0)
+    {Low-pass filter\\absorbs missing energy\\$\rightarrow$ \textbf{baseline bulges up}};
+
+  \draw[arr, steelblue] (s1) -- (s2);
+  \draw[arr, orange] (s2) -- (s3);
+\end{tikzpicture}
+
+\vspace{0.5em}
+\begin{resultbad}
+\centering
+\textcolor{forestgreen}{Green} = true peaks \quad \textcolor{blue}{Blue} = predicted peaks (shrunk) \quad \textcolor{warningred}{Red} = baseline (inflated)\\[3pt]
+Where peaks are dense, the baseline \textbf{absorbs the energy} that soft-thresholding removes.
+\end{resultbad}
+\end{frame}
+
+% =============================================
+% SLIDE 24 — Raw Network Output Examples
+% =============================================
+\begin{frame}{Raw Network Output: Observed / Predicted / Ground Truth}
+\centering
+\includegraphics[width=\textwidth, height=0.85\textheight, keepaspectratio]{figures/leakage-example-again.png}
+\end{frame}
+
+% =============================================
+% SLIDE 25 — Three Root Causes
 % =============================================
 \begin{frame}{Three Root Causes of Baseline Leakage}
 \begin{columns}[T]
@@ -958,23 +1003,33 @@ The negative results (3, 4) are \textbf{as important as the positive ones}.
 \end{frame}
 
 % =============================================
-% SLIDE 26 — Limitations
+% SLIDE 26 — Fixing Leakage: The Peak Trade-Off
+% =============================================
+\begin{frame}{Fixing Leakage: The Peak Trade-Off}
+\centering
+\includegraphics[width=0.95\textwidth, height=0.55\textheight, keepaspectratio]{figures/leakage-fix-example.png}
+
+\vspace{0.3em}
+{\small\textcolor{forestgreen}{\textbf{Baseline improves}} with anti-leakage terms, but \textcolor{warningred}{\textbf{peaks degrade}} --- the same penalties over-shrink peak amplitudes.}
+\end{frame}
+
+% =============================================
+% SLIDE 27 — Limitations
 % =============================================
 \begin{frame}{Limitations}
 \begin{itemize}
   \setlength\itemsep{0.5em}
-  \item Synthetic-only evaluation --- no real chromatographic ground truth
+  \item Quantitative evaluation on \textbf{synthetic data} --- real GC chromatographs tested qualitatively (visually plausible baselines, but no ground truth for metrics)
   \item No comparison with arPLS, airPLS, or deep learning baselines
   \item Dense $O(N^2)$ matrices --- 128\,MB per buffer at $N\!=\!4096$
   \item Fixed cutoff frequency $f_c$ (not learnable due to SciPy--PyTorch boundary)
-  \item ${\sim}50\%$ area error --- not deployment-ready for quantitative analysis
-  \item 40 test signals --- limited statistical power
+  \item ${\sim}50\%$ area error on synthetic data --- not deployment-ready for quantitative analysis
 \end{itemize}
 
 \vspace{0.8em}
 \begin{tcolorbox}[colback=gray!5, colframe=gray, boxrule=0.5pt]
 \centering
-This is a \textbf{methodological exploration}, not a production tool.
+This is a \textbf{methodological exploration} --- but the architecture is promising for real-world deployment.
 \end{tcolorbox}
 \end{frame}
 
@@ -983,18 +1038,23 @@ This is a \textbf{methodological exploration}, not a production tool.
 % =============================================
 \begin{frame}{Future Directions}
 \begin{enumerate}
-  \setlength\itemsep{0.8em}
+  \setlength\itemsep{0.6em}
   \item \textbf{Group sparsity ($\ell_{2,1}$ penalty)}\\
     {\small Replace element-wise $\ell_1$ with block soft-thresholding.\\
-    $\ell_1$: shrinks each element \quad vs.\quad Group: preserves within-group amplitudes.\\
-    \textcolor{forestgreen}{Directly addresses the leakage mechanism.}}
+    Preserves within-group amplitudes $\rightarrow$ \textcolor{forestgreen}{directly addresses leakage.}}
 
-  \item \textbf{Banded matrix implementation}\\
-    {\small $O(N^2) \rightarrow O(N \cdot b)$.\quad Enables $N = 100{,}000+$ signals.}
+  \item \textbf{Banded matrix implementation in PyTorch}\\
+    {\small $O(N^2) \rightarrow O(N \cdot b)$.\quad Enables $N = 100{,}000+$ signals natively on GPU.}
 
   \item \textbf{Real chromatographic validation}\\
-    {\small Spike-and-recovery experiments, consensus labeling.\\
-    \textcolor{warningred}{The critical missing piece.}}
+    {\small Spike-and-recovery experiments, consensus labeling with expert chromatographers.\\
+    \textcolor{warningred}{The critical missing piece for deployment.}}
+
+  \item \textbf{Edge deployment on STM32 microcontrollers}\\
+    {\small Only \textbf{100 scalar parameters} + banded ops $\rightarrow$ tiny memory footprint.\\
+    At $N\!=\!4096$ with banded matrices: ${\sim}$200\,KB RAM (signal buffers + filter bands).\\
+    Feasible on STM32H7-class MCUs (1\,MB+ SRAM, Cortex-M7 @ 480\,MHz).\\
+    \textcolor{forestgreen}{Enables real-time baseline correction on portable instruments.}}
 \end{enumerate}
 \end{frame}
 

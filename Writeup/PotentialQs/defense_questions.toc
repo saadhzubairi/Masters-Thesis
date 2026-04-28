@@ -9,6 +9,9 @@
 \contentsline {section}{\numberline {9}Writing \& Completeness}{19}{section.9}%
 \contentsline {section}{\numberline {10}Future Work \& Big Picture}{20}{section.10}%
 \contentsline {section}{\numberline {11}Killer Questions --- The Ones That Hurt}{22}{section.11}%
-\contentsline {section}{\numberline {12}Known Inconsistencies \& Issues to Fix Before Defense}{31}{section.12}%
-\contentsline {section}{General Defense Advice}{32}{table.1}%
-\contentsline {section}{Glossary of Key Terms}{33}{Item.30}%
+\contentsline {section}{\numberline {12}Known Inconsistencies \& Issues to Fix Before Defense}{32}{section.12}%
+\contentsline {section}{General Defense Advice}{33}{table.1}%
+\contentsline {section}{Glossary of Key Terms}{34}{Item.30}%
+\contentsline {section}{Loss Weight Reference ($\alpha $ values)}{35}{Item.30}%
+\contentsline {section}{Loss Function Specifications}{38}{table.2}%
+\contentsline {section}{100 Basic Questions \& Short Answers}{42}{table.2}%

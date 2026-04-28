@@ -429,6 +429,178 @@ async def generate_preview(config: GeneratePreviewConfig):
     return {"signals": signals}
 
 
+class BeadsConfig(BaseModel):
+    d: int = 1
+    fc: float = 0.006
+    r: float = 6.0
+    lam0: float = 0.4
+    lam1: float = 4.0
+    lam2: float = 3.2
+    Nit: int = 30
+    label: str = ""
+
+
+class BeadsTestRequest(BaseModel):
+    signal: list[float]
+    x_true: list[float]
+    f_true: list[float]
+    configs: list[BeadsConfig]
+
+
+@app.post("/beads-test")
+async def beads_test(req: BeadsTestRequest):
+    import sys
+    sys.path.insert(0, os.path.join(os.path.dirname(__file__), "models"))
+    from lbeads_net import beads_classic_with_init
+
+    y = np.array(req.signal, dtype=np.float64)
+    results = []
+    for cfg in req.configs:
+        try:
+            x_pred, f_pred = beads_classic_with_init(
+                y, d=cfg.d, fc=cfg.fc, r=cfg.r,
+                lam0=cfg.lam0, lam1=cfg.lam1, lam2=cfg.lam2,
+                Nit=cfg.Nit,
+            )
+            # Compute metrics
+            x_true = np.array(req.x_true, dtype=np.float64)
+            f_true = np.array(req.f_true, dtype=np.float64)
+            peak_mse = float(np.mean((x_pred - x_true) ** 2))
+            baseline_mse = float(np.mean((f_pred - f_true) ** 2))
+            results.append({
+                "label": cfg.label,
+                "x_pred": x_pred.tolist(),
+                "f_pred": f_pred.tolist(),
+                "peak_mse": peak_mse,
+                "baseline_mse": baseline_mse,
+            })
+        except Exception as e:
+            results.append({
+                "label": cfg.label,
+                "error": str(e),
+            })
+
+    return _sanitize({"results": results})
+
+
+REAL_DATA_DIR = os.path.join(os.path.dirname(__file__), "data", "mit-bih-noise-stress-test-database-1.0.0")
+
+
+@app.get("/real-data/records")
+async def list_real_data_records():
+    import glob as _glob
+    hea_files = sorted(_glob.glob(os.path.join(REAL_DATA_DIR, "*.hea")))
+    records = []
+    for hea in hea_files:
+        name = os.path.splitext(os.path.basename(hea))[0]
+        with open(hea) as f:
+            first_line = f.readline().strip().split()
+        n_channels = int(first_line[1]) if len(first_line) > 1 else 0
+        fs = int(first_line[2]) if len(first_line) > 2 else 0
+        sig_len = int(first_line[3]) if len(first_line) > 3 else 0
+        records.append({"name": name, "n_channels": n_channels, "fs": fs, "sig_len": sig_len})
+    return {"records": records}
+
+
+class RealDataInferRequest(BaseModel):
+    run_id: str
+    record: str
+    channel: int = 0
+    start: int = 0
+    length: int = 4096
+
+
+@app.post("/real-data/infer")
+async def real_data_infer(req: RealDataInferRequest):
+    import sys
+    sys.path.insert(0, os.path.join(os.path.dirname(__file__), "models"))
+    import wfdb
+    import torch
+    from lbeads_net import LBEADS_NET, LBEADS_NET_Fast
+
+    # Load real signal
+    record_path = os.path.join(REAL_DATA_DIR, req.record)
+    try:
+        rec = wfdb.rdrecord(record_path)
+    except Exception as e:
+        raise HTTPException(status_code=400, detail=f"Cannot read record: {e}")
+
+    if req.channel >= rec.n_sig:
+        raise HTTPException(status_code=400, detail=f"Channel {req.channel} not found (record has {rec.n_sig})")
+
+    end = min(req.start + req.length, rec.sig_len)
+    segment = rec.p_signal[req.start:end, req.channel].astype(np.float64)
+    N = len(segment)
+
+    # Load model from run checkpoint
+    details = store.get_run(req.run_id)
+    if not details:
+        raise HTTPException(status_code=404, detail="Run not found")
+    run_dir = os.path.join(EXPERIMENTS_DIR, req.run_id)
+    checkpoint_path = os.path.join(run_dir, "checkpoint.pth")
+    if not os.path.exists(checkpoint_path):
+        raise HTTPException(status_code=400, detail="No checkpoint found")
+
+    checkpoint = torch.load(checkpoint_path, map_location="cpu", weights_only=False)
+    config = checkpoint.get("model_config", {})
+    model_type = checkpoint.get("model_type", "lbeads")
+    model_N = config.get("N", 4096)
+
+    # Build model with the segment length (must match)
+    if N != model_N:
+        # Pad or truncate to model_N
+        if N < model_N:
+            segment = np.pad(segment, (0, model_N - N), mode="edge")
+        else:
+            segment = segment[:model_N]
+        N = model_N
+
+    loaded_layers = int(config.get("num_layers", 10))
+
+    if model_type in ("lbeads_fast", "lbeads_v5"):
+        model = LBEADS_NET_Fast(
+            N=N,
+            d=config.get("d", 1),
+            fc=config.get("fc", 0.006),
+            num_layers=loaded_layers,
+            lowpass_iterations=config.get("lowpass_iterations", 3),
+            lowpass_cg_iters=config.get("lowpass_cg_iters", 12),
+        )
+    else:
+        model = LBEADS_NET(
+            N=N,
+            d=config.get("d", 1),
+            fc=config.get("fc", 0.006),
+            num_layers=loaded_layers,
+            shared_params=config.get("shared_params", False),
+            lowpass_iterations=config.get("lowpass_iterations", 1),
+            solve_cg_iters=config.get("solve_cg_iters", 5),
+            lowpass_cg_iters=config.get("lowpass_cg_iters", 24),
+        )
+    model.load_state_dict(checkpoint["model_state_dict"], strict=False)
+    model.eval()
+
+    # Normalize and infer
+    scale = max(float(np.max(np.abs(segment))), 1e-8)
+    y_norm = torch.tensor(segment / scale, dtype=torch.float32).unsqueeze(0)
+    with torch.no_grad():
+        x_pred, f_pred = model(y_norm)
+    x_pred = (x_pred.squeeze(0).numpy() * scale)
+    f_pred = (f_pred.squeeze(0).numpy() * scale)
+
+    # Downsample for transfer
+    step = max(1, N // 1024)
+    return _sanitize({
+        "y": segment[::step].tolist(),
+        "x_pred": x_pred[::step].tolist(),
+        "f_pred": f_pred[::step].tolist(),
+        "N": N,
+        "fs": rec.fs,
+        "channel": rec.sig_name[req.channel],
+        "model_type": model_type,
+    })
+
+
 @app.on_event("startup")
 async def startup():
     # Mark any incomplete runs from previous crashes as failed

@@ -78,6 +78,8 @@
 
 > The idea is beautifully simple. Take an iterative optimization algorithm -- in our case, BEADS. Instead of running it for K iterations with fixed parameters, **unroll** it: map each iteration to one layer of a neural network, and make the algorithm parameters learnable.
 
+> What this essentially unlocks for us is the ability to **learn a different set of parameters at each iteration**. Classical BEADS uses the same six parameters for every iteration -- the algorithm has no way to adapt its behavior as it refines the estimate. But in the unrolled version, each layer gets its own parameters, so the network can learn to do coarse separation in early layers and fine refinement in later layers. We get the interpretability of BEADS -- every parameter still has a physical meaning -- but with the adaptability of a learned model.
+
 > On the left, the classical version: a loop with fixed theta, repeated K times. On the right, the unrolled version: K sequential layers, each with its own parameters theta-k, trained end-to-end via backpropagation.
 
 > For LBEADS-NET, this gives us 20 layers times 5 parameters per layer equals **100 learnable scalars**. That's orders of magnitude fewer than any deep learning baseline, and every parameter has a direct physical interpretation.
@@ -138,7 +140,19 @@
 
 ---
 
-### Slide 14 -- Exp 1.0: Classical BEADS (40 seconds)
+### Slide 14 -- Three-Stage Curriculum Training (40 seconds)
+
+> Before we dive into the experiments, let me explain how we actually train this network. With up to 12 loss terms competing for 100 parameters, you can't just turn everything on from the start -- the optimizer gets pulled in too many directions at once.
+
+> So we use a three-stage curriculum. **Stage A** is pure warmup: only peak reconstruction MSE is active. The network learns basic peak-baseline separation without any competing objectives. This gives the parameters a stable starting point.
+
+> **Stage B** is where the anti-leakage machinery comes online. We activate sparsity, total variation, non-negativity, masked baseline supervision, orthogonality -- ten terms total. The key insight is that these penalties need a reasonable decomposition to produce meaningful gradients. Applied to a random initialization, they'd just produce noise.
+
+> **Stage C** activates the remaining terms -- envelope constraint, frequency separation -- and rebalances all the weights for final refinement. The progression is: learn to separate, then learn to separate *correctly*, then polish.
+
+---
+
+### Slide 15 -- Exp 1.0: Classical BEADS (40 seconds)
 
 > Experiment 1.0 is our baseline: classical BEADS with published default parameters. These parameters were designed for unnormalized chromatograms with peak amplitudes in the hundreds. But our test signals are normalized to the range zero to one.
 
@@ -292,23 +306,25 @@
 
 ### Slide 26 -- Limitations (40 seconds)
 
-> Let me be honest about what this work does not do.
+> Let me be honest about what this work does not do perfectly.
 
-> All evaluation is on synthetic data. We have no real chromatographic ground truth. We don't compare against arPLS, airPLS, or any deep learning baseline -- only against classical BEADS with default parameters. The dense matrix implementation uses O(N-squared) memory, which limits scalability. The cutoff frequency is fixed because of the SciPy-PyTorch autograd boundary. Area error is around 50 percent, which is nowhere near deployment-ready for quantitative analysis. And we have only 40 test signals.
+> Our quantitative evaluation is on synthetic data. We did test on real gas chromatography signals and the model produces visually plausible baselines -- smooth, physically reasonable -- but without ground truth we can't compute metrics on those. We don't compare against arPLS, airPLS, or any deep learning baseline -- only against classical BEADS with default parameters. The dense matrix implementation uses O(N-squared) memory, which limits scalability. The cutoff frequency is fixed because of the SciPy-PyTorch autograd boundary. And area error on synthetic data is around 50 percent, which is not deployment-ready for quantitative analysis.
 
-> This is a **methodological exploration** -- demonstrating algorithm unrolling for BEADS, characterizing the leakage phenomenon, and documenting the failure modes. It is not a production tool.
+> That said, this is a **methodological exploration** -- and the architecture itself is very promising for real-world deployment, as I'll show on the next slide.
 
 ---
 
-### Slide 27 -- Future Directions (40 seconds)
+### Slide 27 -- Future Directions (50 seconds)
 
-> Three concrete next steps, in priority order.
+> Four concrete next steps.
 
-> First, and most impactful: replace the element-wise ell-one penalty with **group sparsity** -- an ell-two-one penalty. Group sparsity penalizes entire blocks of coefficients jointly: either the whole group is zero, or none of it is. Within an active group, amplitudes are NOT shrunk. This directly addresses the leakage mechanism by eliminating the per-element shrinkage bias in peak regions.
+> First, and most impactful for quality: replace the element-wise ell-one penalty with **group sparsity** -- an ell-two-one penalty. Group sparsity penalizes entire blocks of coefficients jointly: either the whole group is zero, or none of it is. Within an active group, amplitudes are NOT shrunk. This directly addresses the leakage mechanism.
 
-> Second: implement banded matrix operations natively in PyTorch, reducing memory from O(N-squared) to O(N-times-b) and enabling signals with hundreds of thousands of data points.
+> Second: implement banded matrix operations **natively in PyTorch**, reducing memory from O(N-squared) to O(N-times-b) and enabling signals with hundreds of thousands of data points on GPU.
 
-> Third, and most important for validation: real chromatographic evaluation. Spike-and-recovery experiments or consensus labeling by expert chromatographers to establish ground truth. This is the critical missing piece.
+> Third: real chromatographic validation. Spike-and-recovery experiments or consensus labeling by expert chromatographers. We've shown qualitatively that it works on real GC data -- now we need the quantitative proof.
+
+> And fourth -- this is exciting -- **edge deployment on STM32 microcontrollers**. The entire model is just 100 scalar parameters. With banded matrix operations, inference on a 4096-sample signal requires roughly 200 kilobytes of RAM. That's well within the capability of an STM32H7 -- a Cortex-M7 running at 480 megahertz with over a megabyte of SRAM. This means real-time baseline correction could run directly on portable chromatography instruments, no cloud or PC required.
 
 ---
 

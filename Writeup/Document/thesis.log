@@ -1,4 +1,4 @@
-This is pdfTeX, Version 3.141592653-2.6-1.40.27 (TeX Live 2025) (preloaded format=pdflatex 2025.3.8)  23 APR 2026 21:51
+This is pdfTeX, Version 3.141592653-2.6-1.40.27 (TeX Live 2025) (preloaded format=pdflatex 2025.3.8)  27 APR 2026 13:49
 entering extended mode
  restricted \write18 enabled.
  %&-line parsing enabled.
@@ -1034,7 +1034,7 @@ Package hyperref Info: Link coloring ON on input line 103.
 [1
 
 {/usr/local/texlive/2025/texmf-var/fonts/map/pdftex/updmap/pdftex.map}]
-Underfull \hbox (badness 10000) in paragraph at lines 222--225
+Underfull \hbox (badness 10000) in paragraph at lines 221--224
 
  []
 
@@ -1045,7 +1045,7 @@ Underfull \hbox (badness 10000) in paragraph at lines 222--225
 [2] (./vita.tex)
 
 [3] (./acknowledge.tex)
-Underfull \hbox (badness 10000) in paragraph at lines 11--263
+Underfull \hbox (badness 10000) in paragraph at lines 11--277
 
  []
 
@@ -1480,7 +1480,7 @@ ive/2025/texmf-dist/fonts/type1/public/amsfonts/cm/cmr8.pfb></usr/local/texlive
 /texmf-dist/fonts/type1/public/amsfonts/cm/cmtt12.pfb></usr/local/texlive/2025/
 texmf-dist/fonts/type1/public/amsfonts/symbols/msbm10.pfb></usr/local/texlive/2
 025/texmf-dist/fonts/type1/public/cm-super/sfrm1200.pfb>
-Output written on thesis.pdf (153 pages, 566710 bytes).
+Output written on thesis.pdf (153 pages, 566816 bytes).
 PDF statistics:
  603 PDF objects out of 1000 (max. 8388607)
  403 compressed objects within 5 object streams

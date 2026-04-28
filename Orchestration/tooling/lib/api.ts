@@ -133,6 +133,73 @@ export async function generatePreview(
   return res.json()
 }
 
+export interface BeadsConfig {
+  d: number
+  fc: number
+  r: number
+  lam0: number
+  lam1: number
+  lam2: number
+  Nit: number
+  label: string
+}
+
+export interface BeadsResult {
+  label: string
+  x_pred?: number[]
+  f_pred?: number[]
+  peak_mse?: number
+  baseline_mse?: number
+  error?: string
+}
+
+export async function runBeadsTest(
+  signal: number[], x_true: number[], f_true: number[], configs: BeadsConfig[]
+): Promise<{ results: BeadsResult[] }> {
+  const res = await fetch(`${API_BASE}/beads-test`, {
+    method: "POST",
+    headers: { "Content-Type": "application/json" },
+    body: JSON.stringify({ signal, x_true, f_true, configs }),
+  })
+  if (!res.ok) throw new Error(await res.text())
+  return res.json()
+}
+
+export interface RealDataRecord {
+  name: string
+  n_channels: number
+  fs: number
+  sig_len: number
+}
+
+export interface RealDataInferResult {
+  y: number[]
+  x_pred: number[]
+  f_pred: number[]
+  N: number
+  fs: number
+  channel: string
+  model_type: string
+}
+
+export async function listRealDataRecords(): Promise<{ records: RealDataRecord[] }> {
+  const res = await fetch(`${API_BASE}/real-data/records`)
+  if (!res.ok) throw new Error(await res.text())
+  return res.json()
+}
+
+export async function inferRealData(
+  run_id: string, record: string, channel: number, start: number, length: number
+): Promise<RealDataInferResult> {
+  const res = await fetch(`${API_BASE}/real-data/infer`, {
+    method: "POST",
+    headers: { "Content-Type": "application/json" },
+    body: JSON.stringify({ run_id, record, channel, start, length }),
+  })
+  if (!res.ok) throw new Error(await res.text())
+  return res.json()
+}
+
 export async function getDataConfig(): Promise<DataConfig> {
   const res = await fetch(`${API_BASE}/data-config`)
   if (!res.ok) throw new Error(await res.text())

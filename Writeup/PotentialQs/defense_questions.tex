@@ -32,6 +32,8 @@
 
 % ── Misc ────────────────────────────────────────────────────────────────────
 \usepackage{booktabs}
+\usepackage{longtable}
+\usepackage{array}
 \usepackage{titlesec}
 
 % ============================================================================
@@ -2052,6 +2054,78 @@ look like on a different random seed?}
 \textbf{Thesis references:} Sec.~5.5 (parameter analysis), Table~5.5 (learned values).
 \end{answerbox}
 
+% ── Q66 ─────────────────────────────────────────────────────────────────────
+\question{You have 100 learnable scalars per layer---$\lambda_0$,
+$\lambda_1$, $\lambda_2$, $r$, $\eta$---but you leave the single
+most important parameter \emph{fixed}: the cutoff frequency $f_c$.
+$f_c$ literally defines the boundary between ``peak'' and
+``baseline.''  You admit it contributes to leakage through filter
+bandwidth mismatch.  You even list three concrete approaches to
+make it learnable in Section~3.5.  So why didn't you just\ldots
+do it?  You had the entire thesis to implement a differentiable
+IIR filter or a learnable FIR.  What stopped you?}
+
+\begin{answerbox}
+\textbf{Key points (this one stings---be honest and precise):}
+\begin{itemize}[nosep]
+  \item \textbf{The technical barrier is real but not insurmountable.}
+        The filter matrices $A$ and $B$ are constructed by
+        \texttt{scipy.signal} routines that are opaque to PyTorch's
+        autograd.  The chain $f_c \to \mathbf{a}, \mathbf{b} \to
+        A, B \to L = I - BA^{-1} \to \hat{\mathbf{f}}$ passes
+        through non-differentiable SciPy operations, so
+        $\partial\mathcal{L}/\partial f_c = 0$ identically.  This is
+        not a gradient-vanishing problem---there is \emph{no gradient
+        at all}.
+  \item \textbf{Why not re-implement in PyTorch?}  The Butterworth
+        pole placement \emph{is} closed-form:
+        $t = ((1-\cos\omega_c)/(1+\cos\omega_c))^d$, and the
+        coefficient vectors $\mathbf{a}$, $\mathbf{b}$ are polynomial
+        functions of $t$.  In principle, all of this can be written in
+        pure PyTorch tensor ops, making $f_c$ differentiable.
+        \textbf{The reason it was not done}: the current architecture
+        stores $A$, $B$, and $L$ as \emph{dense} $N \times N$ matrices.
+        Making $f_c$ learnable means these matrices must be
+        \emph{recomputed at every forward pass} (since $f_c$ changes
+        with each gradient step).  Rebuilding three $4096 \times 4096$
+        dense matrices every forward pass---and backpropagating through
+        $N^2$ entries---is computationally prohibitive.  The
+        engineering prerequisite is banded matrix support, which was
+        itself not implemented.
+  \item \textbf{The dependency chain}: learnable $f_c$ requires
+        differentiable filter construction, which requires either
+        banded matrix ops in PyTorch (not implemented) or accepting
+        $O(N^2)$ recomputation per forward pass (infeasible at
+        $N{=}4096$).  Solving either prerequisite was a thesis-scale
+        effort on its own.
+  \item \textbf{The FIR alternative}: replacing the IIR Butterworth
+        with a learnable FIR filter of fixed order $M$ (initialized
+        from the Butterworth impulse response) would bypass the dense
+        matrix issue entirely---\texttt{torch.nn.functional.conv1d}
+        handles everything.  This is approximately 50 lines of code
+        and should have been tried.  Concede this directly.
+  \item \textbf{The honest answer}: the dense matrix decision early
+        in development created a technical debt that blocked learnable
+        $f_c$.  The FIR workaround was identified late and deprioritized
+        relative to the loss engineering experiments.  In hindsight,
+        learnable $f_c$ via FIR would have been higher-impact than
+        the 12-term loss function.
+  \item \textbf{Impact on leakage}: $f_c$ contributes to leakage
+        through Failure Mode~2 (filter bandwidth mismatch, Sec.~2.2.1.5).
+        Broad peaks with spectral content below $f_c$ have their
+        energy captured by $L$ and attributed to the baseline.  A
+        learnable $f_c$---or better, a \emph{per-layer} $f_c^k$---could
+        adapt the frequency boundary to the signal, potentially reducing
+        this component of leakage.  However, it would not address
+        Failure Mode~1 (sparsity violation), which is the dominant
+        cause.  So learnable $f_c$ is necessary but not sufficient.
+\end{itemize}
+\textbf{Thesis references:} Sec.~3.5 (non-learnable $f_c$ and autograd boundary),
+Sec.~2.2.1.5 (Failure Mode~2: filter bandwidth mismatch),
+Sec.~3.2.2 (filter construction),
+Sec.~6 (future work).
+\end{answerbox}
+
 
 % ============================================================================
 %  KNOWN INCONSISTENCIES TO FIX
@@ -2237,6 +2311,754 @@ etc.)\ can push the BLI below this floor.  The limit generalises to
 as independently confirmed by Gharbi et~al.\ (2024) in their work on
 unrolled sparse-recovery architectures.
 \hfill\textit{Thesis refs: Sec.~5.1.2, Table~5.2, Sec.~1.3 (Contribution~3)}
+
+
+% ============================================================================
+%  LOSS WEIGHT REFERENCE (ALPHAS)
+% ============================================================================
+\newpage
+\section*{Loss Weight Reference ($\alpha$ values)}
+\addcontentsline{toc}{section}{Loss Weight Reference ($\alpha$ values)}
+
+\begin{tcolorbox}[
+  enhanced,
+  colback=blue!3!white,
+  colframe=SectionBlue,
+  fonttitle=\bfseries\sffamily,
+  title={Complete $\alpha$ Reference},
+  coltitle=white,
+  attach boxed title to top center={yshift=-2mm},
+  boxed title style={colback=SectionBlue, colframe=SectionBlue, sharp corners, size=small},
+  left=6pt, right=6pt, top=6pt, bottom=6pt
+]
+{\small The total loss is $\mathcal{L}_{\text{total}} = \sum_{i=1}^{12} \alpha_i \mathcal{L}_i$.
+Each $\alpha_i$ is a \emph{fixed scalar weight set once before training}---it is
+\textbf{not} learned by backpropagation.  The $\alpha$ values define the training
+objective; the 100 per-layer parameters ($\lambda_0^k, \lambda_1^k, \lambda_2^k,
+r^k, \eta^k$) are what the optimizer actually adjusts.  Different experiments use
+different $\alpha$ configurations (see Table~4.3).}
+\end{tcolorbox}
+
+\vspace{0.8em}
+
+\renewcommand{\arraystretch}{1.5}
+{\small
+\begin{longtable}{@{} >{\bfseries}p{0.8cm} p{3.2cm} p{2.2cm} p{1.5cm} p{6.5cm} @{}}
+\toprule
+\textbf{\#} & \textbf{$\alpha$ name} & \textbf{Range used} & \textbf{Stage} & \textbf{What it controls \& why this value} \\
+\midrule
+\endfirsthead
+\midrule
+\textbf{\#} & \textbf{$\alpha$ name} & \textbf{Range used} & \textbf{Stage} & \textbf{What it controls \& why this value} \\
+\midrule
+\endhead
+
+1 & $\alpha_{\text{mse}} = 1.0$ & 1.0 (fixed) & A &
+\textbf{Reconstruction fidelity.} Weight of the Huber loss between $\hat{\mathbf{x}}$ and $\mathbf{x}$.
+Always 1.0 because it is the anchor---all other weights are defined \emph{relative} to reconstruction.
+Active in all three curriculum stages. \\
+
+2 & $\alpha_{\ell_1}$ & 0.005--0.01 & B &
+\textbf{$\ell_1$ sparsity on peaks.} Encourages most peak samples to be zero.
+Kept very low ($\leq 0.01$) because aggressive $\ell_1$ \emph{causes} baseline leakage by over-shrinking
+dense peaks.  At 0.01 it suppresses false peaks in flat regions without excessive shrinkage.
+Exp.~1.4 (v5) uses 0.01; Exp.~1.5 (v7) reduces to 0.005 to accommodate stronger anti-leakage terms. \\
+
+3 & $\alpha_{\text{tv}}$ & 0.005--0.01 & B &
+\textbf{Total variation on peaks.} Promotes piecewise-constant peak shapes with sharp edges.
+Same low weight as $\ell_1$ for the same reason: TV also causes shrinkage in dense regions.
+Together with $\ell_1$, these two terms are both the \emph{cause} of leakage and \emph{necessary}
+for correct behavior in sparse regions---a fundamental tension. \\
+
+4 & $\alpha_{\text{neg}}$ & 0.1--2.0 & B &
+\textbf{Non-negativity penalty.} Penalizes negative peak values via $[\max(0, -\hat{x}_i)]^2$.
+At 0.1 (Exp.~1.2--1.4): mild enforcement, reduces negative fraction from 29.5\% to 21.1\%.
+At 2.0 (Exp.~1.5/v7): 20$\times$ stronger, yet negative fraction \emph{increases} to 30.5\%
+because competing gradient directions from 12 loss terms overwhelm it. \\
+
+5 & $\alpha_{\text{baseline}}$ & 0.5--2.0 & B &
+\textbf{Masked baseline reconstruction.} \textbf{The single most impactful loss term.}
+Supervises the baseline in non-peak regions via a ground-truth-derived binary mask.
+At 1.0 (Exp.~1.3): produces best peak correlation (0.793) and best peak MSE ($9.30 \times 10^{-3}$).
+At 2.0 (Exp.~1.5/v7): doubled, but improvements are marginal due to over-regularization.
+Provides the gradient signal that pure peak reconstruction cannot: ``your baseline is wrong here.'' \\
+
+6 & $\alpha_{\text{smooth}}$ & 0.01--0.2 & B &
+\textbf{Baseline smoothness.} Penalizes second derivative (curvature) of $\hat{\mathbf{f}}$.
+At 0.01: gentle enforcement, allows moderate drift curvature while penalizing sharp leakage bumps.
+Higher values (0.2) produce very smooth baselines but can under-fit rapid drift changes.
+Encodes the physical prior that baseline drift is a slowly varying, low-frequency phenomenon. \\
+
+7 & $\alpha_{\text{baseline\_tv}}$ & 0.0--0.1 & B &
+\textbf{Baseline third derivative.} Catches localized bumps that the second-derivative penalty misses
+(a bump has large third derivative at its edges where curvature changes sign).
+At 0.1 (Exp.~1.4/v5): active, complements smoothness penalty.
+At 0.0 (Exp.~1.5/v7): disabled because redundant when envelope constraint is active.
+Complementary to $\alpha_{\text{smooth}}$---second derivative catches curvature, third derivative
+catches \emph{transitions} in curvature. \\
+
+8 & $\alpha_{\text{leakage}}$ & 0.3--1.0 & B &
+\textbf{High-frequency baseline leakage.} Penalizes high-frequency content in the baseline at peak
+locations (the observable signature of leakage).
+Uses the second derivative of $\hat{\mathbf{f}}$ as a proxy for high-frequency content, masked to peak
+regions.
+At 0.3 (Exp.~1.4): moderate penalty.  At 1.0 (Exp.~1.5): full strength.
+Despite increasing from 0.3 to 1.0, BLI barely moves (0.592 $\to$ 0.611), confirming that this is a
+loss-level intervention against an architectural problem. \\
+
+9 & $\alpha_{\text{ortho}}$ & 0.1--0.5 & B &
+\textbf{Peak-baseline orthogonality.} Penalizes baseline gradient at peak locations, weighted by
+ground-truth peak magnitude (detached).
+At 0.5 (Exp.~1.4/v5): produces best BLI (0.592) and best baseline MSE ($7.40 \times 10^{-3}$).
+The \texttt{.detach()} on ground-truth weights prevents the penalty from vanishing when peaks collapse
+to zero (which is precisely the leakage scenario).
+Conceptually motivated by orthogonal NMF---where one component is active, the other should be locally
+constant. \\
+
+10 & $\alpha_{\text{asym}} = 1.0$ & 1.0 (fixed) & B &
+\textbf{Asymmetric baseline loss} (with internal asymmetry ratio $\alpha_{\text{ratio}} = 0.9$).
+Penalizes baseline over-estimation 9$\times$ more than under-estimation.
+Directly targets leakage: when peak energy leaks into baseline, $\hat{f}_i > f_i$ at peak locations.
+The 9:1 ratio strongly discourages this, even at the cost of slight under-estimation elsewhere.
+$\alpha_{\text{ratio}} = 0.9$ was chosen heuristically; sensitivity sweep was not performed. \\
+
+11 & $\alpha_{\text{envelope}} = 0.5$ & 0.5 & C &
+\textbf{Envelope constraint.} Penalizes baseline exceeding the local minimum of the observed signal,
+computed via differentiable soft-minimum (log-sum-exp, $\tau = 0.1$, window $= 51$).
+Only activated in Stage~C (full refinement) because it is computationally expensive and
+its early activation was found to slow convergence without improving final performance.
+The soft-min target is detached to prevent the network from gaming the local minimum computation. \\
+
+12 & $\alpha_{\text{freq}} = 0.05$ & 0.05 & C &
+\textbf{Frequency separation.} Penalizes high-frequency baseline content (above $f_c$) and
+low-frequency peak content (below $f_c$) in the Fourier domain.
+Very low weight (0.05) because it is a regularizer, not a primary objective.
+Computationally expensive (requires FFT) and typically disabled during training for efficiency.
+Enforces the same spectral separation as the Butterworth filter, but via a soft penalty. \\
+
+\bottomrule
+\end{longtable}
+}
+
+
+% ============================================================================
+%  LOSS FUNCTION SPECIFICATIONS
+% ============================================================================
+\newpage
+\section*{Loss Function Specifications}
+\addcontentsline{toc}{section}{Loss Function Specifications}
+
+\begin{tcolorbox}[
+  enhanced,
+  colback=blue!3!white,
+  colframe=SectionBlue,
+  fonttitle=\bfseries\sffamily,
+  title={Complete Mathematical Specifications of All 12 Loss Terms},
+  coltitle=white,
+  attach boxed title to top center={yshift=-2mm},
+  boxed title style={colback=SectionBlue, colframe=SectionBlue, sharp corners, size=small},
+  left=6pt, right=6pt, top=6pt, bottom=6pt
+]
+{\small
+Notation: $\hat{x}_i$ = predicted peak, $x_i$ = true peak,
+$\hat{f}_i$ = predicted baseline, $f_i$ = true baseline,
+$y_i$ = observed signal, $N$ = signal length,
+$m_i$ = binary peak mask ($1$ at peak locations, $0$ elsewhere),
+$f_c$ = Butterworth cutoff frequency.
+}
+\end{tcolorbox}
+
+\vspace{0.5em}
+
+% ── L1: Reconstruction ─────────────────────────────────────────────
+\begin{questionbox}[Term 1: Reconstruction (Huber)]
+\normalfont
+$$
+\mathcal{L}_{\text{recon}} = \frac{1}{N} \sum_{i=1}^{N} \ell_\delta(\hat{x}_i - x_i), \qquad
+\ell_\delta(u) = \begin{cases}
+    \frac{1}{2}u^2 & |u| \leq \delta \\
+    \delta(|u| - \frac{1}{2}\delta) & |u| > \delta
+\end{cases}
+$$
+\end{questionbox}
+\begin{answerbox}
+\textbf{Specs:} $\delta = 1.0$ (main experiments), $\delta = 0.1$ (progressive experiments, Sec.~4.2).
+On normalized $[0,1]$ data with $\delta = 1.0$, almost all residuals fall in the quadratic regime, so
+Huber $\approx$ MSE.  The linear tail provides robustness to large leakage-induced residuals.
+\textbf{Group:} Reconstruction fidelity.  \textbf{Active:} Stages A, B, C.
+\textbf{Target:} General reconstruction accuracy (anchor term).
+\end{answerbox}
+
+\vspace{0.3em}
+
+% ── L2: ell1 ────────────────────────────────────────────────────────
+\begin{questionbox}[Term 2: $\ell_1$ Sparsity]
+\normalfont
+$$
+\mathcal{L}_{\ell_1} = \frac{1}{N} \sum_{i=1}^{N} |\hat{x}_i|
+$$
+\end{questionbox}
+\begin{answerbox}
+\textbf{Specs:} Normalized by signal length $N$.  No smoothing---uses true absolute value (subgradient at zero).
+\textbf{Group:} Sparsity priors.  \textbf{Active:} Stages B, C.
+\textbf{Target:} False peaks in flat regions.
+\textbf{Side effect:} \emph{Causes} baseline leakage in dense-peak regions by over-shrinking non-zero values.
+\end{answerbox}
+
+\vspace{0.3em}
+
+% ── L3: TV ──────────────────────────────────────────────────────────
+\begin{questionbox}[Term 3: Total Variation]
+\normalfont
+$$
+\mathcal{L}_{\text{tv}} = \frac{1}{N-1} \sum_{i=1}^{N-1} |\hat{x}_{i+1} - \hat{x}_i|
+$$
+\end{questionbox}
+\begin{answerbox}
+\textbf{Specs:} Anisotropic TV (sum of absolute first differences).  Normalized by $N-1$.
+\textbf{Group:} Sparsity priors.  \textbf{Active:} Stages B, C.
+\textbf{Target:} Non-sharp peak transitions (promotes piecewise-constant signals).
+\textbf{Side effect:} Like $\ell_1$, also causes shrinkage in dense regions.
+\end{answerbox}
+
+\vspace{0.3em}
+
+% ── L4: Non-negativity ──────────────────────────────────────────────
+\begin{questionbox}[Term 4: Non-Negativity]
+\normalfont
+$$
+\mathcal{L}_{\text{neg}} = \frac{1}{N} \sum_{i=1}^{N} \left[\max(0, -\hat{x}_i)\right]^2
+$$
+\end{questionbox}
+\begin{answerbox}
+\textbf{Specs:} Squared hinge loss on negative values.  Smooth gradient proportional to violation magnitude
+(unlike a linear penalty which has constant gradient).  Only fires for $\hat{x}_i < 0$.
+\textbf{Group:} Sparsity priors.  \textbf{Active:} Stages B, C.
+\textbf{Target:} Negative peak artifacts (chromatographic peaks are physically non-negative).
+Complements the architectural asymmetric soft-thresholding ($r^k$) in the ISTA layers.
+\end{answerbox}
+
+\vspace{0.3em}
+
+% ── L5: Masked baseline ─────────────────────────────────────────────
+\begin{questionbox}[Term 5: Masked Baseline Reconstruction]
+\normalfont
+\begin{align*}
+\tau &= \max\!\left(\gamma \cdot \max_i |x_i|,\; \tau_{\min}\right), \qquad
+m_i = \mathbf{1}\!\left[|x_i| \geq \tau\right] \\
+\mathcal{L}_{\text{baseline}} &= \frac{\sum_{i=1}^{N}(1 - m_i) \cdot (\hat{f}_i - f_i)^2}{\sum_{i=1}^{N}(1 - m_i) + \epsilon}
+\end{align*}
+\end{questionbox}
+\begin{answerbox}
+\textbf{Specs:} $\gamma = 0.02$ (relative threshold), $\tau_{\min} = 10^{-4}$ (absolute floor),
+$\epsilon = 10^{-8}$ (division safety).  Mask is derived from ground-truth $\mathbf{x}$ (used only during
+training).  Denominator normalizes by number of background samples, so loss magnitude is independent of
+peak density.
+\textbf{Group:} Baseline supervision.  \textbf{Active:} Stages B, C.
+\textbf{Target:} Baseline error in non-peak regions.
+\textbf{Why critical:} Provides the \emph{only} direct gradient signal about baseline quality.  Without it, the
+optimizer has no way to discourage the baseline from absorbing peak energy.
+\end{answerbox}
+
+\vspace{0.3em}
+
+% ── L6: Baseline smoothness ─────────────────────────────────────────
+\begin{questionbox}[Term 6: Baseline Smoothness]
+\normalfont
+$$
+\mathcal{L}_{\text{smooth}} = \frac{1}{N-2} \sum_{i=1}^{N-2} \left[\hat{f}_{i+2} - 2\hat{f}_{i+1} + \hat{f}_i\right]^2
+$$
+\end{questionbox}
+\begin{answerbox}
+\textbf{Specs:} Squared second finite difference of $\hat{\mathbf{f}}$.
+Equivalent to $\|D_2 \hat{\mathbf{f}}\|_2^2 / (N-2)$.  Quadratic penalty: allows moderate curvature
+(gentle drift) while strongly penalizing sharp localized features (leakage bumps).
+\textbf{Group:} Baseline supervision.  \textbf{Active:} Stages B, C.
+\textbf{Target:} High-curvature baseline (encodes physical prior: drift is slowly varying).
+\end{answerbox}
+
+\vspace{0.3em}
+
+% ── L7: Baseline 3rd deriv ──────────────────────────────────────────
+\begin{questionbox}[Term 7: Baseline Third Derivative]
+\normalfont
+$$
+\mathcal{L}_{\text{base\_tv}} = \frac{1}{N-3} \sum_{i=1}^{N-3} \left[\hat{f}_{i+3} - 3\hat{f}_{i+2} + 3\hat{f}_{i+1} - \hat{f}_i\right]^2
+$$
+\end{questionbox}
+\begin{answerbox}
+\textbf{Specs:} Squared third finite difference of $\hat{\mathbf{f}}$.
+A leakage bump has large second derivative at its \emph{center} but large third derivative at its
+\emph{edges} (curvature sign change).  This term catches the edges that Term~6 misses.
+\textbf{Group:} Baseline supervision.  \textbf{Active:} Stages B, C (disabled at 0.0 in v7).
+\textbf{Target:} Localized baseline bumps.
+\end{answerbox}
+
+\vspace{0.3em}
+
+% ── L8: Leakage ─────────────────────────────────────────────────────
+\begin{questionbox}[Term 8: High-Frequency Baseline Leakage]
+\normalfont
+$$
+\mathcal{L}_{\text{leakage}} = \frac{\sum_{i=1}^{N-2} m_i' \cdot [D_2\hat{\mathbf{f}}]_i^2}{\sum_{i=1}^{N-2} m_i' + \epsilon}
+$$
+\end{questionbox}
+\begin{answerbox}
+\textbf{Specs:} $m_i'$ = peak mask restricted to interior samples (indices $2,\ldots,N\!-\!1$).
+$D_2$ = second-difference operator.  Uses second derivative as a proxy for high-frequency content (the
+Butterworth high-pass $\approx$ second-derivative operator at low frequencies).
+Normalized per-peak-sample (by $\sum m_i'$), not per-total-sample.
+\textbf{Group:} Leakage-specific.  \textbf{Active:} Stages B, C.
+\textbf{Target:} Peak energy appearing as high-frequency content in the baseline at peak locations.
+\end{answerbox}
+
+\vspace{0.3em}
+
+% ── L9: Orthogonality ───────────────────────────────────────────────
+\begin{questionbox}[Term 9: Peak-Baseline Orthogonality]
+\normalfont
+$$
+\mathcal{L}_{\text{ortho}} = \frac{1}{N-1}\sum_{i=1}^{N-1} w_i \cdot \left[\hat{f}_{i+1} - \hat{f}_i\right]^2, \qquad
+w_i = \frac{|x_i|}{\max_j |x_j| + \epsilon} \;\;\text{(\texttt{.detach()}'d)}
+$$
+\end{questionbox}
+\begin{answerbox}
+\textbf{Specs:} Weights $w_i$ are derived from ground-truth $\mathbf{x}$ and \textbf{detached} from the
+computational graph.  If predicted $\hat{\mathbf{x}}$ were used instead, the penalty would vanish when
+peaks collapse to zero---precisely the leakage scenario.  Detached ground truth keeps the penalty active
+regardless of current prediction quality.
+\textbf{Group:} Leakage-specific.  \textbf{Active:} Stages B, C.
+\textbf{Target:} Baseline ``tracking'' peak shapes (non-zero baseline gradient at peak locations).
+\end{answerbox}
+
+\vspace{0.3em}
+
+% ── L10: Asymmetric baseline ────────────────────────────────────────
+\begin{questionbox}[Term 10: Asymmetric Baseline Loss]
+\normalfont
+$$
+\mathcal{L}_{\text{asym}} = \frac{1}{N}\sum_{i=1}^{N}
+\begin{cases}
+    \alpha \cdot (\hat{f}_i - f_i)^2 & \text{if } \hat{f}_i > f_i \\
+    (1 - \alpha) \cdot (\hat{f}_i - f_i)^2 & \text{if } \hat{f}_i \leq f_i
+\end{cases}
+$$
+\end{questionbox}
+\begin{answerbox}
+\textbf{Specs:} Internal asymmetry ratio $\alpha = 0.9$ (9:1 over- vs under-estimation penalty).
+Over-estimation $(\hat{f}_i > f_i)$ is the signature of leakage: baseline rises above truth to absorb
+peak energy.  The 9:1 ratio strongly discourages this, at the cost of tolerating mild under-estimation.
+Inspired by the AsLS/arPLS family's asymmetric reweighting, but applied in the loss rather than the
+iterative solver.
+\textbf{Group:} Leakage-specific.  \textbf{Active:} Stages B, C.
+\textbf{Target:} Baseline over-estimation (the directional signature of leakage).
+\end{answerbox}
+
+\vspace{0.3em}
+
+% ── L11: Envelope ───────────────────────────────────────────────────
+\begin{questionbox}[Term 11: Envelope Constraint]
+\normalfont
+\begin{align*}
+\mathcal{L}_{\text{envelope}} &= \frac{1}{N}\sum_{i=1}^{N}\left[\max\!\left(0,\;\hat{f}_i - \tilde{y}_i^{\min}\right)\right]^2 \\
+\tilde{y}_i^{\min} &= -\tau \log \sum_{j \in \mathcal{W}_i} \exp(-y_j/\tau)
+\end{align*}
+\end{questionbox}
+\begin{answerbox}
+\textbf{Specs:} Window size $|\mathcal{W}_i| = 51$ samples ($\approx$ half a typical peak width).
+Temperature $\tau = 0.1$ (tight soft-min approximation).  $\tilde{y}_i^{\min}$ is \textbf{detached}
+from the computational graph to prevent the network from gaming the local minimum computation.
+ReLU ensures only \emph{violations} (baseline above local signal minimum) are penalized.
+\textbf{Group:} Leakage-specific.  \textbf{Active:} Stage C only (expensive; early activation slows convergence).
+\textbf{Target:} Baseline exceeding observed signal (physical impossibility in peak-free regions).
+\end{answerbox}
+
+\vspace{0.3em}
+
+% ── L12: Frequency separation ───────────────────────────────────────
+\begin{questionbox}[Term 12: Frequency Separation]
+\normalfont
+$$
+\mathcal{L}_{\text{freq}} = \frac{1}{M}\sum_{m=1}^{M}\left[|\hat{F}_m|^2 \cdot \mathbf{1}[\nu_m > f_c] + |\hat{X}_m|^2 \cdot \mathbf{1}[\nu_m \leq f_c]\right]
+$$
+\end{questionbox}
+\begin{answerbox}
+\textbf{Specs:} $\hat{X}_m, \hat{F}_m$ = DFT coefficients of $\hat{\mathbf{x}}, \hat{\mathbf{f}}$.
+$\nu_m$ = frequency of bin $m$.  $f_c = 0.006$ (Butterworth cutoff).  $M$ = number of frequency bins.
+First term: penalizes high-freq baseline (above $f_c$).
+Second term: penalizes low-freq peaks (below $f_c$).
+Enforces the same spectral separation as the Butterworth filter, but via soft penalty.
+\textbf{Group:} Leakage-specific.  \textbf{Active:} Stage C only (requires FFT; typically disabled for efficiency).
+\textbf{Target:} Spectral role violation (peaks should be high-freq, baseline should be low-freq).
+\end{answerbox}
+
+
+% ============================================================================
+%  100 BASIC / FRIENDLY QUESTIONS
+% ============================================================================
+\newpage
+\section*{100 Basic Questions \& Short Answers}
+\addcontentsline{toc}{section}{100 Basic Questions \& Short Answers}
+
+\begin{tcolorbox}[
+  enhanced,
+  colback=blue!3!white,
+  colframe=SectionBlue,
+  fonttitle=\bfseries\sffamily,
+  title={Friendly Questions --- The Ones That Help You Shine},
+  coltitle=white,
+  attach boxed title to top center={yshift=-2mm},
+  boxed title style={colback=SectionBlue, colframe=SectionBlue, sharp corners, size=small},
+  left=6pt, right=6pt, top=6pt, bottom=6pt
+]
+{\small These are straightforward clarification questions a committee member
+might ask to understand your work better.  They are not adversarial---they
+are opportunities to demonstrate command of the material.  Each answer
+should be 2--4 sentences.}
+\end{tcolorbox}
+
+\vspace{0.8em}
+
+\newcounter{basicq}
+\newcommand{\bq}[2]{%
+  \stepcounter{basicq}%
+  \par\vspace{0.5em}%
+  \noindent\textbf{\sffamily\color{SectionBlue}\thebasicq.}~\textit{#1}%
+  \par\vspace{0.1em}%
+  \noindent{\small #2}%
+}
+
+% ─── CHROMATOGRAPHY BASICS (1–10) ──────────────────────────────────
+{\large\bfseries\sffamily\color{SectionBlue} Chromatography Basics}\par\vspace{0.2em}
+
+\bq{What is chromatography used for?}
+{Chromatography separates chemical compounds in a mixture so they can be identified and quantified.  It is widely used in pharmaceutical QC, environmental monitoring, food safety, clinical diagnostics, and metabolomics.  The detector records a time-series signal whose peaks correspond to individual analytes.}
+
+\bq{What is a chromatogram?}
+{A chromatogram is the detector response plotted as a function of time (or elution volume).  It consists of peaks---each corresponding to a separated analyte---superimposed on a baseline drift and corrupted by noise.  The area under each peak is proportional to the analyte's concentration.}
+
+\bq{What is baseline drift and what causes it?}
+{Baseline drift is a slowly varying, low-frequency distortion that shifts the signal away from its true zero level.  It is caused by column bleed (thermal degradation of the stationary phase), detector aging, temperature gradients, and compositional changes in the mobile phase during gradient elution.}
+
+\bq{Why is baseline correction important?}
+{Analyte concentration is determined by integrating peak area above the baseline.  If the baseline is wrong, the integrated area is wrong, and the reported concentration is inaccurate.  In regulated industries, even 2\% error can violate acceptance criteria.}
+
+\bq{What is peak area integration?}
+{Peak area integration computes the area between the corrected signal and the estimated baseline for each peak.  This area is proportional to the mass of analyte present.  It is the standard quantification method in chromatography.}
+
+\bq{What is the signal model you use?}
+{$\mathbf{y} = \mathbf{x} + \mathbf{f} + \mathbf{w}$, where $\mathbf{y}$ is the observed signal, $\mathbf{x}$ is the peak component, $\mathbf{f}$ is the baseline drift, and $\mathbf{w}$ is additive noise.  The goal is to estimate $\mathbf{f}$ from $\mathbf{y}$ so that $\hat{\mathbf{x}} = \mathbf{y} - \hat{\mathbf{f}} - \hat{\mathbf{w}}$ faithfully recovers the peaks.}
+
+\bq{What types of chromatography does this apply to?}
+{The method is general---it applies to any chromatographic technique that produces a continuous detector signal: HPLC (liquid chromatography), GC (gas chromatography), ion chromatography, size-exclusion chromatography, etc.  The synthetic data was calibrated against LC and GC signals.}
+
+\bq{What is an EMG peak?}
+{An exponentially modified Gaussian---a Gaussian convolved with an exponential decay.  It is the theoretically justified model for chromatographic peak shapes that accounts for extra-column band broadening.  The ratio $\tau/\sigma$ controls the degree of tailing.}
+
+\bq{What is a bi-Gaussian peak?}
+{A peak model that uses different Gaussian standard deviations for the left and right halves ($\sigma$ and $\sigma + \tau$).  It captures asymmetric tailing without requiring a numerical convolution, making it simpler to generate synthetically.  We use it in our data generation (Sec.~4.1.1).}
+
+\bq{What is the difference between LC and GC?}
+{In LC (liquid chromatography), the mobile phase is a liquid; in GC (gas chromatography), it is a gas.  GC typically produces narrower peaks and has different baseline drift characteristics (column bleed is more pronounced at high temperatures).  Both produce signals that fit the $\mathbf{y} = \mathbf{x} + \mathbf{f} + \mathbf{w}$ model.}
+
+
+% ─── BEADS ALGORITHM (11–25) ──────────────────────────────────────
+\vspace{0.8em}
+{\large\bfseries\sffamily\color{SectionBlue} The BEADS Algorithm}\par\vspace{0.2em}
+
+\bq{What does BEADS stand for?}
+{Baseline Estimation And Denoising using Sparsity.  It was proposed by Ning, Selesnick, and Duval in 2014.  It jointly estimates the baseline and denoises the signal by exploiting the sparsity of peaks and the smoothness of the baseline.}
+
+\bq{What are the two key priors that BEADS uses?}
+{(1)~The peak component $\mathbf{x}$ is \emph{sparse} in the derivative domain---peaks occupy a small fraction of the signal.  (2)~The baseline $\mathbf{f}$ is \emph{smooth}---it varies slowly relative to the peaks, occupying a low-frequency subspace.}
+
+\bq{What is the role of the high-pass filter $H$ in BEADS?}
+{$H$ is a zero-phase Butterworth high-pass filter that removes the low-frequency baseline from the signal.  In the cost function, the data fidelity term $\frac{1}{2}\|H(\mathbf{y} - \mathbf{x})\|^2$ ensures that only the high-frequency residual (peaks + noise) drives the peak estimate.}
+
+\bq{What is the cutoff frequency $f_c$?}
+{The normalized cutoff frequency of the Butterworth filter.  It defines the boundary between ``baseline frequencies'' (below $f_c$) and ``peak frequencies'' (above $f_c$).  In our model, $f_c = 0.006$, corresponding to a period of about 167 samples.}
+
+\bq{What is the asymmetry ratio $r$?}
+{$r$ controls the penalty asymmetry in the sparsity term $\theta(x)$.  Positive values (peaks) are penalized with weight 1, negative values with weight $r$.  Since peaks should be positive, $r > 1$ suppresses negative artifacts more aggressively.  Default: $r = 6$.}
+
+\bq{What is majorization-minimization (MM)?}
+{An iterative optimization technique that replaces a hard-to-minimize objective with a simpler \emph{majorizer} (upper bound) that is tight at the current estimate.  Minimizing the majorizer is guaranteed to decrease the original objective.  BEADS uses MM to handle the non-quadratic penalties $\theta$ and $\phi$.}
+
+\bq{How many iterations does classical BEADS typically need?}
+{About 20--30 iterations to converge.  Each iteration involves solving a banded linear system, which is $O(N)$ with banded solvers.  The total cost is approximately $O(KN)$ where $K$ is the number of iterations.}
+
+\bq{What are the six BEADS parameters?}
+{$\lambda_0$ (sparsity weight), $\lambda_1$ (first-derivative smoothness), $\lambda_2$ (second-derivative smoothness), $r$ (asymmetry ratio), $f_c$ (filter cutoff frequency), and $d$ (filter order).  All must be specified by the user.}
+
+\bq{Why is BEADS hard to tune?}
+{The six parameters interact non-linearly.  The optimal values depend on signal amplitude, noise level, peak density, and baseline shape---all of which vary across instruments and experiments.  No single configuration works for all signals.}
+
+\bq{What is a banded matrix?}
+{A matrix where non-zero entries are confined to a band of diagonals near the main diagonal.  The BEADS filter matrices $A$ and $B$ are banded with bandwidth $d$ (the filter order).  Banded systems can be solved in $O(N)$ time using specialized solvers.}
+
+\bq{What is the penalty function $\phi$ in BEADS?}
+{$\phi(z) = |z| - \epsilon_1 \log(|z| + \epsilon_1)$, a smoothed approximation to the absolute value.  It is differentiable everywhere (unlike $|z|$) while still promoting sparsity.  The constant $\epsilon_1$ controls the smoothing at zero.}
+
+\bq{What is the penalty function $\theta$ in BEADS?}
+{The asymmetric sparsity penalty: $\theta(x) = x$ for $x > \epsilon_0$, $\theta(x) = -rx$ for $x < -\epsilon_0$, with a smooth quadratic transition for $|x| \leq \epsilon_0$.  It promotes sparsity while penalizing negative values $r$ times more heavily.}
+
+\bq{How does BEADS compute the baseline?}
+{After convergence, the baseline is $\hat{\mathbf{f}} = \mathbf{y} - \hat{\mathbf{x}} - H(\mathbf{y} - \hat{\mathbf{x}})$.  This extracts the low-frequency component of the residual $\mathbf{y} - \hat{\mathbf{x}}$ using the complementary low-pass filter $L = I - H$.}
+
+\bq{What are arPLS and airPLS?}
+{Asymmetrically reweighted Penalized Least Squares (arPLS, Baek et al.\ 2015) and adaptive iteratively reweighted PLS (airPLS, Zhang et al.\ 2010).  Both are iterative smoothing methods that estimate the baseline by fitting a smooth curve below the signal, using asymmetric weights to prevent peaks from pulling the baseline up.}
+
+\bq{How does BEADS compare to arPLS?}
+{BEADS jointly estimates peaks and baseline via a cost function with explicit sparsity and smoothness priors, including a frequency-domain filter.  arPLS estimates only the baseline using asymmetric smoothing.  BEADS has more parameters (6 vs 1--2) but provides a richer decomposition.  Both require manual tuning.}
+
+
+% ─── ALGORITHM UNROLLING (26–40) ──────────────────────────────────
+\vspace{0.8em}
+{\large\bfseries\sffamily\color{SectionBlue} Algorithm Unrolling}\par\vspace{0.2em}
+
+\bq{What is algorithm unrolling?}
+{A technique that maps each iteration of an iterative optimization algorithm to one layer of a neural network.  The algorithm's parameters become learnable, and the network is trained end-to-end.  It inherits the structure and inductive biases of the original algorithm while gaining adaptivity from data-driven learning.}
+
+\bq{What is LISTA?}
+{Learned ISTA (Gregor \& LeCun, 2010)---the founding work on algorithm unrolling.  It unrolls the Iterative Shrinkage-Thresholding Algorithm for sparse coding, learning the weight matrices and thresholds end-to-end.  It achieves roughly 20$\times$ faster convergence than classical ISTA.}
+
+\bq{What is ISTA?}
+{The Iterative Shrinkage-Thresholding Algorithm---a proximal gradient method for minimizing the sum of a smooth function and a non-smooth penalty (typically $\ell_1$).  Each iteration consists of a gradient step on the smooth part followed by a proximal (soft-thresholding) step for the $\ell_1$ part.}
+
+\bq{What is a proximal operator?}
+{The proximal operator of a function $g$ at point $\mathbf{v}$ is $\text{prox}_g(\mathbf{v}) = \arg\min_{\mathbf{x}} \frac{1}{2}\|\mathbf{x} - \mathbf{v}\|^2 + g(\mathbf{x})$.  For $g = \lambda\|\cdot\|_1$, the proximal operator is soft-thresholding.  It generalizes projection to non-smooth penalties.}
+
+\bq{What is soft-thresholding?}
+{$\mathcal{S}_\lambda(x) = \text{sign}(x)\max(|x| - \lambda, 0)$.  It sets values with magnitude below $\lambda$ to zero and shrinks larger values toward zero by exactly $\lambda$.  It is the proximal operator of the $\ell_1$ norm.}
+
+\bq{What does ``untied parameters'' mean in unrolling?}
+{In classical algorithms, the same parameters are used at every iteration.  In an unrolled network, each layer gets its own parameters ($\theta^{(k)}$), allowing different layers to specialize.  This breaks convergence guarantees but improves performance.}
+
+\bq{What is the difference between unrolling and a generic neural network?}
+{An unrolled network has a prescribed architecture derived from an algorithm---each layer performs a specific algorithmic step.  A generic network (CNN, U-Net) has no such structure.  Unrolled networks have far fewer parameters, stronger inductive biases, and are more interpretable.}
+
+\bq{What is parameter efficiency in unrolling?}
+{Because the network structure encodes domain knowledge (the algorithm), only the algorithm's parameters need to be learned---not arbitrary weight matrices.  LBEADS-NET has 100 scalars vs millions for a typical CNN.  This means less training data is needed and the model is less prone to overfitting.}
+
+\bq{What is inductive bias?}
+{Prior assumptions embedded in the model architecture that constrain what it can learn.  LBEADS-NET's inductive biases come from BEADS: sparsity of peaks, smoothness of baseline, asymmetric penalization, frequency-domain separation.  These help the model learn from limited data.}
+
+\bq{What is ISTA-Net?}
+{An unrolled ISTA for image compressive sensing (Zhang \& Ghanem, 2018).  It replaces the hand-crafted sparsifying transform with a learned nonlinear transform using two convolutions and a ReLU.  ISTA-Net+ adds skip connections analogous to ResNet.}
+
+\bq{What is ADMM-Net?}
+{An unrolled ADMM for compressive sensing MRI (Yang et al., 2016).  Each ADMM iteration maps to a network stage with reconstruction, shrinkage, and multiplier update.  The shrinkage function is replaced with a learnable piecewise-linear function.}
+
+\bq{What does ``truncation'' mean in unrolling?}
+{Instead of running the algorithm until convergence (unknown number of iterations), we fix $K$ iterations and unroll exactly $K$ layers.  This creates a feed-forward network with fixed depth.  The learned parameters compensate for the truncation.}
+
+\bq{Can unrolled networks overfit?}
+{Yes, but less than generic networks because the algorithmic structure acts as a regularizer.  With only 100 parameters, LBEADS-NET is unlikely to memorize training data.  The main risk is the parameters adapting to the specific characteristics of the synthetic training distribution.}
+
+\bq{What is the relationship between unrolling depth and performance?}
+{Generally, more layers improve performance up to a point, after which diminishing returns or training instability set in.  Classical BEADS converges in $\sim$20 iterations, so $K = 20$ is a natural starting point.  The depth ablation (Table~5.4) is planned but not yet run.}
+
+\bq{Does LBEADS-NET use weight sharing across layers?}
+{No---each layer has independent parameters.  Weight sharing (using the same parameters for all layers) would reduce the model to a learned-but-uniform ISTA, losing the ability for layers to specialize.  The emergent specialization (Sec.~5.5) confirms that untying is beneficial.}
+
+
+% ─── LBEADS-NET ARCHITECTURE (41–60) ──────────────────────────────
+\vspace{0.8em}
+{\large\bfseries\sffamily\color{SectionBlue} LBEADS-NET Architecture}\par\vspace{0.2em}
+
+\bq{How many learnable parameters does LBEADS-NET have?}
+{100 scalars: 5 parameters per layer $\times$ 20 layers.  The parameters are $\lambda_0^k$ (sparsity), $\lambda_1^k$ (first-derivative penalty), $\lambda_2^k$ (second-derivative penalty), $r^k$ (asymmetry ratio), and $\eta^k$ (step size).}
+
+\bq{What is the log-space parameterization?}
+{All learnable parameters must be positive (negative regularization weights are meaningless).  We store $\log\lambda$ and recover $\lambda = \exp(\log\lambda)$.  This ensures positivity via the exponential, allows unconstrained optimization in log-space, and provides smooth gradients.}
+
+\bq{What is the initialization strategy?}
+{All layers start with identical parameters: $\lambda_0 = 0.01$, $\lambda_1 = 0.5$, $\lambda_2 = 0.5$, $r = 6.0$, $\eta = 0.05$.  These are conservative---smaller than classical BEADS defaults---to ensure stable refinement from the high-pass initialization.}
+
+\bq{What is the high-pass initialization?}
+{Instead of starting from $\mathbf{x}^0 = \mathbf{0}$, we compute $\mathbf{x}^0 = \mathbf{y} - L(\mathbf{y})$, the high-pass filtered input.  This removes the bulk of the baseline and gives the network a much better starting estimate.  Without it, small peaks would be permanently zeroed by soft-thresholding in the first layer.}
+
+\bq{How is the baseline computed?}
+{The baseline is not predicted directly by the layers.  After the final layer outputs $\hat{\mathbf{x}} = \mathbf{x}^K$, the baseline is computed as $\hat{\mathbf{f}} = L(\mathbf{y} - \hat{\mathbf{x}})$---the low-pass filtered residual.  This guarantees that $\hat{\mathbf{f}}$ is inherently smooth.}
+
+\bq{What does one ISTA layer do?}
+{Two steps: (1)~a gradient step that moves the peak estimate toward the data using the high-pass filtered residual and smoothness penalty gradients, scaled by step size $\eta^k$; (2)~an asymmetric soft-thresholding step that enforces sparsity and non-negativity.}
+
+\bq{What is asymmetric soft-thresholding?}
+{A modified soft-thresholding where positive values are shrunk by $\lambda_0\eta$ and negative values are shrunk by $\lambda_0\eta r$.  Since $r > 1$, negative values have a larger dead zone and are more aggressively suppressed.  This encourages positive peaks and penalizes negative artifacts.}
+
+\bq{What are the difference operators $D_1$ and $D_2$?}
+{$D_1$ computes first differences: $[D_1\mathbf{x}]_i = x_{i+1} - x_i$.  $D_2$ computes second differences: $[D_2\mathbf{x}]_i = x_{i+2} - 2x_{i+1} + x_i$.  Their transposes $D_1^\top$, $D_2^\top$ are implemented as adjoint accumulation operations.  All are computed in $O(N)$ time with no stored matrices.}
+
+\bq{What is the data fidelity gradient?}
+{$\mathbf{g}_{\text{data}} = H(\mathbf{y} - \mathbf{x}^{k-1}) = (\mathbf{y} - \mathbf{x}^{k-1}) - L(\mathbf{y} - \mathbf{x}^{k-1})$.  It is the high-pass filtered residual---the unexplained high-frequency content.  It drives the peak estimate toward the data while ignoring the low-frequency baseline.}
+
+\bq{What are the smoothness penalty gradients?}
+{$\nabla_\mathbf{x}\mathcal{R}_1 = \lambda_1^k D_1^\top(D_1\mathbf{x}^{k-1}/(|D_1\mathbf{x}^{k-1}| + \epsilon))$ and similarly for $\nabla_\mathbf{x}\mathcal{R}_2$ with $D_2$ and $\lambda_2^k$.  These are subgradients of the smoothed $\ell_1$ norms of the first and second differences.}
+
+\bq{Why $O(N^2)$ memory instead of $O(N)$?}
+{The filter matrices $A$, $B$, $L$ are stored as dense $N \times N$ arrays because the filter construction uses SciPy (which produces dense arrays).  Exploiting the banded structure would require custom PyTorch implementations of banded matrix-vector products with autograd support.  This is an engineering limitation.}
+
+\bq{What is the effective threshold $\lambda_0^k \eta^k$?}
+{The product of the sparsity weight and the step size.  It determines the dead zone of the soft-thresholding operator---values with magnitude below $\lambda_0^k\eta^k$ are set to zero.  The network can control this threshold by adjusting either parameter independently.}
+
+\bq{What is intermediate supervision?}
+{Computing the loss at every intermediate layer output $\mathbf{x}^k$ (for $k = 1, \ldots, K$), not just the final output.  This provides direct gradient signal to each layer, alleviating gradient attenuation across depth.  It was explored but not used in the final v5 model.}
+
+\bq{What is the \texttt{LBEADS\_NET\_Fast} class?}
+{The final architecture implementation using ISTA-style layers.  ``Fast'' refers to the simpler per-layer computation (gradient + proximal) compared to the earlier CG-based \texttt{LBEADS\_NET} class, which solved a linear system at each layer.}
+
+\bq{What framework is the model implemented in?}
+{PyTorch, using float64 precision.  The model is a standard \texttt{nn.Module} with parameters stored as \texttt{nn.ParameterList} entries and filter matrices as registered buffers.  Training uses the Adam optimizer.}
+
+\bq{Why float64 and not float32?}
+{The Butterworth filter matrices at $f_c = 0.006$ have eigenvalues spanning several orders of magnitude.  In float32, the matrix products can produce NaN gradients during backpropagation.  Float64 provides sufficient precision but doubles memory usage.}
+
+\bq{Can the model handle variable-length signals?}
+{The 100 learned scalar parameters are signal-length-agnostic.  However, the filter matrices must be reconstructed for each new $N$, and with dense storage, $N > 10{,}000$ becomes memory-prohibitive.  With banded implementations, arbitrary $N$ would work.}
+
+\bq{What is the MPS bypass?}
+{Apple Silicon GPUs (MPS backend) do not support float64 operations.  The training code explicitly bypasses MPS and falls back to CPU.  CUDA GPUs support float64 natively.}
+
+
+% ─── TRAINING & DATA (61–75) ──────────────────────────────────────
+\vspace{0.8em}
+{\large\bfseries\sffamily\color{SectionBlue} Training \& Data}\par\vspace{0.2em}
+
+\bq{How is the training data generated?}
+{Synthetically: peaks are bi-Gaussian with random positions, widths ($\sigma \in [1.5, 25]$), amplitudes (log-uniform $[15, 2500]$), and optional tailing.  Baselines are cubic splines, exponential decays, or polynomial+sinusoidal mixtures.  Gaussian noise is added with $\sigma_w \in [2, 6]$.}
+
+\bq{How many training signals are there?}
+{200 total: 160 training, 40 test, split 80/20 with a fixed seed (42) for reproducibility.  All experiments share the same split.}
+
+\bq{How are signals normalized?}
+{Each signal is divided by $\max_i |y_i|$, mapping the observed signal to $[-1, 1]$.  The same scale factor is applied to the peak and baseline ground truth, preserving the additive decomposition.}
+
+\bq{What optimizer is used?}
+{Adam with learning rate $10^{-3}$, default momentum parameters ($\beta_1 = 0.9$, $\beta_2 = 0.999$), and gradient clipping at norm 1.0.  A step-wise schedule halves the learning rate every 50 epochs.}
+
+\bq{How many epochs of training?}
+{30 epochs for the progressive experiments (Sec.~4.4), with batch size 16.  This gives 10 gradient steps per epoch, 300 total.  The curriculum-trained model uses 100 epochs split across 3 stages.}
+
+\bq{What is the three-stage curriculum?}
+{Stage A (peak reconstruction): MSE loss only.  Stage B (leakage mitigation): add sparsity, baseline supervision, orthogonality, anti-leakage terms.  Stage C (full refinement): all terms active.  Stages run sequentially; parameters carry forward.  This prevents the competing gradient directions from destabilizing early training.}
+
+\bq{Why is curriculum training necessary?}
+{With 12 loss terms active from epoch 1, the competing gradient directions prevent convergence---Experiment 1.5 shows this directly.  The curriculum introduces terms gradually, letting the network first learn basic reconstruction (Stage~A) before adding structural constraints (Stage~B) and refinement (Stage~C).}
+
+\bq{What is the batch size?}
+{16 signals per batch.  With 160 training signals, each epoch has 10 gradient update steps.}
+
+\bq{What random seed is used?}
+{42 for both data generation and model initialization.  Using the same seed across experiments ensures that differences in results arise solely from the loss configuration, not from data ordering or initialization stochasticity.}
+
+\bq{How long does training take?}
+{Not formally reported.  On CPU (the primary training environment due to MPS bypass), each epoch takes on the order of minutes for $N = 4096$ with $K = 20$ layers and dense matrix operations.  A full 30-epoch run takes roughly 30--60 minutes.}
+
+\bq{What is the peak clustering mechanism?}
+{40\% of peaks are placed in clusters of 2--4 peaks with Gaussian-distributed positions (spread 15--80 samples).  This creates the dense, overlapping peak configurations that stress-test the sparsity assumption and produce baseline leakage.}
+
+\bq{What baseline types are generated?}
+{Three types, selected uniformly at random: (1)~cubic spline through random knots, (2)~exponential decay with a Gaussian hump, (3)~low-degree polynomial plus sinusoidal components.  Each type mimics a different real-world drift pattern.}
+
+\bq{What is the baseline-to-peak ratio?}
+{The baseline amplitude is scaled so that its peak value stands in a log-uniform ratio from 0.01 to 0.5 relative to the peak signal amplitude.  This ensures the dataset includes both low-amplitude baselines (easy) and high-amplitude baselines (challenging).}
+
+\bq{How many peaks per signal?}
+{Between 20 and 55, drawn uniformly.  This range was calibrated against 8 real chromatographic signals that had 29--58 peaks.}
+
+\bq{Why synthetic data instead of real data?}
+{Real chromatograms don't have ground-truth decompositions---you can't separately measure the baseline, peaks, and noise.  Synthetic data provides exact ground truth for all three components, enabling quantitative evaluation.}
+
+
+% ─── EVALUATION METRICS (76–85) ────────────────────────────────────
+\vspace{0.8em}
+{\large\bfseries\sffamily\color{SectionBlue} Evaluation Metrics}\par\vspace{0.2em}
+
+\bq{What is Peak MSE?}
+{$\frac{1}{N}\sum_i (\hat{x}_i - x_i)^2$---the mean squared error between predicted and ground-truth peak signals.  Lower is better.  Reported as $\times 10^{-3}$ for readability.}
+
+\bq{What is Peak Correlation?}
+{The Pearson correlation coefficient between $\hat{\mathbf{x}}$ and $\mathbf{x}$.  It measures shape similarity independent of scale---1.0 means perfect shape recovery.  Values below $\sim$0.95 indicate systematic shape distortion.}
+
+\bq{What is Baseline MSE?}
+{$\frac{1}{N}\sum_i (\hat{f}_i - f_i)^2$---same as Peak MSE but for the baseline component.  Lower is better.}
+
+\bq{What is Area Error?}
+{$|\sum_i \hat{x}_i - \sum_i x_i| / \sum_i x_i \times 100\%$---the relative error in total integrated peak area.  0\% means perfect area preservation.  This is the most practically important metric for quantitative chromatography.}
+
+\bq{What is the Baseline Leakage Index (BLI)?}
+{$\text{BLI} = \sum_i \max(0, \hat{f}_i - f_i) \cdot m_i / (\sum_i x_i \cdot m_i + \epsilon)$.  It measures how much the predicted baseline \emph{over-estimates} the true baseline at peak locations, normalized by peak energy.  BLI = 0 means no leakage; higher means more peak energy absorbed into baseline.}
+
+\bq{What is PBER?}
+{Peak-to-Baseline Error Ratio: RMSE of the baseline at peak locations divided by RMSE at background locations.  PBER $\approx$ 1.0 means uniform baseline accuracy; PBER $\gg$ 1.0 means the baseline is systematically worse where peaks are---the hallmark of leakage.}
+
+\bq{What is the Negative Fraction?}
+{The fraction of predicted peak samples with $\hat{x}_i < 0$.  Should be near zero since chromatographic peaks are physically non-negative.  Non-zero values indicate over-correction artifacts.}
+
+\bq{What is the peak mask?}
+{A binary mask $m_i = \mathbf{1}[|x_i| \geq \tau]$ where $\tau = \max(\gamma \cdot \max_j |x_j|, \tau_{\min})$ with $\gamma = 0.02$.  It identifies which samples are ``at peak locations'' vs ``at background locations.''  Used by BLI, PBER, and the masked baseline loss.}
+
+\bq{Why are BLI and PBER novel metrics?}
+{Prior work on baseline correction reports only global metrics (MSE, correlation, area error).  BLI and PBER are the first metrics specifically designed to detect and quantify the \emph{directional} leakage phenomenon---baseline over-estimation localized at peak positions.}
+
+\bq{Why not use SNR or PSNR?}
+{SNR and PSNR measure overall signal quality but don't distinguish between different types of error.  A model could have good PSNR while suffering from severe leakage (the errors cancel when averaged globally).  BLI and PBER target the specific failure mode we care about.}
+
+
+% ─── RESULTS (86–95) ──────────────────────────────────────────────
+\vspace{0.8em}
+{\large\bfseries\sffamily\color{SectionBlue} Results}\par\vspace{0.2em}
+
+\bq{What is the main quantitative result?}
+{All five LBEADS-NET variants outperform classical BEADS (with default parameters) on peak MSE ($\sim$2$\times$ improvement), baseline MSE ($\sim$1.7$\times$), and area error (99.99\% $\to$ 49--58\%).  The best configuration is Exp.~1.3 with 6 active loss terms.}
+
+\bq{Which experiment configuration is best?}
+{Experiment 1.3 (+Baseline Supervision) achieves the best peak MSE ($9.30 \times 10^{-3}$) and best peak correlation (0.793).  Experiment 1.4 (+Orthogonality, v5) achieves the best baseline MSE ($7.40 \times 10^{-3}$) and best BLI (0.592).}
+
+\bq{What is baseline leakage?}
+{The phenomenon where peak energy is erroneously absorbed into the baseline estimate.  The estimated baseline rises above the true baseline at peak locations, and the peak estimate is correspondingly suppressed.  Caused by the $\ell_1$ shrinkage bias in sparsity-based methods.}
+
+\bq{What is the BLI plateau?}
+{BLI $\approx$ 0.59 across all LBEADS-NET configurations, varying by only 0.005 from Experiments 1.1 through 1.4.  This near-invariance shows that leakage is determined by the architecture (the $\ell_1$-based proximal operator), not the loss function.}
+
+\bq{What is over-regularization?}
+{When too many loss terms create conflicting gradient directions, the optimizer cannot satisfy all objectives and produces a compromise worse than simpler configurations.  Experiment 1.5 (12 terms) performs worse than Experiment 1.3 (6 terms) on multiple metrics.}
+
+\bq{What is emergent parameter specialization?}
+{The phenomenon where layers learn different parameter values despite being initialized identically.  $\lambda_0$ increases monotonically (0.48 $\to$ 2.0), $r$ follows a U-shape (3.36 $\to$ 2.0 $\to$ 9.67), and $\eta$ stays roughly constant ($\sim$0.2).  Early layers do coarse separation; later layers do aggressive refinement.}
+
+\bq{How does LBEADS-NET perform on real data?}
+{Qualitative evaluation only (Sec.~5.6).  The model produces smooth, plausible baselines on real LC signals.  In sparse regions, baseline tracking looks correct.  In dense regions, leakage is difficult to assess visually without ground truth.}
+
+\bq{What is the hybrid inference pipeline?}
+{A two-step post-processing procedure: (1)~adaptive noise thresholding using the MAD of the high-pass residual, clamped to non-negative; (2)~iterated low-pass baseline recomputation ($L^p$ with $p = 3$) for a smoother final baseline.  Applied after the network's raw output.}
+
+\bq{What does the loss term ablation show?}
+{The ablation tables (Tables 5.3, 5.4) are currently empty---experiments have not been run yet.  The expected findings are that baseline supervision is critical, non-negativity improves peak quality, and simpler configurations match complex ones given limited training budget.}
+
+\bq{Why does Experiment 1.5 perform worse?}
+{12 competing loss terms produce conflicting gradients.  The asymmetric baseline loss pushes the baseline down; the envelope constraint also pushes down; the orthogonality loss can push up.  With only 300 gradient steps, the optimizer cannot converge on all 12 objectives simultaneously.}
+
+
+% ─── CONCEPTS & MISC (96–100) ─────────────────────────────────────
+\vspace{0.8em}
+{\large\bfseries\sffamily\color{SectionBlue} Concepts \& Miscellaneous}\par\vspace{0.2em}
+
+\bq{What is the autograd boundary?}
+{The point where PyTorch's automatic differentiation cannot track gradients---specifically, the SciPy-based filter construction.  Operations in SciPy are opaque to PyTorch, so $\partial L / \partial f_c$ cannot be computed.  This is why $f_c$ is fixed rather than learned.}
+
+\bq{What is the difference between v5 and v7?}
+{v5 is the thesis model: 8 loss terms, unclamped exponential parameterization, no softplus output.  v7 adds 4 anti-leakage terms (12 total), stronger non-negativity ($\alpha_{\text{neg}} = 2.0$), softplus final activation, and clamped parameters.  v7 performs \emph{worse} due to over-regularization.}
+
+\bq{What is group sparsity and why is it the top future direction?}
+{Group sparsity ($\ell_{2,1}$ penalty) penalizes \emph{groups} of coefficients jointly: $\sum_g \|\mathbf{x}_g\|_2$.  Within an active group, individual amplitudes are NOT shrunk---only entire groups are zeroed or preserved.  This eliminates the per-element shrinkage bias that causes leakage.}
+
+\bq{What is the significance of the negative result?}
+{The BLI plateau at $\sim$0.59 proves that loss engineering cannot overcome an architectural limitation.  This redirects future research toward structural solutions (group sparsity, non-convex penalties, hybrid architectures) rather than more loss terms.  Negative results save other researchers time.}
+
+\bq{What would you do differently if you started over?}
+{Start with group sparsity instead of $\ell_1$, implement banded matrix operations from the beginning, include arPLS as a comparison baseline, and generate a larger and more diverse synthetic dataset.  The ISTA reformulation and curriculum training were good decisions worth keeping.}
 
 
 \end{document}
